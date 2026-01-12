@@ -23,6 +23,7 @@ export const AnimalRaceHome = () => {
   const [isPlaying, setIsPlaying] = useState(true);
   const [frame, setFrame] = useState(0);
   const [isMining, setIsMining] = useState(false);
+  const [playbackSpeed, setPlaybackSpeed] = useState<1 | 2 | 3>(2);
 
   const { data: animalRaceContract, isLoading: isAnimalRaceLoading } = useDeployedContractInfo({
     contractName: "AnimalRace",
@@ -80,12 +81,15 @@ export const AnimalRaceHome = () => {
     if (!isPlaying) return;
     if (!simulation) return;
 
-    const id = window.setInterval(() => {
-      setFrame(prev => (prev >= lastFrameIndex ? lastFrameIndex : prev + 1));
-    }, 120);
+    const id = window.setInterval(
+      () => {
+        setFrame(prev => (prev >= lastFrameIndex ? lastFrameIndex : prev + 1));
+      },
+      Math.floor(120 / playbackSpeed),
+    );
 
     return () => window.clearInterval(id);
-  }, [isPlaying, simulation, lastFrameIndex]);
+  }, [isPlaying, simulation, lastFrameIndex, playbackSpeed]);
 
   const currentDistances = frames[frame] ?? [0, 0, 0, 0];
   const trackLength = 1000;
@@ -93,6 +97,16 @@ export const AnimalRaceHome = () => {
   const verifiedWinner = parsed?.settled ? parsed.winner : null;
   const simulatedWinner = simulation ? simulation.winner : null;
   const winnersMatch = verifiedWinner !== null && simulatedWinner !== null && verifiedWinner === simulatedWinner;
+
+  const stepBy = (delta: -1 | 1) => {
+    setIsPlaying(false);
+    setFrame(prev => {
+      const next = prev + delta;
+      if (next < 0) return 0;
+      if (next > lastFrameIndex) return lastFrameIndex;
+      return next;
+    });
+  };
 
   const mineBlocks = async (count: number) => {
     if (!publicClient) return;
@@ -240,8 +254,41 @@ export const AnimalRaceHome = () => {
           <div className="flex items-center justify-between">
             <h2 className="card-title">Race</h2>
             <div className="flex items-center gap-2">
+              <div className="join">
+                <button
+                  className={`btn btn-sm join-item ${playbackSpeed === 1 ? "btn-active" : ""}`}
+                  onClick={() => setPlaybackSpeed(1)}
+                  disabled={!simulation}
+                >
+                  1x
+                </button>
+                <button
+                  className={`btn btn-sm join-item ${playbackSpeed === 2 ? "btn-active" : ""}`}
+                  onClick={() => setPlaybackSpeed(2)}
+                  disabled={!simulation}
+                >
+                  2x
+                </button>
+                <button
+                  className={`btn btn-sm join-item ${playbackSpeed === 3 ? "btn-active" : ""}`}
+                  onClick={() => setPlaybackSpeed(3)}
+                  disabled={!simulation}
+                >
+                  3x
+                </button>
+              </div>
               <button className="btn btn-sm" onClick={() => setFrame(0)} disabled={!simulation}>
                 Reset
+              </button>
+              <button className="btn btn-sm" onClick={() => stepBy(-1)} disabled={!simulation || frame === 0}>
+                ◀︎ Tick
+              </button>
+              <button
+                className="btn btn-sm"
+                onClick={() => stepBy(1)}
+                disabled={!simulation || frame >= lastFrameIndex}
+              >
+                Tick ▶︎
               </button>
               <button className="btn btn-sm btn-primary" onClick={() => setIsPlaying(p => !p)} disabled={!simulation}>
                 {isPlaying ? "Pause" : "Play"}
@@ -281,42 +328,44 @@ export const AnimalRaceHome = () => {
               </div>
 
               <div className="flex flex-col gap-3">
-                {ANIMALS.map((animal, i) => {
-                  const d = currentDistances[i] ?? 0;
-                  const pct = Math.min(100, Math.max(0, Math.round((d / trackLength) * 100)));
-                  const isWinner = verifiedWinner === i;
-                  return (
-                    <div key={animal.name} className="flex flex-col gap-1">
-                      <div className="flex justify-between text-sm">
-                        <span className={`font-semibold ${isWinner ? "text-success" : ""}`}>
-                          {animal.emoji} {animal.name} {isWinner ? "(winner)" : ""}
-                        </span>
-                        <span className="opacity-70">{d}</span>
-                      </div>
-                      <div className="relative w-full h-10 rounded-xl bg-base-100 border border-base-300 overflow-hidden">
-                        {/* Start line */}
-                        <div className="absolute left-2 top-1 bottom-1 w-[2px] bg-base-300" />
-                        {/* Finish line */}
-                        <div className="absolute right-2 top-1 bottom-1 w-[2px] bg-base-300" />
+                {/* Shared track: all lanes update on the same frame/tick */}
+                <div className="relative w-full rounded-2xl bg-base-100 border border-base-300 overflow-hidden">
+                  {/* Start / finish lines */}
+                  <div className="absolute left-4 top-3 bottom-3 w-[2px] bg-base-300" />
+                  <div className="absolute right-4 top-3 bottom-3 w-[2px] bg-base-300" />
 
-                        {/* Track */}
-                        <div className="absolute inset-0 opacity-30 [background:repeating-linear-gradient(90deg,transparent,transparent_14px,rgba(0,0,0,0.08)_15px)]" />
+                  {/* Subtle track grid */}
+                  <div className="absolute inset-0 opacity-30 [background:repeating-linear-gradient(90deg,transparent,transparent_14px,rgba(0,0,0,0.08)_15px)]" />
 
-                        {/* Runner */}
-                        <div
-                          className={`absolute top-1/2 text-2xl ${isWinner ? "drop-shadow" : ""}`}
-                          style={{
-                            left: `calc(${pct}% * 0.96 + 2%)`,
-                            transform: "translate(-50%, -50%)",
-                          }}
-                          aria-label={animal.name}
-                        >
-                          {animal.emoji}
+                  <div className="relative flex flex-col">
+                    {ANIMALS.map((animal, i) => {
+                      const d = currentDistances[i] ?? 0;
+                      const pctFloat = Math.min(1, Math.max(0, d / trackLength));
+                      const isWinner = verifiedWinner === i;
+                      const transitionMs = Math.floor(120 / playbackSpeed);
+
+                      return (
+                        <div key={animal.name} className="relative h-14 border-b border-base-300/60 last:border-b-0">
+                          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-xs opacity-70">
+                            {animal.emoji} {animal.name} {isWinner ? "(winner)" : ""} · {d}
+                          </div>
+
+                          <div
+                            className={`absolute top-1/2 text-3xl ${isWinner ? "drop-shadow" : ""}`}
+                            style={{
+                              left: `calc(${(pctFloat * 100).toFixed(2)}% * 0.92 + 4%)`,
+                              transform: "translate(-50%, -50%)",
+                              transition: `left ${transitionMs}ms linear`,
+                            }}
+                            aria-label={animal.name}
+                          >
+                            {animal.emoji}
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
 
               <details className="collapse collapse-arrow bg-base-100">

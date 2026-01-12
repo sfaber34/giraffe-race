@@ -1,5 +1,14 @@
 # 🏗 Scaffold-ETH 2
 
+## How to test it
+- Send a transaction to createRace. Either use the one with closeBlock input to set a closeBlock in the future or use the one without an input to automatically set closeBlock to +10 blocks in the future
+- Optionally place bets with raceId = nextRaceId - 1
+- Advance the local chain using the "Mine +" buttons on the homepage
+- Use settleRace to settle it (if you're past the closeBlock)
+- Enter your settled race ID on the homepage to see if the TS emoji replay matches the solidity result
+
+Note: The default owner of AnimalRace.sol is 0x668887c62AF23E42aB10105CB4124CF2C656F331. Might have to change that in DeployAnimalRace.s.sol.
+
 <h4 align="center">
   <a href="https://docs.scaffoldeth.io">Documentation</a> |
   <a href="https://scaffoldeth.io">Website</a>
