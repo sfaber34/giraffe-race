@@ -1,7 +1,7 @@
 # 🏗 Scaffold-ETH 2
 
 ## What it is
-Basic test of how to do a deterministic animal race game using deterministic dice. Many limitations (betting payout scheme, using eth for bets, a draw picks a winner at random between the draw animals, All animals have same (no) stats, I'm sure other stuff) but a basic test so far.
+Basic test of how to do a deterministic animal race game using deterministic dice. The seed for a race is keccak256(abi.encodePacked(bh, raceId, address(this))). It has many limitations (betting payout scheme, using eth for bets, a draw picks a winner at random between the draw animals, All animals have same (no) stats, I'm sure other stuff) but a basic test so far.
 
 ## How to test it
 - Send a transaction to createRace. Either use the one with closeBlock input to set a closeBlock in the future or use the one without an input to automatically set closeBlock to +10 blocks in the future
