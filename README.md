@@ -1,11 +1,15 @@
 # 🏗 Scaffold-ETH 2
 
+## What it is
+Basic test of how to do a deterministic animal race game using deterministic dice. Many limitations (betting payout scheme, using eth for bets, I'm sure other stuff) but a basic test so far.
+
 ## How to test it
 - Send a transaction to createRace. Either use the one with closeBlock input to set a closeBlock in the future or use the one without an input to automatically set closeBlock to +10 blocks in the future
 - Optionally place bets with raceId = nextRaceId - 1
-- Advance the local chain using the "Mine +" buttons on the homepage
+- Advance the local chain using the "Mine +" buttons on the homepage. If you didn't place bets you'll have to advance the local chain 11 blocks.
 - Use settleRace to settle it (if you're past the closeBlock)
 - Enter your settled race ID on the homepage to see if the TS emoji replay matches the solidity result
+- Hit claim function to get paid if you bet correctly.
 
 Note: The default owner of AnimalRace.sol is 0x668887c62AF23E42aB10105CB4124CF2C656F331. Might have to change that in DeployAnimalRace.s.sol.
 
