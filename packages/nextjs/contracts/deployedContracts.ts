@@ -150,6 +150,459 @@ const deployedContracts = {
       inheritedFunctions: {},
       deployedOnBlock: 1,
     },
+    AnimalRace: {
+      address: "0xa15bb66138824a1c7167f5e85b957d04dd34e468",
+      abi: [
+        {
+          type: "constructor",
+          inputs: [
+            {
+              name: "_owner",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "ANIMAL_COUNT",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint8",
+              internalType: "uint8",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "SPEED_RANGE",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint8",
+              internalType: "uint8",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "TICK_COUNT",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint16",
+              internalType: "uint16",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "animalCount",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint8",
+              internalType: "uint8",
+            },
+          ],
+          stateMutability: "pure",
+        },
+        {
+          type: "function",
+          name: "claim",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "payout",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "createRace",
+          inputs: [
+            {
+              name: "closeBlock",
+              type: "uint64",
+              internalType: "uint64",
+            },
+          ],
+          outputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "getBet",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "bettor",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "amount",
+              type: "uint128",
+              internalType: "uint128",
+            },
+            {
+              name: "animal",
+              type: "uint8",
+              internalType: "uint8",
+            },
+            {
+              name: "claimed",
+              type: "bool",
+              internalType: "bool",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getRace",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "closeBlock",
+              type: "uint64",
+              internalType: "uint64",
+            },
+            {
+              name: "settled",
+              type: "bool",
+              internalType: "bool",
+            },
+            {
+              name: "winner",
+              type: "uint8",
+              internalType: "uint8",
+            },
+            {
+              name: "seed",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+            {
+              name: "totalPot",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "totalOnAnimal",
+              type: "uint256[4]",
+              internalType: "uint256[4]",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "nextRaceId",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "owner",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "placeBet",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "animal",
+              type: "uint8",
+              internalType: "uint8",
+            },
+          ],
+          outputs: [],
+          stateMutability: "payable",
+        },
+        {
+          type: "function",
+          name: "settleRace",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "simulate",
+          inputs: [
+            {
+              name: "seed",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+          ],
+          outputs: [
+            {
+              name: "winner",
+              type: "uint8",
+              internalType: "uint8",
+            },
+            {
+              name: "distances",
+              type: "uint16[4]",
+              internalType: "uint16[4]",
+            },
+          ],
+          stateMutability: "pure",
+        },
+        {
+          type: "function",
+          name: "speedRange",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint8",
+              internalType: "uint8",
+            },
+          ],
+          stateMutability: "pure",
+        },
+        {
+          type: "function",
+          name: "tickCount",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint16",
+              internalType: "uint16",
+            },
+          ],
+          stateMutability: "pure",
+        },
+        {
+          type: "event",
+          name: "BetPlaced",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "bettor",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "animal",
+              type: "uint8",
+              indexed: true,
+              internalType: "uint8",
+            },
+            {
+              name: "amount",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "Claimed",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "bettor",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "payout",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "RaceCreated",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "closeBlock",
+              type: "uint64",
+              indexed: false,
+              internalType: "uint64",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "RaceSettled",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "seed",
+              type: "bytes32",
+              indexed: false,
+              internalType: "bytes32",
+            },
+            {
+              name: "winner",
+              type: "uint8",
+              indexed: false,
+              internalType: "uint8",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "error",
+          name: "AlreadyBet",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "AlreadyClaimed",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "AlreadySettled",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "BettingClosed",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "BlockhashUnavailable",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "InvalidAnimal",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "InvalidRace",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "NotOwner",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "NotSettled",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "NotWinner",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "TransferFailed",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "ZeroBet",
+          inputs: [],
+        },
+      ],
+      inheritedFunctions: {},
+      deployedOnBlock: 2,
+    },
   },
 } as const;
 
