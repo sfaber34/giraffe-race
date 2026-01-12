@@ -179,6 +179,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "MAX_TICKS",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint16",
+              internalType: "uint16",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "SPEED_RANGE",
           inputs: [],
           outputs: [
@@ -192,7 +205,7 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "TICK_COUNT",
+          name: "TRACK_LENGTH",
           inputs: [],
           outputs: [
             {
@@ -429,6 +442,19 @@ const deployedContracts = {
         {
           type: "function",
           name: "tickCount",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint16",
+              internalType: "uint16",
+            },
+          ],
+          stateMutability: "pure",
+        },
+        {
+          type: "function",
+          name: "trackLength",
           inputs: [],
           outputs: [
             {

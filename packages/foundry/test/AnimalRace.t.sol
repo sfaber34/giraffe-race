@@ -14,7 +14,8 @@ contract AnimalRaceTest is Test {
     address public bob = address(0xB0B);
 
     uint256 internal constant ANIMAL_COUNT = 4;
-    uint256 internal constant TICK_COUNT = 40;
+    uint256 internal constant TRACK_LENGTH = 1000;
+    uint256 internal constant MAX_TICKS = 500;
     uint256 internal constant SPEED_RANGE = 6;
 
     function setUp() public {
@@ -27,13 +28,22 @@ contract AnimalRaceTest is Test {
         DeterministicDice.Dice memory dice = DeterministicDice.create(seed);
 
         uint16[4] memory distances;
-        for (uint256 t = 0; t < TICK_COUNT; t++) {
+        bool finished = false;
+        for (uint256 t = 0; t < MAX_TICKS; t++) {
             for (uint256 a = 0; a < ANIMAL_COUNT; a++) {
                 (uint256 r, DeterministicDice.Dice memory updatedDice) = dice.roll(SPEED_RANGE);
                 dice = updatedDice;
                 distances[a] += uint16(r + 1);
             }
+            if (
+                distances[0] >= TRACK_LENGTH || distances[1] >= TRACK_LENGTH || distances[2] >= TRACK_LENGTH
+                    || distances[3] >= TRACK_LENGTH
+            ) {
+                finished = true;
+                break;
+            }
         }
+        require(finished, "test: race did not finish");
 
         uint16 best = distances[0];
         uint8 leaderCount = 1;

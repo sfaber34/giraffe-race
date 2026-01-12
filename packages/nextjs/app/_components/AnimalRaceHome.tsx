@@ -63,8 +63,9 @@ export const AnimalRaceHome = () => {
       seed: parsed.seed,
       // Keep these in sync with `AnimalRace.sol` constants
       animalCount: 4,
-      tickCount: 40,
+      maxTicks: 500,
       speedRange: 6,
+      trackLength: 1000,
     });
   }, [parsed, canSimulate]);
 
@@ -87,7 +88,7 @@ export const AnimalRaceHome = () => {
   }, [isPlaying, simulation, lastFrameIndex]);
 
   const currentDistances = frames[frame] ?? [0, 0, 0, 0];
-  const finishDistance = Math.max(...(frames[lastFrameIndex] ?? [0]), 1);
+  const trackLength = 1000;
 
   const verifiedWinner = parsed?.settled ? parsed.winner : null;
   const simulatedWinner = simulation ? simulation.winner : null;
@@ -275,15 +276,14 @@ export const AnimalRaceHome = () => {
                   Tick: <span className="font-semibold opacity-100">{frame}</span> / {lastFrameIndex}
                 </span>
                 <span>
-                  Max distance:{" "}
-                  <span className="font-semibold opacity-100">{Math.max(...(frames[lastFrameIndex] ?? [0]))}</span>
+                  Finish: <span className="font-semibold opacity-100">{trackLength}</span>
                 </span>
               </div>
 
               <div className="flex flex-col gap-3">
                 {ANIMALS.map((animal, i) => {
                   const d = currentDistances[i] ?? 0;
-                  const pct = Math.min(100, Math.max(0, Math.round((d / finishDistance) * 100)));
+                  const pct = Math.min(100, Math.max(0, Math.round((d / trackLength) * 100)));
                   const isWinner = verifiedWinner === i;
                   return (
                     <div key={animal.name} className="flex flex-col gap-1">

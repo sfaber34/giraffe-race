@@ -18,7 +18,8 @@ contract AnimalRace {
     using DeterministicDice for DeterministicDice.Dice;
 
     uint8 public constant ANIMAL_COUNT = 4;
-    uint16 public constant TICK_COUNT = 40;
+    uint16 public constant TRACK_LENGTH = 1000;
+    uint16 public constant MAX_TICKS = 500;
     uint8 public constant SPEED_RANGE = 6; // speeds per tick: 1..6
 
     address public immutable owner;
@@ -74,11 +75,16 @@ contract AnimalRace {
     }
 
     function tickCount() external pure returns (uint16) {
-        return TICK_COUNT;
+        // Backwards compatible name: this is the max number of ticks we'll run before reverting.
+        return MAX_TICKS;
     }
 
     function speedRange() external pure returns (uint8) {
         return SPEED_RANGE;
+    }
+
+    function trackLength() external pure returns (uint16) {
+        return TRACK_LENGTH;
     }
 
     /**
@@ -192,14 +198,27 @@ contract AnimalRace {
     function _simulate(bytes32 seed) internal pure returns (uint8 winner, uint16[ANIMAL_COUNT] memory distances) {
         DeterministicDice.Dice memory dice = DeterministicDice.create(seed);
 
-        for (uint256 t = 0; t < TICK_COUNT; t++) {
+        bool finished = false;
+
+        for (uint256 t = 0; t < MAX_TICKS; t++) {
             for (uint256 a = 0; a < ANIMAL_COUNT; a++) {
                 (uint256 r, DeterministicDice.Dice memory updatedDice) = dice.roll(SPEED_RANGE);
                 dice = updatedDice;
                 // speed in [1..SPEED_RANGE]
                 distances[a] += uint16(r + 1);
             }
+
+            // Check finish after each tick
+            if (
+                distances[0] >= TRACK_LENGTH || distances[1] >= TRACK_LENGTH || distances[2] >= TRACK_LENGTH
+                    || distances[3] >= TRACK_LENGTH
+            ) {
+                finished = true;
+                break;
+            }
         }
+
+        require(finished, "AnimalRace: race did not finish");
 
         // Find leaders
         uint16 best = distances[0];
