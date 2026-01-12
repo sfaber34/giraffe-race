@@ -7,7 +7,12 @@ import { useAccount, usePublicClient } from "wagmi";
 import { useDeployedContractInfo, useScaffoldReadContract, useTargetNetwork } from "~~/hooks/scaffold-eth";
 import { simulateRaceFromSeed } from "~~/utils/race/simulateRace";
 
-const ANIMALS = ["Giraffe", "Cheetah", "Turtle", "Elephant"] as const;
+const ANIMALS = [
+  { name: "Giraffe", emoji: "🦒" },
+  { name: "Cheetah", emoji: "🐆" },
+  { name: "Turtle", emoji: "🐢" },
+  { name: "Elephant", emoji: "🐘" },
+] as const;
 
 export const AnimalRaceHome = () => {
   const { address: connectedAddress } = useAccount();
@@ -82,7 +87,7 @@ export const AnimalRaceHome = () => {
   }, [isPlaying, simulation, lastFrameIndex]);
 
   const currentDistances = frames[frame] ?? [0, 0, 0, 0];
-  const maxDistance = Math.max(...currentDistances, 1);
+  const finishDistance = Math.max(...(frames[lastFrameIndex] ?? [0]), 1);
 
   const verifiedWinner = parsed?.settled ? parsed.winner : null;
   const simulatedWinner = simulation ? simulation.winner : null;
@@ -200,13 +205,21 @@ export const AnimalRaceHome = () => {
               <div className="flex justify-between items-center">
                 <span className="opacity-70">Verified winner (on-chain)</span>
                 <span className="font-semibold">
-                  {verifiedWinner === null ? "-" : (ANIMALS[verifiedWinner] ?? verifiedWinner)}
+                  {verifiedWinner === null
+                    ? "-"
+                    : ANIMALS[verifiedWinner]
+                      ? `${ANIMALS[verifiedWinner].emoji} ${ANIMALS[verifiedWinner].name}`
+                      : verifiedWinner}
                 </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="opacity-70">Simulated winner (TS replay)</span>
                 <span className="font-semibold">
-                  {simulatedWinner === null ? "-" : (ANIMALS[simulatedWinner] ?? simulatedWinner)}
+                  {simulatedWinner === null
+                    ? "-"
+                    : ANIMALS[simulatedWinner]
+                      ? `${ANIMALS[simulatedWinner].emoji} ${ANIMALS[simulatedWinner].name}`
+                      : simulatedWinner}
                 </span>
               </div>
               {verifiedWinner !== null && simulatedWinner !== null ? (
@@ -268,23 +281,39 @@ export const AnimalRaceHome = () => {
               </div>
 
               <div className="flex flex-col gap-3">
-                {ANIMALS.map((name, i) => {
+                {ANIMALS.map((animal, i) => {
                   const d = currentDistances[i] ?? 0;
-                  const pct = Math.min(100, Math.round((d / maxDistance) * 100));
+                  const pct = Math.min(100, Math.max(0, Math.round((d / finishDistance) * 100)));
                   const isWinner = verifiedWinner === i;
                   return (
-                    <div key={name} className="flex flex-col gap-1">
+                    <div key={animal.name} className="flex flex-col gap-1">
                       <div className="flex justify-between text-sm">
                         <span className={`font-semibold ${isWinner ? "text-success" : ""}`}>
-                          {name} {isWinner ? "(winner)" : ""}
+                          {animal.emoji} {animal.name} {isWinner ? "(winner)" : ""}
                         </span>
                         <span className="opacity-70">{d}</span>
                       </div>
-                      <progress
-                        className={`progress ${isWinner ? "progress-success" : "progress-primary"} w-full`}
-                        value={pct}
-                        max={100}
-                      />
+                      <div className="relative w-full h-10 rounded-xl bg-base-100 border border-base-300 overflow-hidden">
+                        {/* Start line */}
+                        <div className="absolute left-2 top-1 bottom-1 w-[2px] bg-base-300" />
+                        {/* Finish line */}
+                        <div className="absolute right-2 top-1 bottom-1 w-[2px] bg-base-300" />
+
+                        {/* Track */}
+                        <div className="absolute inset-0 opacity-30 [background:repeating-linear-gradient(90deg,transparent,transparent_14px,rgba(0,0,0,0.08)_15px)]" />
+
+                        {/* Runner */}
+                        <div
+                          className={`absolute top-1/2 text-2xl ${isWinner ? "drop-shadow" : ""}`}
+                          style={{
+                            left: `calc(${pct}% * 0.96 + 2%)`,
+                            transform: "translate(-50%, -50%)",
+                          }}
+                          aria-label={animal.name}
+                        >
+                          {animal.emoji}
+                        </div>
+                      </div>
                     </div>
                   );
                 })}
