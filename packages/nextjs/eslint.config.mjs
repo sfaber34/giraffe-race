@@ -12,6 +12,7 @@ const compat = new FlatCompat({
 
 export default defineConfig([
   {
+    ignores: ["../foundry/**", "**/*.sol"],
     plugins: {
       prettier: prettierPlugin,
     },

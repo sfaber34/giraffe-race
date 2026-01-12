@@ -269,6 +269,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "createRace",
+          inputs: [],
+          outputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
           name: "getBet",
           inputs: [
             {
@@ -613,6 +626,11 @@ const deployedContracts = {
         {
           type: "error",
           name: "NotWinner",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "RaceNotReady",
           inputs: [],
         },
         {

@@ -64,7 +64,7 @@ export const AnimalRaceHome = () => {
       // Keep these in sync with `AnimalRace.sol` constants
       animalCount: 4,
       maxTicks: 500,
-      speedRange: 6,
+      speedRange: 10,
       trackLength: 1000,
     });
   }, [parsed, canSimulate]);

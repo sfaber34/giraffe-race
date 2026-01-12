@@ -16,7 +16,7 @@ contract AnimalRaceTest is Test {
     uint256 internal constant ANIMAL_COUNT = 4;
     uint256 internal constant TRACK_LENGTH = 1000;
     uint256 internal constant MAX_TICKS = 500;
-    uint256 internal constant SPEED_RANGE = 6;
+    uint256 internal constant SPEED_RANGE = 10;
 
     function setUp() public {
         race = new AnimalRace(owner);
@@ -69,7 +69,7 @@ contract AnimalRaceTest is Test {
     function testSettleIsDeterministicFromSeed() public {
         vm.roll(100);
         vm.prank(owner);
-        uint256 raceId = race.createRace(uint64(block.number + 5));
+        uint256 raceId = race.createRace();
 
         uint64 closeBlock;
         (closeBlock,,,,,) = race.getRace(raceId);
@@ -98,7 +98,7 @@ contract AnimalRaceTest is Test {
     function testCannotBetTwice() public {
         vm.roll(10);
         vm.prank(owner);
-        uint256 raceId = race.createRace(uint64(block.number + 3));
+        uint256 raceId = race.createRace();
 
         vm.prank(alice);
         race.placeBet{ value: 1 ether }(raceId, 2);
@@ -111,7 +111,7 @@ contract AnimalRaceTest is Test {
     function testClaimPayoutProRata() public {
         vm.roll(200);
         vm.prank(owner);
-        uint256 raceId = race.createRace(uint64(block.number + 2));
+        uint256 raceId = race.createRace();
 
         uint64 closeBlock;
         (closeBlock,,,,,) = race.getRace(raceId);
@@ -159,7 +159,7 @@ contract AnimalRaceTest is Test {
     function testSettleRevertsIfBlockhashUnavailable() public {
         vm.roll(1000);
         vm.prank(owner);
-        uint256 raceId = race.createRace(uint64(block.number + 1));
+        uint256 raceId = race.createRace();
 
         uint64 closeBlock;
         (closeBlock,,,,,) = race.getRace(raceId);

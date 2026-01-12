@@ -12,7 +12,7 @@ export function simulateRaceFromSeed({
   seed,
   animalCount = 4,
   maxTicks = 500,
-  speedRange = 6,
+  speedRange = 10,
   trackLength = 1000,
 }: {
   seed: Hex;

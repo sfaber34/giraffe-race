@@ -20,7 +20,7 @@ contract AnimalRace {
     uint8 public constant ANIMAL_COUNT = 4;
     uint16 public constant TRACK_LENGTH = 1000;
     uint16 public constant MAX_TICKS = 500;
-    uint8 public constant SPEED_RANGE = 6; // speeds per tick: 1..6
+    uint8 public constant SPEED_RANGE = 10; // speeds per tick: 1-10
 
     address public immutable owner;
 
@@ -57,6 +57,7 @@ contract AnimalRace {
     error AlreadySettled();
     error NotSettled();
     error BlockhashUnavailable();
+    error RaceNotReady();
     error NotWinner();
     error AlreadyClaimed();
     error TransferFailed();
@@ -97,7 +98,17 @@ contract AnimalRace {
         return _simulate(seed);
     }
 
+    /// @notice Convenience: create a race that closes 10 blocks from now.
+    function createRace() external onlyOwner returns (uint256 raceId) {
+        return _createRace(uint64(block.number + 10));
+    }
+
+    /// @notice Create a race with an explicit close block.
     function createRace(uint64 closeBlock) external onlyOwner returns (uint256 raceId) {
+        return _createRace(closeBlock);
+    }
+
+    function _createRace(uint64 closeBlock) internal returns (uint256 raceId) {
         if (closeBlock <= block.number) revert BettingClosed();
 
         raceId = nextRaceId++;
@@ -132,7 +143,7 @@ contract AnimalRace {
         Race storage r = races[raceId];
         if (r.closeBlock == 0) revert InvalidRace();
         if (r.settled) revert AlreadySettled();
-        if (block.number <= r.closeBlock) revert BettingClosed();
+        if (block.number <= r.closeBlock) revert RaceNotReady();
 
         bytes32 bh = blockhash(r.closeBlock);
         if (bh == bytes32(0)) revert BlockhashUnavailable();
