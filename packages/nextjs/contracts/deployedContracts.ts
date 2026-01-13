@@ -687,7 +687,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 3,
+      deployedOnBlock: 2,
     },
     AnimalRace: {
       address: "0x0c8e79f3534b00d9a3d4a856b665bf4ebc22f2ba",
@@ -951,11 +951,6 @@ const deployedContracts = {
               type: "address[4]",
               internalType: "address[4]",
             },
-            {
-              name: "escrowed",
-              type: "bool[4]",
-              internalType: "bool[4]",
-            },
           ],
           stateMutability: "view",
         },
@@ -1003,40 +998,6 @@ const deployedContracts = {
             },
           ],
           stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "onERC721Received",
-          inputs: [
-            {
-              name: "",
-              type: "address",
-              internalType: "address",
-            },
-            {
-              name: "",
-              type: "address",
-              internalType: "address",
-            },
-            {
-              name: "",
-              type: "uint256",
-              internalType: "uint256",
-            },
-            {
-              name: "",
-              type: "bytes",
-              internalType: "bytes",
-            },
-          ],
-          outputs: [
-            {
-              name: "",
-              type: "bytes4",
-              internalType: "bytes4",
-            },
-          ],
-          stateMutability: "pure",
         },
         {
           type: "function",
@@ -1164,57 +1125,8 @@ const deployedContracts = {
           stateMutability: "pure",
         },
         {
-          type: "function",
-          name: "withdrawAnimal",
-          inputs: [
-            {
-              name: "raceId",
-              type: "uint256",
-              internalType: "uint256",
-            },
-            {
-              name: "lane",
-              type: "uint8",
-              internalType: "uint8",
-            },
-          ],
-          outputs: [],
-          stateMutability: "nonpayable",
-        },
-        {
           type: "event",
           name: "AnimalSubmitted",
-          inputs: [
-            {
-              name: "raceId",
-              type: "uint256",
-              indexed: true,
-              internalType: "uint256",
-            },
-            {
-              name: "owner",
-              type: "address",
-              indexed: true,
-              internalType: "address",
-            },
-            {
-              name: "tokenId",
-              type: "uint256",
-              indexed: true,
-              internalType: "uint256",
-            },
-            {
-              name: "lane",
-              type: "uint8",
-              indexed: false,
-              internalType: "uint8",
-            },
-          ],
-          anonymous: false,
-        },
-        {
-          type: "event",
-          name: "AnimalWithdrawn",
           inputs: [
             {
               name: "raceId",
@@ -1395,11 +1307,6 @@ const deployedContracts = {
         },
         {
           type: "error",
-          name: "AnimalNotEscrowed",
-          inputs: [],
-        },
-        {
-          type: "error",
           name: "BettingClosed",
           inputs: [],
         },
@@ -1425,17 +1332,17 @@ const deployedContracts = {
         },
         {
           type: "error",
-          name: "NotOriginalOwner",
-          inputs: [],
-        },
-        {
-          type: "error",
           name: "NotOwner",
           inputs: [],
         },
         {
           type: "error",
           name: "NotSettled",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "NotTokenOwner",
           inputs: [],
         },
         {
@@ -1451,6 +1358,11 @@ const deployedContracts = {
         {
           type: "error",
           name: "RaceNotReady",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "TokenAlreadyEntered",
           inputs: [],
         },
         {

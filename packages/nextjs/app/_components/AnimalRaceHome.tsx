@@ -55,6 +55,12 @@ export const AnimalRaceHome = () => {
     query: { enabled: readEnabled && raceIdArg !== undefined },
   });
 
+  const { data: houseAddress } = useScaffoldReadContract({
+    contractName: "AnimalRace",
+    functionName: "house",
+    query: { enabled: readEnabled },
+  });
+
   const parsed = useMemo(() => {
     if (!raceData) return null;
     const [closeBlock, settled, winner, seed, totalPot, totalOnAnimal] = raceData;
@@ -70,12 +76,11 @@ export const AnimalRaceHome = () => {
 
   const parsedAnimals = useMemo(() => {
     if (!raceAnimalsData) return null;
-    const [assignedCount, tokenIds, originalOwners, escrowed] = raceAnimalsData;
+    const [assignedCount, tokenIds, originalOwners] = raceAnimalsData;
     return {
       assignedCount: Number(assignedCount as any),
       tokenIds: (tokenIds as readonly bigint[]).map(x => BigInt(x)),
       originalOwners: originalOwners as readonly `0x${string}`[],
-      escrowed: escrowed as readonly boolean[],
     };
   }, [raceAnimalsData]);
 
@@ -260,7 +265,7 @@ export const AnimalRaceHome = () => {
                   {Array.from({ length: LANE_COUNT }).map((_, lane) => {
                     const tokenId = parsedAnimals.tokenIds[lane] ?? 0n;
                     const owner = parsedAnimals.originalOwners[lane];
-                    const isEscrowed = parsedAnimals.escrowed[lane] ?? false;
+                    const isHouse = !!houseAddress && owner?.toLowerCase?.() === (houseAddress as string).toLowerCase();
 
                     return (
                       <div key={lane} className="rounded-xl bg-base-100 border border-base-300 px-3 py-2">
@@ -269,7 +274,7 @@ export const AnimalRaceHome = () => {
                             Lane {lane}: {LANE_EMOJI} <LaneName tokenId={tokenId} fallback={`Lane ${lane}`} />
                           </div>
                           <div className="text-xs opacity-70">
-                            {tokenId === 0n ? "Unassigned" : isEscrowed ? "Escrowed" : "House"}
+                            {tokenId === 0n ? "Unassigned" : isHouse ? "House" : "Submitted"}
                           </div>
                         </div>
 
