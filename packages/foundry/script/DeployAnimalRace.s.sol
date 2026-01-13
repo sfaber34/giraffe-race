@@ -17,9 +17,9 @@ contract DeployAnimalRace is ScaffoldETHDeploy {
         address ownerForGame = vm.envOr("ANIMAL_RACE_OWNER", address(0x668887c62AF23E42aB10105CB4124CF2C656F331));
         address houseForGame = ownerForGame;
 
-        // Deploy the AnimalNFT collection. The deployer becomes the collection owner (mint authority).
+        // Deploy the AnimalNFT collection (permissionless mint).
         // We'll mint the initial "house animals" to `houseForGame`.
-        AnimalNFT animalNft = new AnimalNFT(deployer);
+        AnimalNFT animalNft = new AnimalNFT();
 
         uint256[4] memory houseTokenIds;
         houseTokenIds[0] = animalNft.mint(houseForGame, "foo");

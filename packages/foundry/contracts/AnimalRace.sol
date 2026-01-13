@@ -63,7 +63,6 @@ contract AnimalRace is IERC721Receiver {
     // Fixed pool of house animals used to auto-fill empty lanes.
     // These are NOT escrowed by default (no approvals required); we just reference them as house-owned racers.
     uint256[4] public houseAnimalTokenIds;
-    uint8 private nextHouseIdx;
 
     event RaceCreated(uint256 indexed raceId, uint64 closeBlock);
     event BetPlaced(uint256 indexed raceId, address indexed bettor, uint8 indexed animal, uint256 amount);
@@ -215,16 +214,20 @@ contract AnimalRace is IERC721Receiver {
         bytes32 bh = blockhash(r.closeBlock);
         if (bh == bytes32(0)) revert BlockhashUnavailable();
 
-        _assignHouseAnimalsIfNeeded(raceId);
+        // Derive independent seeds for independent decisions to avoid correlation.
+        bytes32 baseSeed = keccak256(abi.encodePacked(bh, raceId, address(this)));
+        bytes32 fillSeed = keccak256(abi.encodePacked(baseSeed, "HOUSE_FILL"));
+        bytes32 simSeed = keccak256(abi.encodePacked(baseSeed, "RACE_SIM"));
 
-        bytes32 seed = keccak256(abi.encodePacked(bh, raceId, address(this)));
-        (uint8 w,) = _simulate(seed);
+        _assignHouseAnimalsIfNeeded(raceId, fillSeed);
+        (uint8 w,) = _simulate(simSeed);
 
         r.settled = true;
         r.winner = w;
-        r.seed = seed;
+        // Store the simulation seed so the race can be replayed off-chain.
+        r.seed = simSeed;
 
-        emit RaceSettled(raceId, seed, r.winner);
+        emit RaceSettled(raceId, simSeed, r.winner);
     }
 
     /**
@@ -317,14 +320,28 @@ contract AnimalRace is IERC721Receiver {
         return (ra.assignedCount, ra.tokenIds, ra.originalOwners, ra.escrowed);
     }
 
-    function _assignHouseAnimalsIfNeeded(uint256 raceId) internal {
+    function _assignHouseAnimalsIfNeeded(uint256 raceId, bytes32 fillSeed) internal {
         RaceAnimals storage ra = raceAnimals[raceId];
+        if (ra.assignedCount >= ANIMAL_COUNT) return;
+
+        // Deterministically shuffle/select house animals per race using independent entropy.
+        DeterministicDice.Dice memory dice = DeterministicDice.create(fillSeed);
+
+        uint8[4] memory availableIdx = [0, 1, 2, 3];
+        uint8 availableCount = 4;
 
         while (ra.assignedCount < ANIMAL_COUNT) {
             uint8 lane = ra.assignedCount;
 
-            uint256 tokenId = houseAnimalTokenIds[nextHouseIdx];
-            nextHouseIdx = uint8((nextHouseIdx + 1) % ANIMAL_COUNT);
+            (uint256 pick, DeterministicDice.Dice memory updatedDice) = dice.roll(availableCount);
+            dice = updatedDice;
+
+            uint8 idx = availableIdx[uint8(pick)];
+            // remove idx from pool (swap-remove)
+            availableCount--;
+            availableIdx[uint8(pick)] = availableIdx[availableCount];
+
+            uint256 tokenId = houseAnimalTokenIds[idx];
 
             // House animals must still be owned by `house` at settlement time.
             // We don't escrow them (no approvals needed); they are trusted protocol-provided racers.

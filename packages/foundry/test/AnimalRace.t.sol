@@ -21,7 +21,7 @@ contract AnimalRaceTest is Test {
     uint256 internal constant SPEED_RANGE = 10;
 
     function setUp() public {
-        animalNft = new AnimalNFT(address(this));
+        animalNft = new AnimalNFT();
         uint256[4] memory houseTokenIds;
         for (uint256 i = 0; i < 4; i++) {
             houseTokenIds[i] = animalNft.mint(owner, "house");
@@ -97,15 +97,16 @@ contract AnimalRaceTest is Test {
         vm.setBlockhash(uint256(closeBlock), forcedBh);
         vm.roll(uint256(closeBlock) + 1);
 
-        bytes32 seed = keccak256(abi.encodePacked(forcedBh, raceId, address(race)));
-        uint8 expected = _expectedWinner(seed);
+        bytes32 baseSeed = keccak256(abi.encodePacked(forcedBh, raceId, address(race)));
+        bytes32 simSeed = keccak256(abi.encodePacked(baseSeed, "RACE_SIM"));
+        uint8 expected = _expectedWinner(simSeed);
 
         race.settleRace(raceId);
 
         (, bool settled, uint8 winner, bytes32 storedSeed,,) = race.getRace(raceId);
         assertTrue(settled);
         assertEq(winner, expected);
-        assertEq(storedSeed, seed);
+        assertEq(storedSeed, simSeed);
     }
 
     function testCannotBetTwice() public {
