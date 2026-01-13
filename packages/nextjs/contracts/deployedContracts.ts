@@ -733,6 +733,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "MAX_ENTRIES_PER_RACE",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint16",
+              internalType: "uint16",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "MAX_TICKS",
           inputs: [],
           outputs: [
@@ -1317,6 +1330,11 @@ const deployedContracts = {
         },
         {
           type: "error",
+          name: "EntryPoolFull",
+          inputs: [],
+        },
+        {
+          type: "error",
           name: "InvalidAnimal",
           inputs: [],
         },
@@ -1348,11 +1366,6 @@ const deployedContracts = {
         {
           type: "error",
           name: "NotWinner",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "RaceFull",
           inputs: [],
         },
         {

@@ -19,6 +19,8 @@ contract AnimalRace {
     using DeterministicDice for DeterministicDice.Dice;
 
     uint8 public constant ANIMAL_COUNT = 4;
+    // Cap entrant pool size to keep `settleRace` gas bounded. Can be increased later.
+    uint16 public constant MAX_ENTRIES_PER_RACE = 128;
     uint16 public constant TRACK_LENGTH = 1000;
     uint16 public constant MAX_TICKS = 500;
     uint8 public constant SPEED_RANGE = 10; // speeds per tick: 1-10
@@ -37,12 +39,17 @@ contract AnimalRace {
     }
 
     struct RaceAnimals {
-        // Number of lanes that have been assigned tokenIds (user submissions + house auto-fill).
+        // Number of lanes that have been assigned tokenIds (selected entrants + house fill).
         uint8 assignedCount;
         // Token ID for each lane (0..3). 0 means unassigned (valid tokenIds start at 1 in our AnimalNFT).
         uint256[4] tokenIds;
-        // Original owner for each lane (who can withdraw if escrowed).
+        // The owner snapshot for each lane at the time the entrant was selected (or `house` for house fill).
         address[4] originalOwners;
+    }
+
+    struct RaceEntry {
+        uint256 tokenId;
+        address submitter;
     }
 
     struct Bet {
@@ -56,6 +63,8 @@ contract AnimalRace {
     mapping(uint256 => mapping(address => Bet)) private bets;
     mapping(uint256 => RaceAnimals) private raceAnimals;
     mapping(uint256 => mapping(address => bool)) private hasSubmittedAnimal;
+    mapping(uint256 => RaceEntry[]) private raceEntries;
+    mapping(uint256 => mapping(uint256 => bool)) private tokenEntered;
 
     // Fixed pool of house animals used to auto-fill empty lanes.
     // These are NOT escrowed by default (no approvals required); we just reference them as house-owned racers.
@@ -81,12 +90,12 @@ contract AnimalRace {
     error NotWinner();
     error AlreadyClaimed();
     error TransferFailed();
-    error RaceFull();
     error AlreadySubmitted();
     error InvalidHouseAnimal();
     error AnimalNotAssigned();
     error NotTokenOwner();
     error TokenAlreadyEntered();
+    error EntryPoolFull();
 
     modifier onlyOwner() {
         if (msg.sender != owner) revert NotOwner();
@@ -174,9 +183,12 @@ contract AnimalRace {
     }
 
     /**
-     * @notice Submit one of your AnimalNFTs to race in the next open lane.
-     * @dev Non-custodial: we only record the tokenId + owner snapshot at submit time.
-     *      If the NFT is transferred away before settlement, it becomes a no-show and will be replaced by a house animal.
+     * @notice Submit one of your AnimalNFTs into the race's entrant pool (non-custodial).
+     * @dev If <= 4 total entrants submit, all valid entrants race.
+     *      If > 4 submit, we deterministically draw 4 valid entrants at settlement.
+     *
+     *      "Valid" at settlement time means the current owner still matches the original submitter.
+     *      If an entrant becomes invalid (transferred away), they're treated as a no-show.
      */
     function submitAnimal(uint256 raceId, uint256 tokenId) external {
         Race storage r = races[raceId];
@@ -190,23 +202,16 @@ contract AnimalRace {
         for (uint256 i = 0; i < ANIMAL_COUNT; i++) {
             if (houseAnimalTokenIds[i] == tokenId) revert InvalidHouseAnimal();
         }
-
-        RaceAnimals storage ra = raceAnimals[raceId];
-        uint8 lane = ra.assignedCount;
-        if (lane >= ANIMAL_COUNT) revert RaceFull();
-
-        // Prevent duplicate tokenIds within a race.
-        for (uint256 i = 0; i < ANIMAL_COUNT; i++) {
-            if (ra.tokenIds[i] == tokenId) revert TokenAlreadyEntered();
-        }
+        if (tokenEntered[raceId][tokenId]) revert TokenAlreadyEntered();
+        if (raceEntries[raceId].length >= MAX_ENTRIES_PER_RACE) revert EntryPoolFull();
 
         // Mark submission before external call; tx reverts if transfer fails.
         hasSubmittedAnimal[raceId][msg.sender] = true;
-        ra.assignedCount = lane + 1;
-        ra.tokenIds[lane] = tokenId;
-        ra.originalOwners[lane] = msg.sender;
+        tokenEntered[raceId][tokenId] = true;
+        raceEntries[raceId].push(RaceEntry({ tokenId: tokenId, submitter: msg.sender }));
 
-        emit AnimalSubmitted(raceId, msg.sender, tokenId, lane);
+        // Lane isn't determined until settlement; emit 255 to mean "pool entry".
+        emit AnimalSubmitted(raceId, msg.sender, tokenId, type(uint8).max);
     }
 
     function settleRace(uint256 raceId) external {
@@ -223,7 +228,7 @@ contract AnimalRace {
         bytes32 fillSeed = keccak256(abi.encodePacked(baseSeed, "HOUSE_FILL"));
         bytes32 simSeed = keccak256(abi.encodePacked(baseSeed, "RACE_SIM"));
 
-        _finalizeAnimalsWithNoShowFallback(raceId, fillSeed);
+        _finalizeAnimalsFromPool(raceId, fillSeed);
         (uint8 w,) = _simulate(simSeed);
 
         r.settled = true;
@@ -298,63 +303,82 @@ contract AnimalRace {
         return (ra.assignedCount, ra.tokenIds, ra.originalOwners);
     }
 
-    function _finalizeAnimalsWithNoShowFallback(uint256 raceId, bytes32 fillSeed) internal {
+    function _finalizeAnimalsFromPool(uint256 raceId, bytes32 fillSeed) internal {
+        // Reset any previous lane data (should be empty before settle, but be safe).
+        delete raceAnimals[raceId];
         RaceAnimals storage ra = raceAnimals[raceId];
 
-        // Deterministically shuffle/select house animals per race using independent entropy.
+        // Deterministically shuffle/select pool entrants + house animals per race using independent entropy.
         DeterministicDice.Dice memory dice = DeterministicDice.create(fillSeed);
 
         uint8[4] memory availableIdx = [0, 1, 2, 3];
         uint8 availableCount = 4;
 
-        // Fill any empty lane, and replace any "no-show" (NFT transferred away) with a house animal.
-        for (uint8 lane = 0; lane < ANIMAL_COUNT; lane++) {
-            uint256 tokenId = ra.tokenIds[lane];
-            address submittedOwner = ra.originalOwners[lane];
+        RaceEntry[] storage entries = raceEntries[raceId];
+        uint256 n = entries.length;
 
-            bool needsHouse = false;
-            if (tokenId == 0) {
-                needsHouse = true;
-            } else {
-                // If the NFT changed hands, treat it as a no-show.
-                // (We do NOT revert; we replace.)
-                if (animalNft.ownerOf(tokenId) != submittedOwner) {
-                    needsHouse = true;
+        // Build a list of "valid" entrants (still owned by submitter at settlement time).
+        uint256[] memory validIdx = new uint256[](n);
+        uint256 validCount = 0;
+        for (uint256 i = 0; i < n; i++) {
+            RaceEntry storage e = entries[i];
+            if (animalNft.ownerOf(e.tokenId) == e.submitter) {
+                validIdx[validCount++] = i;
+            }
+        }
+
+        // Select racers:
+        // - If <= 4 valid entrants, take them all (in submission order).
+        // - If > 4 valid entrants, draw 4 without replacement using dice.
+        if (validCount <= ANIMAL_COUNT) {
+            uint8 lane = 0;
+            for (uint256 i = 0; i < n && lane < ANIMAL_COUNT; i++) {
+                RaceEntry storage e = entries[i];
+                if (animalNft.ownerOf(e.tokenId) == e.submitter) {
+                    ra.tokenIds[lane] = e.tokenId;
+                    ra.originalOwners[lane] = e.submitter;
+                    lane++;
                 }
             }
+            ra.assignedCount = lane;
+        } else {
+            for (uint8 lane = 0; lane < ANIMAL_COUNT; lane++) {
+                uint256 remaining = validCount - uint256(lane);
+                (uint256 pick, DeterministicDice.Dice memory updatedDice) = dice.roll(remaining);
+                dice = updatedDice;
 
-            if (!needsHouse) continue;
+                uint256 chosenPos = uint256(lane) + pick;
+                uint256 entryIdx = validIdx[chosenPos];
+                // swap-remove within the tail of validIdx
+                validIdx[chosenPos] = validIdx[uint256(lane)];
+                validIdx[uint256(lane)] = entryIdx;
 
+                RaceEntry storage e = entries[entryIdx];
+                ra.tokenIds[lane] = e.tokenId;
+                ra.originalOwners[lane] = e.submitter;
+            }
+            ra.assignedCount = ANIMAL_COUNT;
+        }
+
+        // Fill remaining lanes with house animals (deterministically randomized, no repeats).
+        for (uint8 lane = ra.assignedCount; lane < ANIMAL_COUNT; lane++) {
             if (availableCount == 0) revert InvalidHouseAnimal();
             (uint256 pick, DeterministicDice.Dice memory updatedDice) = dice.roll(availableCount);
             dice = updatedDice;
 
             uint8 idx = availableIdx[uint8(pick)];
-            // remove idx from pool (swap-remove)
             availableCount--;
             availableIdx[uint8(pick)] = availableIdx[availableCount];
 
             uint256 houseTokenId = houseAnimalTokenIds[idx];
-
-            // House animals must still be owned by `house` at settlement time.
-            // We don't escrow them (no approvals needed); they are trusted protocol-provided racers.
             if (animalNft.ownerOf(houseTokenId) != house) revert InvalidHouseAnimal();
 
-            if (ra.tokenIds[lane] == 0) {
-                // If we are filling an empty lane, this increases assignedCount.
-                // If we are replacing a no-show, assignedCount is already >= 4 (or at least includes this lane), so don't rely on it for logic.
-                ra.assignedCount++;
-            }
             ra.tokenIds[lane] = houseTokenId;
             ra.originalOwners[lane] = house;
-
             emit HouseAnimalAssigned(raceId, houseTokenId, lane);
         }
 
-        // assignedCount can exceed 4 if we incremented for replacements; clamp for UI sanity.
-        if (ra.assignedCount > ANIMAL_COUNT) {
-            ra.assignedCount = ANIMAL_COUNT;
-        }
+        ra.assignedCount = ANIMAL_COUNT;
     }
 
     function _simulate(bytes32 seed) internal pure returns (uint8 winner, uint16[4] memory distances) {
