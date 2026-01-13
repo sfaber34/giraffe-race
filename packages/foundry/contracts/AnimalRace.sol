@@ -19,6 +19,12 @@ contract AnimalRace {
     using DeterministicDice for DeterministicDice.Dice;
 
     uint8 public constant ANIMAL_COUNT = 4;
+    // Phase schedule (v2):
+    // - Submissions close at (bettingCloseBlock - SUBMISSION_CLOSE_OFFSET_BLOCKS)
+    // - Betting is only open after submissions close (inclusive) and before bettingCloseBlock (exclusive)
+    // This ensures bettors can see the finalized lane lineup before betting.
+    uint64 internal constant SUBMISSION_CLOSE_OFFSET_BLOCKS = 10;
+    uint64 internal constant DEFAULT_BETTING_CLOSE_OFFSET_BLOCKS = 20;
     // Cap entrant pool size to keep `settleRace` gas bounded. Can be increased later.
     uint16 public constant MAX_ENTRIES_PER_RACE = 128;
     uint16 public constant TRACK_LENGTH = 1000;
@@ -30,7 +36,10 @@ contract AnimalRace {
     IERC721 public animalNft;
 
     struct Race {
+        // Betting close block (formerly "closeBlock" in v1).
         uint64 closeBlock;
+        // Lane lineup finalized from entrant pool + house fill.
+        bool animalsFinalized;
         bool settled;
         uint8 winner; // 0-3, valid only if settled
         bytes32 seed; // stored on settlement for later verification
@@ -75,11 +84,14 @@ contract AnimalRace {
     event RaceSettled(uint256 indexed raceId, bytes32 seed, uint8 winner);
     event Claimed(uint256 indexed raceId, address indexed bettor, uint256 payout);
     event AnimalSubmitted(uint256 indexed raceId, address indexed owner, uint256 indexed tokenId, uint8 lane);
+    event AnimalAssigned(uint256 indexed raceId, uint256 indexed tokenId, address indexed originalOwner, uint8 lane);
     event HouseAnimalAssigned(uint256 indexed raceId, uint256 indexed tokenId, uint8 lane);
 
     error NotOwner();
     error InvalidRace();
     error BettingClosed();
+    error BettingNotOpen();
+    error SubmissionsClosed();
     error AlreadyBet();
     error InvalidAnimal();
     error ZeroBet();
@@ -96,6 +108,8 @@ contract AnimalRace {
     error NotTokenOwner();
     error TokenAlreadyEntered();
     error EntryPoolFull();
+    error InvalidCloseBlock();
+    error AnimalsAlreadyFinalized();
 
     modifier onlyOwner() {
         if (msg.sender != owner) revert NotOwner();
@@ -141,9 +155,9 @@ contract AnimalRace {
         return _simulate(seed);
     }
 
-    /// @notice Convenience: create a race that closes 10 blocks from now.
+    /// @notice Convenience: create a race that closes 20 blocks from now.
     function createRace() external onlyOwner returns (uint256 raceId) {
-        return _createRace(uint64(block.number + 10));
+        return _createRace(uint64(block.number + DEFAULT_BETTING_CLOSE_OFFSET_BLOCKS));
     }
 
     /// @notice Create a race with an explicit close block.
@@ -152,7 +166,11 @@ contract AnimalRace {
     }
 
     function _createRace(uint64 closeBlock) internal returns (uint256 raceId) {
-        if (closeBlock <= block.number) revert BettingClosed();
+        // Need at least SUBMISSION_CLOSE_OFFSET_BLOCKS blocks between creation and submission close,
+        // and another SUBMISSION_CLOSE_OFFSET_BLOCKS blocks between submission close and betting close.
+        // (With the current constants, that's 20 blocks total.)
+        if (closeBlock <= block.number) revert InvalidCloseBlock();
+        if (closeBlock < uint64(block.number) + DEFAULT_BETTING_CLOSE_OFFSET_BLOCKS) revert InvalidCloseBlock();
 
         raceId = nextRaceId++;
         Race storage r = races[raceId];
@@ -167,8 +185,12 @@ contract AnimalRace {
         Race storage r = races[raceId];
         if (r.closeBlock == 0) revert InvalidRace();
         if (block.number >= r.closeBlock) revert BettingClosed();
+        if (block.number < _submissionCloseBlock(r.closeBlock)) revert BettingNotOpen();
 
         if (msg.value == 0) revert ZeroBet();
+
+        // Ensure the lane lineup is finalized before accepting bets (so bettors can see who is racing).
+        _ensureAnimalsFinalized(raceId);
 
         Bet storage b = bets[raceId][msg.sender];
         if (b.amount != 0) revert AlreadyBet();
@@ -193,7 +215,8 @@ contract AnimalRace {
     function submitAnimal(uint256 raceId, uint256 tokenId) external {
         Race storage r = races[raceId];
         if (r.closeBlock == 0) revert InvalidRace();
-        if (block.number >= r.closeBlock) revert BettingClosed();
+        // Submissions close earlier than betting.
+        if (block.number >= _submissionCloseBlock(r.closeBlock)) revert SubmissionsClosed();
         if (r.settled) revert AlreadySettled();
 
         if (hasSubmittedAnimal[raceId][msg.sender]) revert AlreadySubmitted();
@@ -214,6 +237,26 @@ contract AnimalRace {
         emit AnimalSubmitted(raceId, msg.sender, tokenId, type(uint8).max);
     }
 
+    /**
+     * @notice Finalize the race lineup (which tokenIds are in which lanes) after submissions close.
+     * @dev Anyone can call this. Once finalized, the lane lineup is stable and can be shown in the UI
+     *      during the betting window.
+     *
+     *      Entropy uses `blockhash(submissionCloseBlock - 1)` so it's available starting at
+     *      `submissionCloseBlock` (the first block where submissions are closed).
+     */
+    function finalizeRaceAnimals(uint256 raceId) external {
+        Race storage r = races[raceId];
+        if (r.closeBlock == 0) revert InvalidRace();
+        if (r.settled) revert AlreadySettled();
+        if (r.animalsFinalized) revert AnimalsAlreadyFinalized();
+
+        uint64 submissionCloseBlock = _submissionCloseBlock(r.closeBlock);
+        if (block.number < submissionCloseBlock) revert BettingNotOpen();
+
+        _finalizeAnimals(raceId);
+    }
+
     function settleRace(uint256 raceId) external {
         Race storage r = races[raceId];
         if (r.closeBlock == 0) revert InvalidRace();
@@ -225,10 +268,11 @@ contract AnimalRace {
 
         // Derive independent seeds for independent decisions to avoid correlation.
         bytes32 baseSeed = keccak256(abi.encodePacked(bh, raceId, address(this)));
-        bytes32 fillSeed = keccak256(abi.encodePacked(baseSeed, "HOUSE_FILL"));
         bytes32 simSeed = keccak256(abi.encodePacked(baseSeed, "RACE_SIM"));
 
-        _finalizeAnimalsFromPool(raceId, fillSeed);
+        // Make sure lineup is finalized (it should have been finalized during betting window,
+        // but keep settlement robust).
+        _ensureAnimalsFinalized(raceId);
         (uint8 w,) = _simulate(simSeed);
 
         r.settled = true;
@@ -301,6 +345,41 @@ contract AnimalRace {
 
         RaceAnimals storage ra = raceAnimals[raceId];
         return (ra.assignedCount, ra.tokenIds, ra.originalOwners);
+    }
+
+    function _submissionCloseBlock(uint64 bettingCloseBlock) internal pure returns (uint64) {
+        // bettingCloseBlock is validated at creation to be >= SUBMISSION_CLOSE_OFFSET_BLOCKS.
+        return bettingCloseBlock - SUBMISSION_CLOSE_OFFSET_BLOCKS;
+    }
+
+    function _ensureAnimalsFinalized(uint256 raceId) internal {
+        Race storage r = races[raceId];
+        if (r.animalsFinalized) return;
+
+        uint64 submissionCloseBlock = _submissionCloseBlock(r.closeBlock);
+        if (block.number < submissionCloseBlock) revert BettingNotOpen();
+
+        _finalizeAnimals(raceId);
+    }
+
+    function _finalizeAnimals(uint256 raceId) internal {
+        Race storage r = races[raceId];
+        uint64 submissionCloseBlock = _submissionCloseBlock(r.closeBlock);
+
+        // We use (submissionCloseBlock - 1) so the hash is available starting at submissionCloseBlock.
+        bytes32 bh = blockhash(uint256(submissionCloseBlock - 1));
+        if (bh == bytes32(0)) revert BlockhashUnavailable();
+
+        bytes32 baseSeed = keccak256(abi.encodePacked(bh, raceId, address(this)));
+        bytes32 fillSeed = keccak256(abi.encodePacked(baseSeed, "HOUSE_FILL"));
+
+        _finalizeAnimalsFromPool(raceId, fillSeed);
+        r.animalsFinalized = true;
+
+        RaceAnimals storage ra = raceAnimals[raceId];
+        for (uint8 lane = 0; lane < ANIMAL_COUNT; lane++) {
+            emit AnimalAssigned(raceId, ra.tokenIds[lane], ra.originalOwners[lane], lane);
+        }
     }
 
     function _finalizeAnimalsFromPool(uint256 raceId, bytes32 fillSeed) internal {

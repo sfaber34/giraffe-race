@@ -168,6 +168,30 @@ export const AnimalRaceHome = () => {
 
   return (
     <div className="flex flex-col gap-8 w-full max-w-4xl px-6 py-10">
+      <div className="card bg-base-200 shadow">
+        <div className="card-body gap-2">
+          <div className="flex items-center justify-between">
+            <div className="text-sm font-medium">Mine blocks (local)</div>
+            {isMining ? <span className="text-xs opacity-70">Mining…</span> : null}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button className="btn btn-sm" onClick={() => mineBlocks(1)} disabled={!publicClient || isMining}>
+              Mine +1
+            </button>
+            <button className="btn btn-sm" onClick={() => mineBlocks(10)} disabled={!publicClient || isMining}>
+              Mine +10
+            </button>
+            <button className="btn btn-sm" onClick={() => mineBlocks(50)} disabled={!publicClient || isMining}>
+              Mine +50
+            </button>
+          </div>
+          <div className="text-xs opacity-70">
+            Uses <span className="font-mono">anvil_mine</span>/<span className="font-mono">hardhat_mine</span> when
+            available.
+          </div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 gap-4">
         <div className="card bg-base-200 shadow">
           <div className="card-body gap-3">
@@ -196,19 +220,6 @@ export const AnimalRaceHome = () => {
                 inputMode="numeric"
               />
             </label>
-
-            <div className="flex flex-wrap gap-2">
-              <button className="btn btn-sm" onClick={() => mineBlocks(1)} disabled={!publicClient || isMining}>
-                Mine +1
-              </button>
-              <button className="btn btn-sm" onClick={() => mineBlocks(10)} disabled={!publicClient || isMining}>
-                Mine +10
-              </button>
-              <button className="btn btn-sm" onClick={() => mineBlocks(50)} disabled={!publicClient || isMining}>
-                Mine +50
-              </button>
-              {isMining ? <span className="text-xs opacity-70 self-center">Mining…</span> : null}
-            </div>
 
             <div className="text-sm">
               <div className="flex justify-between">

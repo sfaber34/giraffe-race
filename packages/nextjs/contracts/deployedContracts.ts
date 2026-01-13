@@ -862,6 +862,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "finalizeRaceAnimals",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
           name: "getBet",
           inputs: [
             {
@@ -1139,6 +1152,37 @@ const deployedContracts = {
         },
         {
           type: "event",
+          name: "AnimalAssigned",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "tokenId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "originalOwner",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "lane",
+              type: "uint8",
+              indexed: false,
+              internalType: "uint8",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
           name: "AnimalSubmitted",
           inputs: [
             {
@@ -1320,7 +1364,17 @@ const deployedContracts = {
         },
         {
           type: "error",
+          name: "AnimalsAlreadyFinalized",
+          inputs: [],
+        },
+        {
+          type: "error",
           name: "BettingClosed",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "BettingNotOpen",
           inputs: [],
         },
         {
@@ -1336,6 +1390,11 @@ const deployedContracts = {
         {
           type: "error",
           name: "InvalidAnimal",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "InvalidCloseBlock",
           inputs: [],
         },
         {
@@ -1375,6 +1434,11 @@ const deployedContracts = {
         },
         {
           type: "error",
+          name: "SubmissionsClosed",
+          inputs: [],
+        },
+        {
+          type: "error",
           name: "TokenAlreadyEntered",
           inputs: [],
         },
@@ -1390,7 +1454,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 3,
+      deployedOnBlock: 4,
     },
   },
 } as const;

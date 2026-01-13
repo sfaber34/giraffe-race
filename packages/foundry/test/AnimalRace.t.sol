@@ -86,7 +86,15 @@ contract AnimalRaceTest is Test {
 
         uint64 closeBlock;
         (closeBlock,,,,,) = race.getRace(raceId);
+        uint64 submissionCloseBlock = closeBlock - 10;
 
+        // Set the lineup entropy blockhash so finalize (triggered during placeBet) doesn't revert.
+        bytes32 forcedLineupBh = keccak256("forced lineup blockhash");
+        vm.roll(uint256(submissionCloseBlock - 1));
+        vm.setBlockhash(uint256(submissionCloseBlock - 1), forcedLineupBh);
+
+        // Betting only opens after submissions close.
+        vm.roll(uint256(submissionCloseBlock));
         vm.prank(alice);
         race.placeBet{value: 1 ether}(raceId, 0);
         vm.prank(bob);
@@ -113,6 +121,14 @@ contract AnimalRaceTest is Test {
         vm.roll(10);
         vm.prank(owner);
         uint256 raceId = race.createRace();
+        uint64 closeBlock;
+        (closeBlock,,,,,) = race.getRace(raceId);
+        uint64 submissionCloseBlock = closeBlock - 10;
+
+        bytes32 forcedLineupBh = keccak256("forced lineup blockhash 2");
+        vm.roll(uint256(submissionCloseBlock - 1));
+        vm.setBlockhash(uint256(submissionCloseBlock - 1), forcedLineupBh);
+        vm.roll(uint256(submissionCloseBlock));
 
         vm.prank(alice);
         race.placeBet{ value: 1 ether }(raceId, 2);
@@ -129,6 +145,12 @@ contract AnimalRaceTest is Test {
 
         uint64 closeBlock;
         (closeBlock,,,,,) = race.getRace(raceId);
+        uint64 submissionCloseBlock = closeBlock - 10;
+
+        bytes32 forcedLineupBh = keccak256("forced lineup blockhash 3");
+        vm.roll(uint256(submissionCloseBlock - 1));
+        vm.setBlockhash(uint256(submissionCloseBlock - 1), forcedLineupBh);
+        vm.roll(uint256(submissionCloseBlock));
 
         // Alice and Bob both bet on animal 0, different amounts
         vm.prank(alice);
@@ -183,6 +205,39 @@ contract AnimalRaceTest is Test {
 
         vm.expectRevert(AnimalRace.BlockhashUnavailable.selector);
         race.settleRace(raceId);
+    }
+
+    function testCannotSubmitAfterSubmissionsClose() public {
+        vm.roll(500);
+        vm.prank(owner);
+        uint256 raceId = race.createRace();
+
+        uint64 closeBlock;
+        (closeBlock,,,,,) = race.getRace(raceId);
+        uint64 submissionCloseBlock = closeBlock - 10;
+
+        vm.prank(alice);
+        uint256 aliceTokenId = animalNft.mint(alice, "alice");
+
+        vm.roll(uint256(submissionCloseBlock));
+        vm.prank(alice);
+        vm.expectRevert(AnimalRace.SubmissionsClosed.selector);
+        race.submitAnimal(raceId, aliceTokenId);
+    }
+
+    function testCannotBetBeforeSubmissionsClose() public {
+        vm.roll(600);
+        vm.prank(owner);
+        uint256 raceId = race.createRace();
+
+        uint64 closeBlock;
+        (closeBlock,,,,,) = race.getRace(raceId);
+        uint64 submissionCloseBlock = closeBlock - 10;
+
+        vm.roll(uint256(submissionCloseBlock - 1));
+        vm.prank(alice);
+        vm.expectRevert(AnimalRace.BettingNotOpen.selector);
+        race.placeBet{ value: 1 ether }(raceId, 0);
     }
 }
 

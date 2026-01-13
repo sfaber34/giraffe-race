@@ -2,21 +2,43 @@
 
 import { useMemo, useState } from "react";
 import { EtherInput } from "@scaffold-ui/components";
-import { formatEther, parseEther } from "viem";
-import { useAccount, useBlockNumber } from "wagmi";
-import { useDeployedContractInfo, useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
+import { formatEther, parseEther, toHex } from "viem";
+import { useAccount, useBlockNumber, usePublicClient } from "wagmi";
+import {
+  useDeployedContractInfo,
+  useScaffoldReadContract,
+  useScaffoldWriteContract,
+  useTargetNetwork,
+} from "~~/hooks/scaffold-eth";
 
 const LANE_COUNT = 4 as const;
 const LANE_EMOJI = "🦒";
+const SUBMISSION_CLOSE_OFFSET_BLOCKS = 10n;
 
-type RaceStatus = "no_race" | "open" | "not_open" | "settled";
+type RaceStatus = "no_race" | "submissions_open" | "betting_open" | "closed" | "settled";
+
+const LaneName = ({ tokenId, fallback }: { tokenId: bigint; fallback: string }) => {
+  const enabled = tokenId !== 0n;
+  const { data: nameData } = useScaffoldReadContract({
+    contractName: "AnimalNFT",
+    functionName: "nameOf",
+    args: [enabled ? tokenId : undefined],
+    query: { enabled },
+  });
+
+  const name = (nameData as string | undefined) ?? "";
+  return <span>{name.trim() ? name : fallback}</span>;
+};
 
 export const HomeRacePrototype = () => {
+  const { targetNetwork } = useTargetNetwork();
+  const publicClient = usePublicClient({ chainId: targetNetwork.id });
   const { address: connectedAddress } = useAccount();
 
   const [tokenIdInput, setTokenIdInput] = useState("");
   const [betLane, setBetLane] = useState<0 | 1 | 2 | 3>(0);
   const [betAmountEth, setBetAmountEth] = useState("");
+  const [isMining, setIsMining] = useState(false);
 
   const { data: animalRaceContract } = useDeployedContractInfo({ contractName: "AnimalRace" });
 
@@ -47,6 +69,13 @@ export const HomeRacePrototype = () => {
     query: { enabled: readEnabled },
   });
 
+  const { data: raceAnimalsData } = useScaffoldReadContract({
+    contractName: "AnimalRace",
+    functionName: "getRaceAnimals",
+    args: [readEnabled ? latestRaceId : undefined],
+    query: { enabled: readEnabled },
+  });
+
   const parsed = useMemo(() => {
     if (!raceData) return null;
     // getRace returns: (closeBlock, settled, winner, seed, totalPot, totalOnAnimal)
@@ -61,18 +90,42 @@ export const HomeRacePrototype = () => {
     };
   }, [raceData]);
 
+  const parsedAnimals = useMemo(() => {
+    if (!raceAnimalsData) return null;
+    const [assignedCount, tokenIds, originalOwners] = raceAnimalsData;
+    return {
+      assignedCount: Number(assignedCount as any),
+      tokenIds: (tokenIds as readonly bigint[]).map(x => BigInt(x)),
+      originalOwners: originalOwners as readonly `0x${string}`[],
+    };
+  }, [raceAnimalsData]);
+
+  const submissionCloseBlock = useMemo(() => {
+    if (!parsed) return null;
+    if (parsed.closeBlock < SUBMISSION_CLOSE_OFFSET_BLOCKS) return null;
+    return parsed.closeBlock - SUBMISSION_CLOSE_OFFSET_BLOCKS;
+  }, [parsed]);
+
   const status: RaceStatus = useMemo(() => {
     if (!animalRaceContract) return "no_race";
     if (latestRaceId === undefined) return "no_race";
-    if (!parsed) return "not_open";
+    if (!parsed) return "closed";
     if (parsed.settled) return "settled";
-    if (blockNumber !== undefined && parsed.closeBlock !== 0n && blockNumber >= parsed.closeBlock) return "not_open";
-    return "open";
-  }, [animalRaceContract, latestRaceId, parsed, blockNumber]);
+    if (blockNumber === undefined) return "closed";
 
-  const blocksRemaining =
+    if (blockNumber >= parsed.closeBlock) return "closed";
+    if (submissionCloseBlock !== null && blockNumber < submissionCloseBlock) return "submissions_open";
+    return "betting_open";
+  }, [animalRaceContract, latestRaceId, parsed, blockNumber, submissionCloseBlock]);
+
+  const blocksRemainingToBetClose =
     parsed && blockNumber !== undefined && blockNumber < parsed.closeBlock
       ? Number(parsed.closeBlock - blockNumber)
+      : 0;
+
+  const blocksRemainingToSubmissionClose =
+    submissionCloseBlock !== null && blockNumber !== undefined && blockNumber < submissionCloseBlock
+      ? Number(submissionCloseBlock - blockNumber)
       : 0;
 
   const { data: myBetData } = useScaffoldReadContract({
@@ -96,7 +149,9 @@ export const HomeRacePrototype = () => {
 
   const { writeContractAsync: writeAnimalRaceAsync } = useScaffoldWriteContract({ contractName: "AnimalRace" });
 
-  const canInteract = status === "open";
+  const canSubmit = status === "submissions_open";
+  const canBet = status === "betting_open";
+  const lineupFinalized = (parsedAnimals?.assignedCount ?? 0) === 4;
 
   const submitTokenId = useMemo(() => {
     const v = tokenIdInput.trim();
@@ -122,12 +177,61 @@ export const HomeRacePrototype = () => {
     }
   }, [betAmountEth]);
 
+  const mineBlocks = async (count: number) => {
+    if (!publicClient) return;
+    setIsMining(true);
+    try {
+      const hexCount = toHex(count);
+      // Anvil
+      try {
+        await publicClient.request({ method: "anvil_mine" as any, params: [hexCount] as any });
+        return;
+      } catch {
+        // Hardhat
+        try {
+          await publicClient.request({ method: "hardhat_mine" as any, params: [hexCount] as any });
+          return;
+        } catch {
+          for (let i = 0; i < count; i++) {
+            await publicClient.request({ method: "evm_mine" as any, params: [] as any });
+          }
+        }
+      }
+    } finally {
+      setIsMining(false);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-8 w-full max-w-4xl px-6 py-10">
+      <div className="card bg-base-200 shadow">
+        <div className="card-body gap-2">
+          <div className="flex items-center justify-between">
+            <div className="text-sm font-medium">Mine blocks (local)</div>
+            {isMining ? <span className="text-xs opacity-70">Mining…</span> : null}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button className="btn btn-sm" onClick={() => mineBlocks(1)} disabled={!publicClient || isMining}>
+              Mine +1
+            </button>
+            <button className="btn btn-sm" onClick={() => mineBlocks(10)} disabled={!publicClient || isMining}>
+              Mine +10
+            </button>
+            <button className="btn btn-sm" onClick={() => mineBlocks(50)} disabled={!publicClient || isMining}>
+              Mine +50
+            </button>
+          </div>
+          <div className="text-xs opacity-70">
+            Uses <span className="font-mono">anvil_mine</span>/<span className="font-mono">hardhat_mine</span> when
+            available.
+          </div>
+        </div>
+      </div>
+
       <div className="flex flex-col gap-2">
         <h1 className="text-4xl font-bold">Giraffe Race</h1>
         <p className="text-base-content/70">
-          Player home (prototype): submit an NFT, place a bet, then watch the replay in{" "}
+          Player home (prototype): submit an NFT, wait for submissions to close, place a bet, then watch the replay in{" "}
           <a className="link" href="/race-view">
             Race View
           </a>
@@ -168,7 +272,13 @@ export const HomeRacePrototype = () => {
                 <div className="flex justify-between">
                   <span className="opacity-70">Status</span>
                   <span className="font-semibold">
-                    {status === "open" ? "Open" : status === "settled" ? "Settled" : "Not open"}
+                    {status === "submissions_open"
+                      ? "Submissions open"
+                      : status === "betting_open"
+                        ? "Betting open"
+                        : status === "settled"
+                          ? "Settled"
+                          : "Closed"}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -176,12 +286,20 @@ export const HomeRacePrototype = () => {
                   <span>{blockNumber !== undefined ? blockNumber.toString() : "-"}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="opacity-70">Close block</span>
+                  <span className="opacity-70">Submissions close</span>
+                  <span>{submissionCloseBlock !== null ? submissionCloseBlock.toString() : "-"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="opacity-70">Betting closes</span>
                   <span>{parsed.closeBlock.toString()}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="opacity-70">Blocks remaining</span>
-                  <span>{status === "open" ? blocksRemaining.toString() : "0"}</span>
+                  <span className="opacity-70">Blocks until submissions close</span>
+                  <span>{status === "submissions_open" ? blocksRemainingToSubmissionClose.toString() : "0"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="opacity-70">Blocks until betting closes</span>
+                  <span>{status === "betting_open" ? blocksRemainingToBetClose.toString() : "0"}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="opacity-70">Total pot</span>
@@ -198,6 +316,18 @@ export const HomeRacePrototype = () => {
                         <span className="font-mono text-xs opacity-70">
                           {formatEther(parsed.totalOnAnimal[lane] ?? 0n)} ETH
                         </span>
+                      </div>
+                      <div className="mt-1 text-xs opacity-70">
+                        {parsedAnimals?.tokenIds?.[lane] && parsedAnimals.tokenIds[lane] !== 0n ? (
+                          <>
+                            <span className="font-medium">
+                              <LaneName tokenId={parsedAnimals.tokenIds[lane]} fallback={`Lane ${lane}`} />
+                            </span>{" "}
+                            <span className="font-mono">#{parsedAnimals.tokenIds[lane].toString()}</span>
+                          </>
+                        ) : (
+                          <span>Lineup not finalized yet</span>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -230,7 +360,8 @@ export const HomeRacePrototype = () => {
           <div className="card-body gap-3">
             <h2 className="card-title">Enter an NFT</h2>
             <p className="text-sm opacity-70">
-              Submit one AnimalNFT you own into the entrant pool (non-custodial). Lanes are assigned at settlement.
+              Submit one AnimalNFT you own into the entrant pool (non-custodial). Submissions close, then the lane
+              lineup is finalized and shown for betting.
             </p>
 
             <label className="form-control w-full">
@@ -249,7 +380,7 @@ export const HomeRacePrototype = () => {
             <button
               className="btn btn-primary"
               disabled={
-                !animalRaceContract || !connectedAddress || !canInteract || !submitTokenId || latestRaceId === undefined
+                !animalRaceContract || !connectedAddress || !canSubmit || !submitTokenId || latestRaceId === undefined
               }
               onClick={async () => {
                 if (latestRaceId === undefined) return;
@@ -264,8 +395,8 @@ export const HomeRacePrototype = () => {
               Submit NFT to race
             </button>
 
-            {!canInteract ? (
-              <div className="text-xs opacity-70">Submissions are only available while the race is open.</div>
+            {!canSubmit ? (
+              <div className="text-xs opacity-70">Submissions are only available before submissions close.</div>
             ) : null}
           </div>
         </div>
@@ -273,7 +404,34 @@ export const HomeRacePrototype = () => {
         <div className="card bg-base-200 shadow">
           <div className="card-body gap-3">
             <h2 className="card-title">Place a bet</h2>
-            <p className="text-sm opacity-70">One bet per address per race.</p>
+            <p className="text-sm opacity-70">
+              One bet per address per race. Betting opens once the lane lineup is finalized.
+            </p>
+
+            {!lineupFinalized ? (
+              <div className="alert alert-info">
+                <div className="flex flex-col gap-1">
+                  <div className="text-sm font-medium">Waiting on lane lineup</div>
+                  <div className="text-xs opacity-70">
+                    After submissions close, anyone can finalize the lineup. Once it’s finalized, you can bet while the
+                    betting window is open.
+                  </div>
+                  <button
+                    className="btn btn-sm btn-outline mt-2 self-start"
+                    disabled={!animalRaceContract || latestRaceId === undefined || !canBet}
+                    onClick={async () => {
+                      if (latestRaceId === undefined) return;
+                      await writeAnimalRaceAsync({
+                        functionName: "finalizeRaceAnimals",
+                        args: [latestRaceId],
+                      } as any);
+                    }}
+                  >
+                    Finalize lane lineup
+                  </button>
+                </div>
+              </div>
+            ) : null}
 
             <div className="flex flex-wrap gap-2">
               {Array.from({ length: LANE_COUNT }).map((_, lane) => (
@@ -283,7 +441,15 @@ export const HomeRacePrototype = () => {
                   onClick={() => setBetLane(lane as 0 | 1 | 2 | 3)}
                   type="button"
                 >
-                  Lane {lane} {LANE_EMOJI}
+                  {lineupFinalized && parsedAnimals?.tokenIds?.[lane] && parsedAnimals.tokenIds[lane] !== 0n ? (
+                    <>
+                      {LANE_EMOJI} <LaneName tokenId={parsedAnimals.tokenIds[lane]} fallback={`Lane ${lane}`} />
+                    </>
+                  ) : (
+                    <>
+                      Lane {lane} {LANE_EMOJI}
+                    </>
+                  )}
                 </button>
               ))}
             </div>
@@ -299,7 +465,8 @@ export const HomeRacePrototype = () => {
               disabled={
                 !animalRaceContract ||
                 !connectedAddress ||
-                !canInteract ||
+                !canBet ||
+                !lineupFinalized ||
                 latestRaceId === undefined ||
                 !placeBetValue ||
                 !!myBet?.hasBet
@@ -318,8 +485,12 @@ export const HomeRacePrototype = () => {
               Place bet
             </button>
 
-            {!canInteract ? (
-              <div className="text-xs opacity-70">Betting is only available while the race is open.</div>
+            {!canBet ? (
+              <div className="text-xs opacity-70">
+                Betting is only available after submissions close and before betting closes.
+              </div>
+            ) : !lineupFinalized ? (
+              <div className="text-xs opacity-70">Finalize the lane lineup to reveal which NFTs are racing.</div>
             ) : myBet?.hasBet ? (
               <div className="text-xs opacity-70">You already placed a bet for this race.</div>
             ) : null}
