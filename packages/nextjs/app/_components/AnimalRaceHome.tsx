@@ -168,13 +168,6 @@ export const AnimalRaceHome = () => {
 
   return (
     <div className="flex flex-col gap-8 w-full max-w-4xl px-6 py-10">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-4xl font-bold">Giraffe Race</h1>
-        <p className="text-base-content/70">
-          On-chain deterministic outcome, with a tick-by-tick replay animation from the same seed.
-        </p>
-      </div>
-
       <div className="grid grid-cols-1 gap-4">
         <div className="card bg-base-200 shadow">
           <div className="card-body gap-3">

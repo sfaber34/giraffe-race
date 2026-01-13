@@ -1,12 +1,11 @@
 "use client";
 
 import type { NextPage } from "next";
-import { AnimalRaceHome } from "~~/app/_components/AnimalRaceHome";
 
 const Home: NextPage = () => {
   return (
-    <div className="flex items-center flex-col grow">
-      <AnimalRaceHome />
+    <div className="flex items-center justify-center flex-col grow">
+      <h1 className="text-6xl font-bold">Giraffe Race</h1>
     </div>
   );
 };

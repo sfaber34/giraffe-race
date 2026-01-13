@@ -21,6 +21,10 @@ export const menuLinks: HeaderMenuLink[] = [
     href: "/",
   },
   {
+    label: "Race View",
+    href: "/race-view",
+  },
+  {
     label: "NFTs",
     href: "/nfts",
   },
