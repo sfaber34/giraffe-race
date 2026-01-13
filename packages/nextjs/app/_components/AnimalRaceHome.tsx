@@ -7,12 +7,21 @@ import { useAccount, usePublicClient } from "wagmi";
 import { useDeployedContractInfo, useScaffoldReadContract, useTargetNetwork } from "~~/hooks/scaffold-eth";
 import { simulateRaceFromSeed } from "~~/utils/race/simulateRace";
 
-const ANIMALS = [
-  { name: "Giraffe", emoji: "🦒" },
-  { name: "Cheetah", emoji: "🐆" },
-  { name: "Turtle", emoji: "🐢" },
-  { name: "Elephant", emoji: "🐘" },
-] as const;
+const LANE_COUNT = 4 as const;
+const LANE_EMOJI = "🦒";
+
+const LaneName = ({ tokenId, fallback }: { tokenId: bigint; fallback: string }) => {
+  const enabled = tokenId !== 0n;
+  const { data: nameData } = useScaffoldReadContract({
+    contractName: "AnimalNFT",
+    functionName: "nameOf",
+    args: [enabled ? tokenId : undefined],
+    query: { enabled },
+  });
+
+  const name = (nameData as string | undefined) ?? "";
+  return <span>{name.trim() ? name : fallback}</span>;
+};
 
 export const AnimalRaceHome = () => {
   const { address: connectedAddress } = useAccount();
@@ -39,6 +48,13 @@ export const AnimalRaceHome = () => {
     query: { enabled: readEnabled && raceIdArg !== undefined },
   });
 
+  const { data: raceAnimalsData, isLoading: isRaceAnimalsLoading } = useScaffoldReadContract({
+    contractName: "AnimalRace",
+    functionName: "getRaceAnimals",
+    args: [raceIdArg],
+    query: { enabled: readEnabled && raceIdArg !== undefined },
+  });
+
   const parsed = useMemo(() => {
     if (!raceData) return null;
     const [closeBlock, settled, winner, seed, totalPot, totalOnAnimal] = raceData;
@@ -52,6 +68,17 @@ export const AnimalRaceHome = () => {
     };
   }, [raceData]);
 
+  const parsedAnimals = useMemo(() => {
+    if (!raceAnimalsData) return null;
+    const [assignedCount, tokenIds, originalOwners, escrowed] = raceAnimalsData;
+    return {
+      assignedCount: Number(assignedCount as any),
+      tokenIds: (tokenIds as readonly bigint[]).map(x => BigInt(x)),
+      originalOwners: originalOwners as readonly `0x${string}`[],
+      escrowed: escrowed as readonly boolean[],
+    };
+  }, [raceAnimalsData]);
+
   const canSimulate = useMemo(() => {
     if (!parsed?.settled) return false;
     if (!parsed.seed) return false;
@@ -63,7 +90,7 @@ export const AnimalRaceHome = () => {
     return simulateRaceFromSeed({
       seed: parsed.seed,
       // Keep these in sync with `AnimalRace.sol` constants
-      animalCount: 4,
+      animalCount: LANE_COUNT,
       maxTicks: 500,
       speedRange: 10,
       trackLength: 1000,
@@ -217,24 +244,101 @@ export const AnimalRaceHome = () => {
             <div className="divider my-1" />
 
             <div className="text-sm">
+              <div className="flex justify-between">
+                <span className="opacity-70">Lane NFTs</span>
+                <span>
+                  {isRaceAnimalsLoading
+                    ? "Loading…"
+                    : parsedAnimals
+                      ? `${parsedAnimals.assignedCount}/4 assigned`
+                      : "-"}
+                </span>
+              </div>
+
+              {parsedAnimals ? (
+                <div className="mt-2 flex flex-col gap-2">
+                  {Array.from({ length: LANE_COUNT }).map((_, lane) => {
+                    const tokenId = parsedAnimals.tokenIds[lane] ?? 0n;
+                    const owner = parsedAnimals.originalOwners[lane];
+                    const isEscrowed = parsedAnimals.escrowed[lane] ?? false;
+
+                    return (
+                      <div key={lane} className="rounded-xl bg-base-100 border border-base-300 px-3 py-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="font-medium">
+                            Lane {lane}: {LANE_EMOJI} <LaneName tokenId={tokenId} fallback={`Lane ${lane}`} />
+                          </div>
+                          <div className="text-xs opacity-70">
+                            {tokenId === 0n ? "Unassigned" : isEscrowed ? "Escrowed" : "House"}
+                          </div>
+                        </div>
+
+                        {tokenId === 0n ? (
+                          <div className="text-xs opacity-70 mt-1">No NFT assigned yet.</div>
+                        ) : (
+                          <div className="mt-1 grid grid-cols-1 gap-1">
+                            <div className="flex justify-between text-xs">
+                              <span className="opacity-70">Token ID</span>
+                              <span className="font-mono">{tokenId.toString()}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-xs">
+                              <span className="opacity-70">Original owner</span>
+                              <span className="text-right">
+                                <Address address={owner} chain={targetNetwork} />
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="mt-2 text-xs opacity-70">No lane data yet.</div>
+              )}
+            </div>
+
+            <div className="divider my-1" />
+
+            <div className="text-sm">
               <div className="flex justify-between items-center">
                 <span className="opacity-70">Verified winner (on-chain)</span>
                 <span className="font-semibold">
-                  {verifiedWinner === null
-                    ? "-"
-                    : ANIMALS[verifiedWinner]
-                      ? `${ANIMALS[verifiedWinner].emoji} ${ANIMALS[verifiedWinner].name}`
-                      : verifiedWinner}
+                  {verifiedWinner === null ? (
+                    "-"
+                  ) : (
+                    <>
+                      {LANE_EMOJI}{" "}
+                      {parsedAnimals ? (
+                        <LaneName
+                          tokenId={parsedAnimals.tokenIds[verifiedWinner] ?? 0n}
+                          fallback={`Lane ${verifiedWinner}`}
+                        />
+                      ) : (
+                        `Lane ${verifiedWinner}`
+                      )}
+                    </>
+                  )}
                 </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="opacity-70">Simulated winner (TS replay)</span>
                 <span className="font-semibold">
-                  {simulatedWinner === null
-                    ? "-"
-                    : ANIMALS[simulatedWinner]
-                      ? `${ANIMALS[simulatedWinner].emoji} ${ANIMALS[simulatedWinner].name}`
-                      : simulatedWinner}
+                  {simulatedWinner === null ? (
+                    "-"
+                  ) : (
+                    <>
+                      {LANE_EMOJI}{" "}
+                      {parsedAnimals ? (
+                        <LaneName
+                          tokenId={parsedAnimals.tokenIds[simulatedWinner] ?? 0n}
+                          fallback={`Lane ${simulatedWinner}`}
+                        />
+                      ) : (
+                        `Lane ${simulatedWinner}`
+                      )}
+                    </>
+                  )}
                 </span>
               </div>
               {verifiedWinner !== null && simulatedWinner !== null ? (
@@ -338,16 +442,22 @@ export const AnimalRaceHome = () => {
                   <div className="absolute inset-0 opacity-30 [background:repeating-linear-gradient(90deg,transparent,transparent_14px,rgba(0,0,0,0.08)_15px)]" />
 
                   <div className="relative flex flex-col">
-                    {ANIMALS.map((animal, i) => {
+                    {Array.from({ length: LANE_COUNT }).map((_, i) => {
                       const d = currentDistances[i] ?? 0;
                       const pctFloat = Math.min(1, Math.max(0, d / trackLength));
                       const isWinner = verifiedWinner === i;
                       const transitionMs = Math.floor(120 / playbackSpeed);
 
                       return (
-                        <div key={animal.name} className="relative h-14 border-b border-base-300/60 last:border-b-0">
+                        <div key={i} className="relative h-14 border-b border-base-300/60 last:border-b-0">
                           <div className="absolute left-3 top-1/2 -translate-y-1/2 text-xs opacity-70">
-                            {animal.emoji} {animal.name} {isWinner ? "(winner)" : ""} · {d}
+                            {LANE_EMOJI}{" "}
+                            {parsedAnimals ? (
+                              <LaneName tokenId={parsedAnimals.tokenIds[i] ?? 0n} fallback={`Lane ${i}`} />
+                            ) : (
+                              `Lane ${i}`
+                            )}{" "}
+                            {isWinner ? "(winner)" : ""} · {d}
                           </div>
 
                           <div
@@ -357,9 +467,9 @@ export const AnimalRaceHome = () => {
                               transform: "translate(-50%, -50%)",
                               transition: `left ${transitionMs}ms linear`,
                             }}
-                            aria-label={animal.name}
+                            aria-label={`Lane ${i}`}
                           >
-                            {animal.emoji}
+                            {LANE_EMOJI}
                           </div>
                         </div>
                       );

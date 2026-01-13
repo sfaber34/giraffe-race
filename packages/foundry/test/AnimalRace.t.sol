@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.19;
 
 import "forge-std/Test.sol";
 import "../contracts/AnimalRace.sol";
+import "../contracts/AnimalNFT.sol";
 import { DeterministicDice } from "../contracts/libraries/DeterministicDice.sol";
 
 contract AnimalRaceTest is Test {
     using DeterministicDice for DeterministicDice.Dice;
 
     AnimalRace public race;
+    AnimalNFT public animalNft;
     address public owner = address(0xBEEF);
     address public alice = address(0xA11CE);
     address public bob = address(0xB0B);
@@ -19,7 +21,13 @@ contract AnimalRaceTest is Test {
     uint256 internal constant SPEED_RANGE = 10;
 
     function setUp() public {
-        race = new AnimalRace(owner);
+        animalNft = new AnimalNFT(address(this));
+        uint256[4] memory houseTokenIds;
+        for (uint256 i = 0; i < 4; i++) {
+            houseTokenIds[i] = animalNft.mint(owner, "house");
+        }
+
+        race = new AnimalRace(owner, address(animalNft), owner, houseTokenIds);
         vm.deal(alice, 10 ether);
         vm.deal(bob, 10 ether);
     }
@@ -31,8 +39,10 @@ contract AnimalRaceTest is Test {
         bool finished = false;
         for (uint256 t = 0; t < MAX_TICKS; t++) {
             for (uint256 a = 0; a < ANIMAL_COUNT; a++) {
-                (uint256 r, DeterministicDice.Dice memory updatedDice) = dice.roll(SPEED_RANGE);
-                dice = updatedDice;
+                uint256 r;
+                DeterministicDice.Dice memory updatedDice1;
+                (r, updatedDice1) = dice.roll(SPEED_RANGE);
+                dice = updatedDice1;
                 distances[a] += uint16(r + 1);
             }
             if (
@@ -62,7 +72,10 @@ contract AnimalRaceTest is Test {
         }
 
         if (leaderCount == 1) return leaders[0];
-        (uint256 pick,) = dice.roll(leaderCount);
+        uint256 pick;
+        DeterministicDice.Dice memory updatedDice2;
+        (pick, updatedDice2) = dice.roll(leaderCount);
+        dice = updatedDice2;
         return leaders[uint8(pick)];
     }
 
@@ -75,9 +88,9 @@ contract AnimalRaceTest is Test {
         (closeBlock,,,,,) = race.getRace(raceId);
 
         vm.prank(alice);
-        race.placeBet{ value: 1 ether }(raceId, 0);
+        race.placeBet{value: 1 ether}(raceId, 0);
         vm.prank(bob);
-        race.placeBet{ value: 2 ether }(raceId, 1);
+        race.placeBet{value: 2 ether}(raceId, 1);
 
         bytes32 forcedBh = keccak256("forced blockhash");
         vm.roll(uint256(closeBlock));

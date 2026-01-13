@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.8.0 <0.9.0;
+pragma solidity ^0.8.19;
 
 import { DeterministicDice } from "./libraries/DeterministicDice.sol";
+import { IERC721 } from "../lib/openzeppelin-contracts/contracts/token/ERC721/IERC721.sol";
+import { IERC721Receiver } from "../lib/openzeppelin-contracts/contracts/token/ERC721/IERC721Receiver.sol";
 
 /**
  * @title AnimalRace
@@ -14,7 +16,7 @@ import { DeterministicDice } from "./libraries/DeterministicDice.sol";
  * NOTE: `blockhash(closeBlock)` is only available for the most recent ~256 blocks,
  * so `settleRace` must be called soon after `closeBlock`.
  */
-contract AnimalRace {
+contract AnimalRace is IERC721Receiver {
     using DeterministicDice for DeterministicDice.Dice;
 
     uint8 public constant ANIMAL_COUNT = 4;
@@ -22,7 +24,9 @@ contract AnimalRace {
     uint16 public constant MAX_TICKS = 500;
     uint8 public constant SPEED_RANGE = 10; // speeds per tick: 1-10
 
-    address public immutable owner;
+    address public owner;
+    address public house;
+    IERC721 public animalNft;
 
     struct Race {
         uint64 closeBlock;
@@ -30,7 +34,18 @@ contract AnimalRace {
         uint8 winner; // 0-3, valid only if settled
         bytes32 seed; // stored on settlement for later verification
         uint256 totalPot;
-        uint256[ANIMAL_COUNT] totalOnAnimal;
+        uint256[4] totalOnAnimal;
+    }
+
+    struct RaceAnimals {
+        // Number of lanes that have been assigned tokenIds (user submissions + house auto-fill).
+        uint8 assignedCount;
+        // Token ID for each lane (0..3). 0 means unassigned (valid tokenIds start at 1 in our AnimalNFT).
+        uint256[4] tokenIds;
+        // Original owner for each lane (who can withdraw if escrowed).
+        address[4] originalOwners;
+        // Whether the NFT is escrowed in this contract (true for user submissions).
+        bool[4] escrowed;
     }
 
     struct Bet {
@@ -42,11 +57,21 @@ contract AnimalRace {
     uint256 public nextRaceId;
     mapping(uint256 => Race) private races;
     mapping(uint256 => mapping(address => Bet)) private bets;
+    mapping(uint256 => RaceAnimals) private raceAnimals;
+    mapping(uint256 => mapping(address => bool)) private hasSubmittedAnimal;
+
+    // Fixed pool of house animals used to auto-fill empty lanes.
+    // These are NOT escrowed by default (no approvals required); we just reference them as house-owned racers.
+    uint256[4] public houseAnimalTokenIds;
+    uint8 private nextHouseIdx;
 
     event RaceCreated(uint256 indexed raceId, uint64 closeBlock);
     event BetPlaced(uint256 indexed raceId, address indexed bettor, uint8 indexed animal, uint256 amount);
     event RaceSettled(uint256 indexed raceId, bytes32 seed, uint8 winner);
     event Claimed(uint256 indexed raceId, address indexed bettor, uint256 payout);
+    event AnimalSubmitted(uint256 indexed raceId, address indexed owner, uint256 indexed tokenId, uint8 lane);
+    event HouseAnimalAssigned(uint256 indexed raceId, uint256 indexed tokenId, uint8 lane);
+    event AnimalWithdrawn(uint256 indexed raceId, address indexed owner, uint256 indexed tokenId, uint8 lane);
 
     error NotOwner();
     error InvalidRace();
@@ -61,14 +86,28 @@ contract AnimalRace {
     error NotWinner();
     error AlreadyClaimed();
     error TransferFailed();
+    error RaceFull();
+    error AlreadySubmitted();
+    error InvalidHouseAnimal();
+    error NotOriginalOwner();
+    error AnimalNotEscrowed();
+    error AnimalNotAssigned();
 
     modifier onlyOwner() {
         if (msg.sender != owner) revert NotOwner();
         _;
     }
 
-    constructor(address _owner) {
+    constructor(address _owner, address _animalNft, address _house, uint256[ANIMAL_COUNT] memory _houseAnimalTokenIds) {
         owner = _owner;
+        animalNft = IERC721(_animalNft);
+        house = _house;
+        houseAnimalTokenIds = _houseAnimalTokenIds;
+
+        // Basic sanity: prevent accidental all-zeros configuration.
+        for (uint256 i = 0; i < ANIMAL_COUNT; i++) {
+            if (_houseAnimalTokenIds[i] == 0) revert InvalidHouseAnimal();
+        }
     }
 
     function animalCount() external pure returns (uint8) {
@@ -139,6 +178,34 @@ contract AnimalRace {
         emit BetPlaced(raceId, msg.sender, animal, msg.value);
     }
 
+    /**
+     * @notice Submit one of your AnimalNFTs to race in the next open lane.
+     * @dev Escrows the NFT into this contract via safeTransferFrom; user can withdraw it after settlement.
+     */
+    function submitAnimal(uint256 raceId, uint256 tokenId) external {
+        Race storage r = races[raceId];
+        if (r.closeBlock == 0) revert InvalidRace();
+        if (block.number >= r.closeBlock) revert BettingClosed();
+        if (r.settled) revert AlreadySettled();
+
+        if (hasSubmittedAnimal[raceId][msg.sender]) revert AlreadySubmitted();
+
+        RaceAnimals storage ra = raceAnimals[raceId];
+        uint8 lane = ra.assignedCount;
+        if (lane >= ANIMAL_COUNT) revert RaceFull();
+
+        // Mark submission before external call; tx reverts if transfer fails.
+        hasSubmittedAnimal[raceId][msg.sender] = true;
+        ra.assignedCount = lane + 1;
+        ra.tokenIds[lane] = tokenId;
+        ra.originalOwners[lane] = msg.sender;
+        ra.escrowed[lane] = true;
+
+        animalNft.safeTransferFrom(msg.sender, address(this), tokenId);
+
+        emit AnimalSubmitted(raceId, msg.sender, tokenId, lane);
+    }
+
     function settleRace(uint256 raceId) external {
         Race storage r = races[raceId];
         if (r.closeBlock == 0) revert InvalidRace();
@@ -148,6 +215,8 @@ contract AnimalRace {
         bytes32 bh = blockhash(r.closeBlock);
         if (bh == bytes32(0)) revert BlockhashUnavailable();
 
+        _assignHouseAnimalsIfNeeded(raceId);
+
         bytes32 seed = keccak256(abi.encodePacked(bh, raceId, address(this)));
         (uint8 w,) = _simulate(seed);
 
@@ -156,6 +225,31 @@ contract AnimalRace {
         r.seed = seed;
 
         emit RaceSettled(raceId, seed, r.winner);
+    }
+
+    /**
+     * @notice Withdraw your escrowed AnimalNFT from a settled race.
+     * @dev We use transferFrom (not safeTransferFrom) so settlement/withdrawals can't be blocked by contracts
+     *      that don't implement IERC721Receiver.
+     */
+    function withdrawAnimal(uint256 raceId, uint8 lane) external {
+        Race storage r = races[raceId];
+        if (r.closeBlock == 0) revert InvalidRace();
+        if (!r.settled) revert NotSettled();
+        if (lane >= ANIMAL_COUNT) revert InvalidAnimal();
+
+        RaceAnimals storage ra = raceAnimals[raceId];
+        uint256 tokenId = ra.tokenIds[lane];
+        if (tokenId == 0) revert AnimalNotAssigned();
+        if (!ra.escrowed[lane]) revert AnimalNotEscrowed();
+        if (ra.originalOwners[lane] != msg.sender) revert NotOriginalOwner();
+
+        // Mark as no longer escrowed before external call.
+        ra.escrowed[lane] = false;
+
+        animalNft.transferFrom(address(this), msg.sender, tokenId);
+
+        emit AnimalWithdrawn(raceId, msg.sender, tokenId, lane);
     }
 
     function claim(uint256 raceId) external returns (uint256 payout) {
@@ -193,7 +287,7 @@ contract AnimalRace {
             uint8 winner,
             bytes32 seed,
             uint256 totalPot,
-            uint256[ANIMAL_COUNT] memory totalOnAnimal
+            uint256[4] memory totalOnAnimal
         )
     {
         Race storage r = races[raceId];
@@ -206,7 +300,50 @@ contract AnimalRace {
         return (b.amount, b.animal, b.claimed);
     }
 
-    function _simulate(bytes32 seed) internal pure returns (uint8 winner, uint16[ANIMAL_COUNT] memory distances) {
+    function getRaceAnimals(uint256 raceId)
+        external
+        view
+        returns (
+            uint8 assignedCount,
+            uint256[4] memory tokenIds,
+            address[4] memory originalOwners,
+            bool[4] memory escrowed
+        )
+    {
+        Race storage r = races[raceId];
+        if (r.closeBlock == 0) revert InvalidRace();
+
+        RaceAnimals storage ra = raceAnimals[raceId];
+        return (ra.assignedCount, ra.tokenIds, ra.originalOwners, ra.escrowed);
+    }
+
+    function _assignHouseAnimalsIfNeeded(uint256 raceId) internal {
+        RaceAnimals storage ra = raceAnimals[raceId];
+
+        while (ra.assignedCount < ANIMAL_COUNT) {
+            uint8 lane = ra.assignedCount;
+
+            uint256 tokenId = houseAnimalTokenIds[nextHouseIdx];
+            nextHouseIdx = uint8((nextHouseIdx + 1) % ANIMAL_COUNT);
+
+            // House animals must still be owned by `house` at settlement time.
+            // We don't escrow them (no approvals needed); they are trusted protocol-provided racers.
+            if (animalNft.ownerOf(tokenId) != house) revert InvalidHouseAnimal();
+
+            ra.assignedCount = lane + 1;
+            ra.tokenIds[lane] = tokenId;
+            ra.originalOwners[lane] = house;
+            ra.escrowed[lane] = false;
+
+            emit HouseAnimalAssigned(raceId, tokenId, lane);
+        }
+    }
+
+    function onERC721Received(address, address, uint256, bytes calldata) external pure returns (bytes4) {
+        return IERC721Receiver.onERC721Received.selector;
+    }
+
+    function _simulate(bytes32 seed) internal pure returns (uint8 winner, uint16[4] memory distances) {
         DeterministicDice.Dice memory dice = DeterministicDice.create(seed);
 
         bool finished = false;
@@ -234,7 +371,7 @@ contract AnimalRace {
         // Find leaders
         uint16 best = distances[0];
         uint8 leaderCount = 1;
-        uint8[ANIMAL_COUNT] memory leaders;
+        uint8[4] memory leaders;
         leaders[0] = 0;
 
         for (uint8 i = 1; i < ANIMAL_COUNT; i++) {
