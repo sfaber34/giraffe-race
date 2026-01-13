@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Address, Balance } from "@scaffold-ui/components";
+import { Address } from "@scaffold-ui/components";
 import { Hex, formatEther, isHex, toHex } from "viem";
-import { useAccount, usePublicClient } from "wagmi";
+import { usePublicClient } from "wagmi";
 import { useDeployedContractInfo, useScaffoldReadContract, useTargetNetwork } from "~~/hooks/scaffold-eth";
 import { simulateRaceFromSeed } from "~~/utils/race/simulateRace";
 
@@ -24,7 +24,6 @@ const LaneName = ({ tokenId, fallback }: { tokenId: bigint; fallback: string }) 
 };
 
 export const AnimalRaceHome = () => {
-  const { address: connectedAddress } = useAccount();
   const { targetNetwork } = useTargetNetwork();
   const publicClient = usePublicClient({ chainId: targetNetwork.id });
 
@@ -176,20 +175,7 @@ export const AnimalRaceHome = () => {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="card bg-base-200 shadow">
-          <div className="card-body gap-3">
-            <div className="flex items-center justify-between">
-              <h2 className="card-title">Wallet</h2>
-              <div className="text-xs opacity-70">{targetNetwork.name}</div>
-            </div>
-            <div className="flex flex-col gap-2">
-              <Address address={connectedAddress} chain={targetNetwork} />
-              {connectedAddress ? <Balance address={connectedAddress} /> : null}
-            </div>
-          </div>
-        </div>
-
+      <div className="grid grid-cols-1 gap-4">
         <div className="card bg-base-200 shadow">
           <div className="card-body gap-3">
             <div className="flex items-center justify-between">
