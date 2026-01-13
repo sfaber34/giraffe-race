@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { EtherInput } from "@scaffold-ui/components";
 import { formatEther, parseEther, toHex } from "viem";
 import { useAccount, useBlockNumber, usePublicClient } from "wagmi";
@@ -35,12 +35,93 @@ export const HomeRacePrototype = () => {
   const publicClient = usePublicClient({ chainId: targetNetwork.id });
   const { address: connectedAddress } = useAccount();
 
-  const [tokenIdInput, setTokenIdInput] = useState("");
+  const [selectedTokenId, setSelectedTokenId] = useState<bigint | null>(null);
   const [betLane, setBetLane] = useState<0 | 1 | 2 | 3>(0);
   const [betAmountEth, setBetAmountEth] = useState("");
   const [isMining, setIsMining] = useState(false);
+  const [ownedTokenNameById, setOwnedTokenNameById] = useState<Record<string, string>>({});
+  const [isLoadingOwnedTokenNames, setIsLoadingOwnedTokenNames] = useState(false);
 
   const { data: animalRaceContract } = useDeployedContractInfo({ contractName: "AnimalRace" });
+  const { data: animalNftContract } = useDeployedContractInfo({ contractName: "AnimalNFT" });
+
+  const { data: ownedTokenIdsData, isLoading: isOwnedTokensLoading } = useScaffoldReadContract({
+    contractName: "AnimalNFT",
+    functionName: "tokensOfOwner",
+    args: [connectedAddress],
+    query: { enabled: !!connectedAddress },
+  });
+
+  const ownedTokenIds = useMemo(() => {
+    const raw = (ownedTokenIdsData as readonly bigint[] | undefined) ?? [];
+    // Ensure stable BigInt array (and drop any zeros just in case)
+    return raw.map(x => BigInt(x)).filter(x => x !== 0n);
+  }, [ownedTokenIdsData]);
+
+  useEffect(() => {
+    const run = async () => {
+      if (!publicClient) return;
+      if (!animalNftContract?.address || !animalNftContract?.abi) return;
+      if (ownedTokenIds.length === 0) {
+        setOwnedTokenNameById({});
+        return;
+      }
+
+      setIsLoadingOwnedTokenNames(true);
+      try {
+        const calls = ownedTokenIds.map(tokenId => ({
+          address: animalNftContract.address as `0x${string}`,
+          abi: animalNftContract.abi as any,
+          functionName: "nameOf",
+          args: [tokenId],
+        }));
+
+        let res:
+          | { result?: string }[]
+          | {
+              status: "success" | "failure";
+              result?: string;
+            }[];
+
+        try {
+          res = (await publicClient.multicall({
+            contracts: calls as any,
+            allowFailure: true,
+          })) as any;
+        } catch {
+          const results = await Promise.allSettled(
+            ownedTokenIds.map(tokenId =>
+              (publicClient as any).readContract({
+                address: animalNftContract.address as `0x${string}`,
+                abi: animalNftContract.abi as any,
+                functionName: "nameOf",
+                args: [tokenId],
+              }),
+            ),
+          );
+          res = results.map(r =>
+            r.status === "fulfilled" ? { status: "success", result: r.value } : { status: "failure" },
+          );
+        }
+
+        const next: Record<string, string> = {};
+        ownedTokenIds.forEach((tokenId, i) => {
+          next[tokenId.toString()] = (((res[i] as any)?.result as string | undefined) ?? "").trim();
+        });
+        setOwnedTokenNameById(next);
+      } finally {
+        setIsLoadingOwnedTokenNames(false);
+      }
+    };
+
+    void run();
+  }, [publicClient, animalNftContract?.address, animalNftContract?.abi, ownedTokenIds]);
+
+  const { data: ownerAddress } = useScaffoldReadContract({
+    contractName: "AnimalRace",
+    functionName: "owner",
+    query: { enabled: !!animalRaceContract },
+  });
 
   const { data: nextRaceIdData } = useScaffoldReadContract({
     contractName: "AnimalRace",
@@ -152,18 +233,8 @@ export const HomeRacePrototype = () => {
   const canSubmit = status === "submissions_open";
   const canBet = status === "betting_open";
   const lineupFinalized = (parsedAnimals?.assignedCount ?? 0) === 4;
-
-  const submitTokenId = useMemo(() => {
-    const v = tokenIdInput.trim();
-    if (!v) return null;
-    try {
-      const id = BigInt(v);
-      if (id <= 0n) return null;
-      return id;
-    } catch {
-      return null;
-    }
-  }, [tokenIdInput]);
+  const isOwner =
+    !!connectedAddress && !!ownerAddress && connectedAddress.toLowerCase() === (ownerAddress as string).toLowerCase();
 
   const placeBetValue = useMemo(() => {
     const v = betAmountEth.trim();
@@ -225,6 +296,68 @@ export const HomeRacePrototype = () => {
             Uses <span className="font-mono">anvil_mine</span>/<span className="font-mono">hardhat_mine</span> when
             available.
           </div>
+        </div>
+      </div>
+
+      <div className="card bg-base-200 shadow">
+        <div className="card-body gap-2">
+          <div className="flex items-center justify-between">
+            <div className="text-sm font-medium">Owner test helpers</div>
+            <div className="text-xs opacity-70">
+              {ownerAddress ? (
+                <>
+                  Owner: <span className="font-mono">{String(ownerAddress)}</span>
+                </>
+              ) : (
+                "Loading owner…"
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              className="btn btn-sm btn-primary"
+              disabled={!animalRaceContract || !isOwner}
+              onClick={async () => {
+                // Calls the helper that auto-sets closeBlock (+20 blocks in the contract).
+                await writeAnimalRaceAsync({ functionName: "createRace" } as any);
+              }}
+            >
+              Create Race
+            </button>
+
+            <button
+              className="btn btn-sm btn-outline"
+              disabled={!animalRaceContract || !isOwner || latestRaceId === undefined}
+              onClick={async () => {
+                if (latestRaceId === undefined) return;
+                await writeAnimalRaceAsync({ functionName: "finalizeRaceAnimals", args: [latestRaceId] } as any);
+              }}
+            >
+              Finalize Race Animals
+            </button>
+
+            <button
+              className="btn btn-sm btn-outline"
+              disabled={!animalRaceContract || !isOwner || latestRaceId === undefined}
+              onClick={async () => {
+                if (latestRaceId === undefined) return;
+                await writeAnimalRaceAsync({ functionName: "settleRace", args: [latestRaceId] } as any);
+              }}
+            >
+              Settle Race
+            </button>
+          </div>
+
+          {!connectedAddress ? (
+            <div className="text-xs opacity-70">Connect the owner wallet to use these helpers.</div>
+          ) : !isOwner ? (
+            <div className="text-xs opacity-70">These helpers are only enabled for the owner address.</div>
+          ) : (
+            <div className="text-xs opacity-70">
+              Finalize/Settle automatically target <span className="font-mono">nextRaceId - 1</span>.
+            </div>
+          )}
         </div>
       </div>
 
@@ -366,30 +499,65 @@ export const HomeRacePrototype = () => {
 
             <label className="form-control w-full">
               <div className="label">
-                <span className="label-text">Token ID</span>
+                <span className="label-text">Your NFTs</span>
               </div>
-              <input
-                className="input input-bordered w-full"
-                value={tokenIdInput}
-                onChange={e => setTokenIdInput(e.target.value)}
-                inputMode="numeric"
-                placeholder="e.g. 12"
-              />
+              {!connectedAddress ? (
+                <div className="text-sm opacity-70">Connect your wallet to see your NFTs.</div>
+              ) : isOwnedTokensLoading ? (
+                <div className="text-sm opacity-70">Loading your NFTs…</div>
+              ) : ownedTokenIds.length === 0 ? (
+                <div className="text-sm opacity-70">You don’t own any AnimalNFTs yet.</div>
+              ) : (
+                <select
+                  className="select select-bordered w-full"
+                  value={selectedTokenId?.toString() ?? ""}
+                  onChange={e => setSelectedTokenId(e.target.value ? BigInt(e.target.value) : null)}
+                >
+                  <option value="" disabled>
+                    Select an NFT…
+                  </option>
+                  {ownedTokenIds.map(tokenId => (
+                    <option key={tokenId.toString()} value={tokenId.toString()}>
+                      {LANE_EMOJI}{" "}
+                      {(ownedTokenNameById[tokenId.toString()] || "").trim()
+                        ? ownedTokenNameById[tokenId.toString()]
+                        : isLoadingOwnedTokenNames
+                          ? "Loading…"
+                          : "(unnamed)"}{" "}
+                      (#{tokenId.toString()})
+                    </option>
+                  ))}
+                </select>
+              )}
             </label>
+
+            {selectedTokenId !== null ? (
+              <div className="text-xs opacity-70">
+                Selected:{" "}
+                <span className="font-medium">
+                  <LaneName tokenId={selectedTokenId} fallback={`#${selectedTokenId.toString()}`} />
+                </span>{" "}
+                <span className="font-mono">#{selectedTokenId.toString()}</span>
+              </div>
+            ) : null}
 
             <button
               className="btn btn-primary"
               disabled={
-                !animalRaceContract || !connectedAddress || !canSubmit || !submitTokenId || latestRaceId === undefined
+                !animalRaceContract ||
+                !connectedAddress ||
+                !canSubmit ||
+                selectedTokenId === null ||
+                latestRaceId === undefined
               }
               onClick={async () => {
                 if (latestRaceId === undefined) return;
-                if (!submitTokenId) return;
+                if (selectedTokenId === null) return;
                 await writeAnimalRaceAsync({
                   functionName: "submitAnimal",
-                  args: [latestRaceId, submitTokenId],
+                  args: [latestRaceId, selectedTokenId],
                 });
-                setTokenIdInput("");
+                setSelectedTokenId(null);
               }}
             >
               Submit NFT to race
@@ -496,16 +664,6 @@ export const HomeRacePrototype = () => {
             ) : null}
           </div>
         </div>
-      </div>
-
-      <div className="alert alert-info">
-        <span className="text-sm">
-          Owner actions (create/settle) are intentionally kept in{" "}
-          <a className="link" href="/debug">
-            Debug
-          </a>
-          .
-        </span>
       </div>
     </div>
   );

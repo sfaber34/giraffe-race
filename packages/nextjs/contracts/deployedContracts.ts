@@ -486,6 +486,25 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "tokensOfOwner",
+          inputs: [
+            {
+              name: "owner",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "uint256[]",
+              internalType: "uint256[]",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "transferFrom",
           inputs: [
             {
@@ -1454,7 +1473,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 4,
+      deployedOnBlock: 2,
     },
   },
 } as const;

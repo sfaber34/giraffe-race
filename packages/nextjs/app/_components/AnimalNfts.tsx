@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Address } from "@scaffold-ui/components";
 import { useAccount, usePublicClient } from "wagmi";
 import {
@@ -31,6 +31,18 @@ export const AnimalNfts = () => {
     query: { enabled: !!animalNftContract },
   });
 
+  const { data: ownedTokenIdsData } = useScaffoldReadContract({
+    contractName: "AnimalNFT",
+    functionName: "tokensOfOwner",
+    args: [connectedAddress],
+    query: { enabled: !!connectedAddress && !!animalNftContract },
+  });
+
+  const ownedTokenIds = useMemo(() => {
+    const raw = (ownedTokenIdsData as readonly bigint[] | undefined) ?? [];
+    return raw.map(x => BigInt(x)).filter(x => x !== 0n);
+  }, [ownedTokenIdsData]);
+
   const { writeContractAsync: writeAnimalNftAsync } = useScaffoldWriteContract({
     contractName: "AnimalNFT",
   });
@@ -44,73 +56,14 @@ export const AnimalNfts = () => {
       if (!publicClient) return;
       if (!animalNftContract?.address) return;
 
-      const max = nextTokenId ? BigInt(nextTokenId as any) : 1n;
-      const lastMinted = max > 0n ? max - 1n : 0n;
-      if (lastMinted === 0n) {
-        setOwnedNfts([]);
-        return;
-      }
-
-      // Keep this bounded for UX + RPC sanity. For local dev, this is plenty.
-      const MAX_SCAN = 200n;
-      const start = lastMinted > MAX_SCAN ? lastMinted - MAX_SCAN + 1n : 1n;
-
       setIsLoadingOwnedNfts(true);
       try {
-        const ids: bigint[] = [];
-        for (let id = start; id <= lastMinted; id++) ids.push(id);
-
-        const ownerCalls = ids.map(id => ({
-          address: animalNftContract.address as `0x${string}`,
-          abi: animalNftContract.abi as any,
-          functionName: "ownerOf",
-          args: [id],
-        }));
-
-        // Some local chains (Foundry) don't have Multicall3 configured in the chain definition.
-        // Fall back to individual reads in that case.
-        let owners:
-          | { result?: `0x${string}` }[]
-          | {
-              status: "success" | "failure";
-              result?: `0x${string}`;
-            }[];
-
-        try {
-          owners = (await publicClient.multicall({
-            contracts: ownerCalls as any,
-            allowFailure: true,
-          })) as any;
-        } catch {
-          const results = await Promise.allSettled(
-            ids.map(id =>
-              (publicClient as any).readContract({
-                address: animalNftContract.address as `0x${string}`,
-                abi: animalNftContract.abi as any,
-                functionName: "ownerOf",
-                args: [id],
-              }),
-            ),
-          );
-          owners = results.map(r =>
-            r.status === "fulfilled" ? { status: "success", result: r.value } : { status: "failure" },
-          );
-        }
-
-        const mine: bigint[] = [];
-        owners.forEach((res, i) => {
-          const owner = (res as any)?.result as `0x${string}` | undefined;
-          if (owner && owner.toLowerCase() === connectedAddress.toLowerCase()) {
-            mine.push(ids[i] as bigint);
-          }
-        });
-
-        if (mine.length === 0) {
+        if (ownedTokenIds.length === 0) {
           setOwnedNfts([]);
           return;
         }
 
-        const nameCalls = mine.map(id => ({
+        const nameCalls = ownedTokenIds.map(id => ({
           address: animalNftContract.address as `0x${string}`,
           abi: animalNftContract.abi as any,
           functionName: "nameOf",
@@ -131,7 +84,7 @@ export const AnimalNfts = () => {
           })) as any;
         } catch {
           const results = await Promise.allSettled(
-            mine.map(id =>
+            ownedTokenIds.map(id =>
               (publicClient as any).readContract({
                 address: animalNftContract.address as `0x${string}`,
                 abi: animalNftContract.abi as any,
@@ -146,7 +99,7 @@ export const AnimalNfts = () => {
         }
 
         setOwnedNfts(
-          mine.map((tokenId, i) => ({
+          ownedTokenIds.map((tokenId, i) => ({
             tokenId,
             name: (((names[i] as any)?.result as string | undefined) ?? "").trim(),
           })),
@@ -157,7 +110,7 @@ export const AnimalNfts = () => {
     };
 
     void run();
-  }, [connectedAddress, publicClient, animalNftContract?.address, animalNftContract?.abi, nextTokenId]);
+  }, [connectedAddress, publicClient, animalNftContract?.address, animalNftContract?.abi, ownedTokenIds, nextTokenId]);
 
   return (
     <div className="flex flex-col gap-8 w-full max-w-4xl px-6 py-10">
@@ -223,7 +176,7 @@ export const AnimalNfts = () => {
                 <span className="text-sm">Connect a wallet to see your NFTs.</span>
               </div>
             ) : ownedNfts.length === 0 ? (
-              <div className="text-sm opacity-70">No NFTs found (scans the last ~200 tokenIds).</div>
+              <div className="text-sm opacity-70">No NFTs found.</div>
             ) : (
               <div className="flex flex-col gap-2">
                 {ownedNfts.map(nft => (
