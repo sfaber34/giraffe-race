@@ -1,0 +1,22 @@
+{
+  "batchIndex": 7,
+  "houseTokenIds": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "laneWins": [
+    53,
+    35,
+    59,
+    53
+  ],
+  "races": 200,
+  "tokenWins": [
+    46,
+    58,
+    47,
+    49
+  ]
+}
