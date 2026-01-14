@@ -107,7 +107,7 @@ export const AnimalRaceHome = () => {
     });
   }, [parsed, canSimulate]);
 
-  const frames = simulation?.frames ?? [];
+  const frames = useMemo(() => simulation?.frames ?? [], [simulation]);
   const lastFrameIndex = Math.max(0, frames.length - 1);
 
   useEffect(() => {
@@ -121,6 +121,12 @@ export const AnimalRaceHome = () => {
     setViewportEl(el);
   }, []);
   const [viewportWidthPx, setViewportWidthPx] = useState(0);
+
+  const [cameraScrollEl, setCameraScrollEl] = useState<HTMLDivElement | null>(null);
+  const cameraScrollRefCb = useCallback((el: HTMLDivElement | null) => {
+    setCameraScrollEl(el);
+  }, []);
+  const [cameraX, setCameraX] = useState(0);
 
   // Start-delay logic: hold the racers at the start line for 3s, then begin ticking.
   useEffect(() => {
@@ -195,9 +201,80 @@ export const AnimalRaceHome = () => {
     return () => window.clearInterval(id);
   }, [isPlaying, simulation, raceStarted, lastFrameIndex, playbackSpeed]);
 
-  const currentDistances = frames[frame] ?? [0, 0, 0, 0];
+  const currentDistances = useMemo(() => frames[frame] ?? [0, 0, 0, 0], [frames, frame]);
   const trackLength = 1000;
-  const prevDistances = frames[Math.max(0, frame - 1)] ?? [0, 0, 0, 0];
+  const prevDistances = useMemo(() => frames[Math.max(0, frame - 1)] ?? [0, 0, 0, 0], [frames, frame]);
+
+  // Track/camera geometry (in "world" pixels; scaling is handled separately).
+  const laneHeightPx = 86;
+  const laneGapPx = 10;
+  const worldPaddingLeftPx = 80;
+  const worldPaddingRightPx = 140;
+  const pxPerUnit = 3;
+  const giraffeSizePx = 78;
+  const trackLengthPx = trackLength * pxPerUnit;
+  const finishLineX = worldPaddingLeftPx + trackLengthPx;
+  const worldWidthPx = worldPaddingLeftPx + trackLengthPx + worldPaddingRightPx;
+  const trackHeightPx = LANE_COUNT * (laneHeightPx + laneGapPx) - laneGapPx;
+
+  // Compute cameraX in a side-effect so we can drive scrollLeft (instead of animating transforms).
+  useEffect(() => {
+    if (!simulation) {
+      setCameraX(0);
+      return;
+    }
+
+    const viewportWorldWidth = viewportWidthPx > 0 ? viewportWidthPx / Math.max(0.25, scaleFactor) : 0;
+    if (viewportWorldWidth <= 0) {
+      setCameraX(0);
+      return;
+    }
+
+    const leader = Math.max(...currentDistances.map(x => Number(x ?? 0)));
+    const leaderX = worldPaddingLeftPx + (leader / trackLength) * trackLengthPx;
+
+    // Keep the leader fully visible (account for sprite width), not just the leader point.
+    const spriteHalf = giraffeSizePx / 2;
+    const spritePad = 12;
+    const minLeaderScreenX = spriteHalf + spritePad;
+    const maxLeaderScreenX = Math.max(minLeaderScreenX, viewportWorldWidth - (spriteHalf + spritePad));
+
+    // Camera behavior:
+    // 1) Start: no camera movement.
+    // 2) Mid-race: follow leader, keeping them toward the right side of the viewport.
+    // 3) Finish approach: stop slewing once the finish line is visible on the right side.
+    const followStartThresholdScreenX = viewportWorldWidth * 0.84;
+    const followStartX = Math.max(minLeaderScreenX, followStartThresholdScreenX);
+
+    const targetLeaderScreenX = viewportWorldWidth * 0.8;
+    const desiredLeaderScreenX = Math.min(maxLeaderScreenX, Math.max(minLeaderScreenX, targetLeaderScreenX));
+
+    const maxCameraX = Math.max(0, worldWidthPx - viewportWorldWidth);
+
+    const finishInset = 18;
+    const freezeX = Math.min(maxCameraX, Math.max(0, finishLineX - (viewportWorldWidth - finishInset)));
+
+    const followX = Math.min(maxCameraX, Math.max(0, leaderX - desiredLeaderScreenX));
+    const nextCameraX = leaderX < followStartX ? 0 : Math.min(followX, freezeX);
+    setCameraX(nextCameraX);
+  }, [
+    simulation,
+    currentDistances,
+    viewportWidthPx,
+    scaleFactor,
+    trackLength,
+    trackLengthPx,
+    finishLineX,
+    worldWidthPx,
+    worldPaddingLeftPx,
+    giraffeSizePx,
+  ]);
+
+  // Drive camera via scrollLeft (avoids transform animation starving SVG CSS animations in some browsers).
+  useEffect(() => {
+    if (!cameraScrollEl) return;
+    cameraScrollEl.scrollLeft = Math.max(0, Math.floor(cameraX));
+  }, [cameraScrollEl, cameraX]);
 
   const verifiedWinner = parsed?.settled ? parsed.winner : null;
   const simulatedWinner = simulation ? simulation.winner : null;
@@ -527,57 +604,13 @@ export const AnimalRaceHome = () => {
 
                 {/* Shared track: all lanes update on the same frame/tick (must match on-chain sim) */}
                 {(() => {
-                  const laneHeightPx = 86;
-                  const laneGapPx = 10;
-                  const worldPaddingLeftPx = 80;
-                  const worldPaddingRightPx = 140;
-                  const pxPerUnit = 3;
-                  const giraffeSizePx = 78;
-                  const trackLengthPx = trackLength * pxPerUnit;
-                  const worldWidthPx = worldPaddingLeftPx + trackLengthPx + worldPaddingRightPx;
                   const transitionMs = Math.floor(120 / playbackSpeed);
-
-                  const leader = Math.max(...currentDistances.map(x => Number(x ?? 0)));
-                  const leaderX = worldPaddingLeftPx + (leader / trackLength) * trackLengthPx;
-                  const viewportWorldWidth = viewportWidthPx > 0 ? viewportWidthPx / Math.max(0.25, scaleFactor) : 0;
-
-                  const finishLineX = worldPaddingLeftPx + trackLengthPx;
-
-                  // Keep the leader fully visible (account for sprite width), not just the leader point.
-                  const spriteHalf = giraffeSizePx / 2;
-                  const spritePad = 12; // extra safety padding so it doesn't kiss the edge
-                  const minLeaderScreenX = spriteHalf + spritePad;
-                  const maxLeaderScreenX = Math.max(minLeaderScreenX, viewportWorldWidth - (spriteHalf + spritePad));
-                  const maxCameraX = Math.max(0, worldWidthPx - viewportWorldWidth);
-
-                  // Camera behavior:
-                  // 1) Start: no camera movement (cameraX=0).
-                  // 2) Mid-race: follow leader, keeping them toward the right side.
-                  // 3) Finish approach: stop slewing once the finish line is visible on the right side.
-                  const followStartThresholdScreenX = viewportWorldWidth * 0.84;
-                  const followStartX = Math.max(minLeaderScreenX, followStartThresholdScreenX);
-
-                  const targetLeaderScreenX = viewportWorldWidth * 0.8; // keep leader near the right
-                  const desiredLeaderScreenX = Math.min(
-                    maxLeaderScreenX,
-                    Math.max(minLeaderScreenX, targetLeaderScreenX),
-                  );
-
-                  // Camera position that keeps the finish line visible on the right with a small inset.
-                  const finishInset = 18;
-                  const freezeX = Math.min(maxCameraX, Math.max(0, finishLineX - (viewportWorldWidth - finishInset)));
-
-                  // If we haven't reached the follow threshold yet, stay in state (1).
-                  const followXUnclamped = leaderX - desiredLeaderScreenX;
-                  const followX = Math.min(maxCameraX, Math.max(0, followXUnclamped));
-
-                  const cameraX = viewportWorldWidth <= 0 ? 0 : leaderX < followStartX ? 0 : Math.min(followX, freezeX);
 
                   return (
                     <div
                       ref={viewportRefCb}
                       className="relative w-full rounded-2xl bg-base-100 border border-base-300 overflow-hidden"
-                      style={{ height: `${LANE_COUNT * (laneHeightPx + laneGapPx) - laneGapPx}px` }}
+                      style={{ height: `${trackHeightPx}px` }}
                     >
                       {/* Fixed lane labels */}
                       <div className="absolute left-3 top-3 bottom-3 z-10 flex flex-col justify-between pointer-events-none">
@@ -613,94 +646,90 @@ export const AnimalRaceHome = () => {
                           transformOrigin: "top left",
                         }}
                       >
-                        <div
-                          className="absolute inset-0"
-                          style={{
-                            width: `${worldWidthPx}px`,
-                            transform: `translateX(${-cameraX}px)`,
-                            transition: `transform ${transitionMs}ms linear`,
-                          }}
-                        >
-                          {/* Track background */}
-                          <div className="absolute inset-0">
-                            {/* Start + finish */}
-                            <div
-                              className="absolute top-3 bottom-3 w-[3px] bg-base-300"
-                              style={{ left: `${worldPaddingLeftPx}px` }}
-                            />
-                            <div
-                              className="absolute top-3 bottom-3 w-[3px] bg-base-300"
-                              style={{
-                                left: `${worldPaddingLeftPx + trackLengthPx}px`,
-                              }}
-                            />
+                        <div ref={cameraScrollRefCb} className="absolute inset-0 overflow-hidden">
+                          <div
+                            className="relative"
+                            style={{ width: `${worldWidthPx}px`, height: `${trackHeightPx}px` }}
+                          >
+                            {/* Track background */}
+                            <div className="absolute inset-0">
+                              {/* Start + finish */}
+                              <div
+                                className="absolute top-3 bottom-3 w-[3px] bg-base-300"
+                                style={{ left: `${worldPaddingLeftPx}px` }}
+                              />
+                              <div
+                                className="absolute top-3 bottom-3 w-[3px] bg-base-300"
+                                style={{
+                                  left: `${worldPaddingLeftPx + trackLengthPx}px`,
+                                }}
+                              />
 
-                            {/* Tick grid */}
-                            <div
-                              className="absolute inset-0 opacity-30"
-                              style={{
-                                background:
-                                  "repeating-linear-gradient(90deg, transparent, transparent 29px, rgba(0,0,0,0.10) 30px)",
-                              }}
-                            />
+                              {/* Tick grid */}
+                              <div
+                                className="absolute inset-0 opacity-30"
+                                style={{
+                                  background:
+                                    "repeating-linear-gradient(90deg, transparent, transparent 29px, rgba(0,0,0,0.10) 30px)",
+                                }}
+                              />
 
-                            {/* Lanes */}
+                              {/* Lanes */}
+                              {Array.from({ length: LANE_COUNT }).map((_, i) => {
+                                const top = i * (laneHeightPx + laneGapPx);
+                                return (
+                                  <div
+                                    key={i}
+                                    className="absolute left-0 right-0 rounded-xl"
+                                    style={{
+                                      top: `${top}px`,
+                                      height: `${laneHeightPx}px`,
+                                      background:
+                                        "linear-gradient(180deg, rgba(0,0,0,0.04), rgba(0,0,0,0.02)), repeating-linear-gradient(90deg, rgba(0,0,0,0.00), rgba(0,0,0,0.00) 10px, rgba(0,0,0,0.05) 11px)",
+                                      border: "1px solid rgba(0,0,0,0.06)",
+                                    }}
+                                  />
+                                );
+                              })}
+                            </div>
+
+                            {/* Giraffes */}
                             {Array.from({ length: LANE_COUNT }).map((_, i) => {
-                              const top = i * (laneHeightPx + laneGapPx);
+                              const d = Number(currentDistances[i] ?? 0);
+                              const prev = Number(prevDistances[i] ?? 0);
+                              const delta = Math.max(0, d - prev); // 1..10 normally (per on-chain)
+                              const isWinner = verifiedWinner === i;
+
+                              // Tie the SVG animation speed to the *per-tick* movement delta.
+                              // Movement uses the same frames array as the on-chain sim; this only changes visuals.
+                              const speedFactor = Math.min(3, Math.max(0.6, delta / 4));
+
+                              const x =
+                                worldPaddingLeftPx +
+                                (Math.min(trackLength, Math.max(0, d)) / trackLength) * trackLengthPx;
+                              const y = i * (laneHeightPx + laneGapPx) + laneHeightPx / 2;
+
                               return (
                                 <div
                                   key={i}
-                                  className="absolute left-0 right-0 rounded-xl"
+                                  className="absolute left-0 top-0"
                                   style={{
-                                    top: `${top}px`,
-                                    height: `${laneHeightPx}px`,
-                                    background:
-                                      "linear-gradient(180deg, rgba(0,0,0,0.04), rgba(0,0,0,0.02)), repeating-linear-gradient(90deg, rgba(0,0,0,0.00), rgba(0,0,0,0.00) 10px, rgba(0,0,0,0.05) 11px)",
-                                    border: "1px solid rgba(0,0,0,0.06)",
+                                    transform: `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%)`,
+                                    transition: `transform ${transitionMs}ms linear`,
+                                    willChange: "transform",
+                                    filter: isWinner ? "drop-shadow(0 6px 10px rgba(0,0,0,0.25))" : undefined,
                                   }}
-                                />
+                                >
+                                  <GiraffeAnimated
+                                    idPrefix={`lane-${i}`}
+                                    playbackRate={speedFactor}
+                                    playing={isPlaying && raceStarted}
+                                    sizePx={giraffeSizePx}
+                                  />
+                                </div>
                               );
                             })}
                           </div>
-
-                          {/* Giraffes */}
-                          {Array.from({ length: LANE_COUNT }).map((_, i) => {
-                            const d = Number(currentDistances[i] ?? 0);
-                            const prev = Number(prevDistances[i] ?? 0);
-                            const delta = Math.max(0, d - prev); // 1..10 normally (per on-chain)
-                            const isWinner = verifiedWinner === i;
-
-                            // Tie the SVG animation speed to the *per-tick* movement delta.
-                            // Movement uses the same frames array as the on-chain sim; this only changes visuals.
-                            const speedFactor = Math.min(3, Math.max(0.6, delta / 4));
-                            const durationMs = 2000 / speedFactor;
-
-                            const x =
-                              worldPaddingLeftPx +
-                              (Math.min(trackLength, Math.max(0, d)) / trackLength) * trackLengthPx;
-                            const y = i * (laneHeightPx + laneGapPx) + laneHeightPx / 2;
-
-                            return (
-                              <div
-                                key={i}
-                                className="absolute"
-                                style={{
-                                  left: `${x}px`,
-                                  top: `${y}px`,
-                                  transform: "translate(-50%, -50%)",
-                                  transition: `left ${transitionMs}ms linear`,
-                                  filter: isWinner ? "drop-shadow(0 6px 10px rgba(0,0,0,0.25))" : undefined,
-                                }}
-                              >
-                                <GiraffeAnimated
-                                  idPrefix={`lane-${i}`}
-                                  durationMs={durationMs}
-                                  playing={isPlaying && raceStarted}
-                                  sizePx={giraffeSizePx}
-                                />
-                              </div>
-                            );
-                          })}
                         </div>
                       </div>
                     </div>

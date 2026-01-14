@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type Props = {
   /**
@@ -9,10 +9,10 @@ type Props = {
    */
   idPrefix: string;
   /**
-   * Controls the CSS animation rate inside the SVG by overriding animation-duration.
-   * The original SVG uses ~2000ms as its base duration.
+   * Controls animation speed without restarting by setting Web Animations API playbackRate.
+   * 1 = normal speed, 2 = double speed, 0.5 = half speed.
    */
-  durationMs: number;
+  playbackRate: number;
   /**
    * If false, pauses the SVG animation (movement is controlled separately by the race renderer).
    */
@@ -104,13 +104,12 @@ function escapeRegExp(s: string): string {
 
 function addRuntimeOverrides(svg: string): string {
   // Add a class so our override styles can be scoped to this SVG only.
-  // Also add duration/play-state overrides that are driven by CSS variables from the wrapper.
+  // Also add play-state overrides that are driven by CSS variables from the wrapper (fallback).
   const classed = svg.replace(/<svg\b/, `<svg class="giraffe-svg" preserveAspectRatio="xMidYMid meet"`);
 
   const overrideStyle = `
 <style><![CDATA[
 svg.giraffe-svg * {
-  animation-duration: var(--giraffe-anim-duration, 2000ms) !important;
   animation-play-state: var(--giraffe-anim-state, running) !important;
 }
 ]]></style>`;
@@ -121,8 +120,10 @@ svg.giraffe-svg * {
   return classed.slice(0, insertPoint + 1) + overrideStyle + classed.slice(insertPoint + 1);
 }
 
-export function GiraffeAnimated({ idPrefix, durationMs, playing = true, sizePx = 72, className }: Props) {
-  const [svgInnerHtml, setSvgInnerHtml] = useState<string | null>(null);
+export function GiraffeAnimated({ idPrefix, playbackRate, playing = true, sizePx = 72, className }: Props) {
+  const [svgMarkup, setSvgMarkup] = useState<string | null>(null);
+  const hostRef = useRef<HTMLDivElement | null>(null);
+  const animationsRef = useRef<Animation[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -131,35 +132,137 @@ export function GiraffeAnimated({ idPrefix, durationMs, playing = true, sizePx =
       const decoded = decodeEmbeddedCssImport(raw);
       const prefixed = prefixIds(decoded, idPrefix);
       const finalSvg = addRuntimeOverrides(prefixed);
-      if (!cancelled) setSvgInnerHtml(finalSvg);
+      if (!cancelled) setSvgMarkup(finalSvg);
     })().catch(() => {
-      if (!cancelled) setSvgInnerHtml(null);
+      if (!cancelled) setSvgMarkup(null);
     });
     return () => {
       cancelled = true;
     };
   }, [idPrefix]);
 
+  // IMPORTANT: Don't use dangerouslySetInnerHTML in render, because React may re-apply it on every parent re-render,
+  // which recreates the SVG subtree and restarts CSS animations. Instead, imperatively set innerHTML only when the
+  // markup changes (which should be only when idPrefix changes).
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    if (!svgMarkup) {
+      host.innerHTML = "";
+      return;
+    }
+    host.innerHTML = svgMarkup;
+  }, [svgMarkup]);
+
+  // Grab the underlying animations once the SVG is in the DOM so we can adjust playbackRate without restarting.
+  useEffect(() => {
+    animationsRef.current = [];
+    const host = hostRef.current;
+    if (!host) return;
+    if (!svgMarkup) return;
+
+    let raf = 0;
+    let attemptsLeft = 10;
+
+    const tryCapture = () => {
+      const svg = host.querySelector("svg.giraffe-svg");
+      if (svg) {
+        try {
+          // subtree:true captures descendant CSS animations too.
+          const anims = svg.getAnimations({ subtree: true });
+          if (anims.length > 0) {
+            animationsRef.current = anims;
+            return;
+          }
+        } catch {
+          // ignore and retry
+        }
+      }
+
+      attemptsLeft -= 1;
+      if (attemptsLeft > 0) {
+        raf = window.requestAnimationFrame(tryCapture);
+      }
+    };
+
+    raf = window.requestAnimationFrame(tryCapture);
+
+    return () => {
+      window.cancelAnimationFrame(raf);
+      animationsRef.current = [];
+    };
+  }, [svgMarkup]);
+
+  // Apply rate changes without restarting animations.
+  useEffect(() => {
+    let anims = animationsRef.current;
+    if (!anims.length) {
+      const host = hostRef.current;
+      const svg = host?.querySelector("svg.giraffe-svg");
+      if (svg) {
+        try {
+          anims = svg.getAnimations({ subtree: true });
+          animationsRef.current = anims;
+        } catch {
+          // ignore
+        }
+      }
+    }
+    if (!anims.length) return;
+
+    const rate = Number.isFinite(playbackRate) ? Math.max(0, playbackRate) : 1;
+
+    for (const a of anims) {
+      try {
+        a.playbackRate = rate === 0 ? 0.0001 : rate;
+      } catch {
+        // ignore
+      }
+    }
+  }, [playbackRate]);
+
+  // Apply play/pause without resetting the timeline.
+  useEffect(() => {
+    let anims = animationsRef.current;
+    if (!anims.length) {
+      const host = hostRef.current;
+      const svg = host?.querySelector("svg.giraffe-svg");
+      if (svg) {
+        try {
+          anims = svg.getAnimations({ subtree: true });
+          animationsRef.current = anims;
+        } catch {
+          // ignore
+        }
+      }
+    }
+    if (!anims.length) return;
+
+    for (const a of anims) {
+      try {
+        if (!playing) {
+          if (a.playState !== "paused") a.pause();
+        } else {
+          // Only resume if paused/idle; avoid calling play() every tick.
+          if (a.playState === "paused" || a.playState === "idle") a.play();
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }, [playing]);
+
   const wrapperStyle = useMemo(() => {
     return {
-      ["--giraffe-anim-duration" as any]: `${Math.max(50, Math.floor(durationMs))}ms`,
-
       ["--giraffe-anim-state" as any]: playing ? "running" : "paused",
       width: `${sizePx}px`,
       height: `${sizePx}px`,
     } as React.CSSProperties;
-  }, [durationMs, playing, sizePx]);
+  }, [playing, sizePx]);
 
-  if (!svgInnerHtml) {
+  if (!svgMarkup) {
     return <div className={className} style={wrapperStyle} aria-hidden="true" />;
   }
 
-  return (
-    <div
-      className={className}
-      style={wrapperStyle}
-      aria-hidden="true"
-      dangerouslySetInnerHTML={{ __html: svgInnerHtml }}
-    />
-  );
+  return <div className={className} style={wrapperStyle} ref={hostRef} aria-hidden="true" />;
 }
