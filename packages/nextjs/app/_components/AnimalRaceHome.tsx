@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Address } from "@scaffold-ui/components";
 import { Hex, formatEther, isHex, toHex } from "viem";
 import { usePublicClient } from "wagmi";
+import { GiraffeAnimated } from "~~/components/assets/GiraffeAnimated";
 import { useDeployedContractInfo, useScaffoldReadContract, useTargetNetwork } from "~~/hooks/scaffold-eth";
 import { simulateRaceFromSeed } from "~~/utils/race/simulateRace";
 
@@ -32,6 +33,7 @@ export const AnimalRaceHome = () => {
   const [frame, setFrame] = useState(0);
   const [isMining, setIsMining] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState<1 | 2 | 3>(2);
+  const [scaleFactor, setScaleFactor] = useState(1);
 
   const { data: animalRaceContract, isLoading: isAnimalRaceLoading } = useDeployedContractInfo({
     contractName: "AnimalRace",
@@ -108,6 +110,22 @@ export const AnimalRaceHome = () => {
     setFrame(0);
   }, [parsed?.seed]);
 
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const [viewportWidthPx, setViewportWidthPx] = useState(0);
+
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+
+    const ro = new ResizeObserver(entries => {
+      const w = entries[0]?.contentRect?.width ?? 0;
+      setViewportWidthPx(w);
+    });
+    ro.observe(el);
+    setViewportWidthPx(el.getBoundingClientRect().width);
+    return () => ro.disconnect();
+  }, []);
+
   useEffect(() => {
     if (!isPlaying) return;
     if (!simulation) return;
@@ -124,6 +142,7 @@ export const AnimalRaceHome = () => {
 
   const currentDistances = frames[frame] ?? [0, 0, 0, 0];
   const trackLength = 1000;
+  const prevDistances = frames[Math.max(0, frame - 1)] ?? [0, 0, 0, 0];
 
   const verifiedWinner = parsed?.settled ? parsed.winner : null;
   const simulatedWinner = simulation ? simulation.winner : null;
@@ -427,50 +446,172 @@ export const AnimalRaceHome = () => {
               </div>
 
               <div className="flex flex-col gap-3">
-                {/* Shared track: all lanes update on the same frame/tick */}
-                <div className="relative w-full rounded-2xl bg-base-100 border border-base-300 overflow-hidden">
-                  {/* Start / finish lines */}
-                  <div className="absolute left-4 top-3 bottom-3 w-[2px] bg-base-300" />
-                  <div className="absolute right-4 top-3 bottom-3 w-[2px] bg-base-300" />
-
-                  {/* Subtle track grid */}
-                  <div className="absolute inset-0 opacity-30 [background:repeating-linear-gradient(90deg,transparent,transparent_14px,rgba(0,0,0,0.08)_15px)]" />
-
-                  <div className="relative flex flex-col">
-                    {Array.from({ length: LANE_COUNT }).map((_, i) => {
-                      const d = currentDistances[i] ?? 0;
-                      const pctFloat = Math.min(1, Math.max(0, d / trackLength));
-                      const isWinner = verifiedWinner === i;
-                      const transitionMs = Math.floor(120 / playbackSpeed);
-
-                      return (
-                        <div key={i} className="relative h-14 border-b border-base-300/60 last:border-b-0">
-                          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-xs opacity-70">
-                            {LANE_EMOJI}{" "}
-                            {parsedAnimals ? (
-                              <LaneName tokenId={parsedAnimals.tokenIds[i] ?? 0n} fallback={`Lane ${i}`} />
-                            ) : (
-                              `Lane ${i}`
-                            )}{" "}
-                            {isWinner ? "(winner)" : ""} · {d}
-                          </div>
-
-                          <div
-                            className={`absolute top-1/2 text-3xl ${isWinner ? "drop-shadow" : ""}`}
-                            style={{
-                              left: `calc(${(pctFloat * 100).toFixed(2)}% * 0.92 + 4%)`,
-                              transform: "translate(-50%, -50%)",
-                              transition: `left ${transitionMs}ms linear`,
-                            }}
-                            aria-label={`Lane ${i}`}
-                          >
-                            {LANE_EMOJI}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-xs opacity-70">Scale</div>
+                  <input
+                    className="range range-xs w-56"
+                    type="range"
+                    min={0.6}
+                    max={1.8}
+                    step={0.05}
+                    value={scaleFactor}
+                    onChange={e => setScaleFactor(Number(e.target.value))}
+                  />
+                  <div className="text-xs tabular-nums opacity-70 w-12 text-right">{scaleFactor.toFixed(2)}x</div>
                 </div>
+
+                {/* Shared track: all lanes update on the same frame/tick (must match on-chain sim) */}
+                {(() => {
+                  const laneHeightPx = 86;
+                  const laneGapPx = 10;
+                  const worldPaddingLeftPx = 80;
+                  const worldPaddingRightPx = 140;
+                  const pxPerUnit = 3;
+                  const trackLengthPx = trackLength * pxPerUnit;
+                  const worldWidthPx = worldPaddingLeftPx + trackLengthPx + worldPaddingRightPx;
+                  const transitionMs = Math.floor(120 / playbackSpeed);
+
+                  const leader = Math.max(...currentDistances.map(x => Number(x ?? 0)));
+                  const leaderX = worldPaddingLeftPx + (leader / trackLength) * trackLengthPx;
+                  const viewportWorldWidth = viewportWidthPx > 0 ? viewportWidthPx / Math.max(0.25, scaleFactor) : 0;
+                  const cameraLead = 0.6; // keep leader ~60% across the viewport
+                  const unclampedCameraX = leaderX - viewportWorldWidth * cameraLead;
+                  const maxCameraX = Math.max(0, worldWidthPx - viewportWorldWidth);
+                  const cameraX = Math.min(maxCameraX, Math.max(0, unclampedCameraX));
+
+                  return (
+                    <div
+                      ref={viewportRef}
+                      className="relative w-full rounded-2xl bg-base-100 border border-base-300 overflow-hidden"
+                      style={{ height: `${LANE_COUNT * (laneHeightPx + laneGapPx) - laneGapPx}px` }}
+                    >
+                      {/* Fixed lane labels */}
+                      <div className="absolute left-3 top-3 bottom-3 z-10 flex flex-col justify-between pointer-events-none">
+                        {Array.from({ length: LANE_COUNT }).map((_, i) => {
+                          const d = Number(currentDistances[i] ?? 0);
+                          const isWinner = verifiedWinner === i;
+                          return (
+                            <div
+                              key={i}
+                              className="flex items-center gap-2 text-xs opacity-80"
+                              style={{ height: `${laneHeightPx}px` }}
+                            >
+                              <span className="font-medium whitespace-nowrap">
+                                Lane {i}
+                                {isWinner ? " (winner)" : ""}
+                              </span>
+                              <span className="opacity-60 tabular-nums">· {d}</span>
+                              <span className="opacity-60">
+                                {parsedAnimals ? (
+                                  <LaneName tokenId={parsedAnimals.tokenIds[i] ?? 0n} fallback={`Lane ${i}`} />
+                                ) : null}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Camera viewport */}
+                      <div
+                        className="absolute inset-0"
+                        style={{
+                          transform: `scale(${scaleFactor})`,
+                          transformOrigin: "top left",
+                        }}
+                      >
+                        <div
+                          className="absolute inset-0"
+                          style={{
+                            width: `${worldWidthPx}px`,
+                            transform: `translateX(${-cameraX}px)`,
+                            transition: `transform ${transitionMs}ms linear`,
+                          }}
+                        >
+                          {/* Track background */}
+                          <div className="absolute inset-0">
+                            {/* Start + finish */}
+                            <div
+                              className="absolute top-3 bottom-3 w-[3px] bg-base-300"
+                              style={{ left: `${worldPaddingLeftPx}px` }}
+                            />
+                            <div
+                              className="absolute top-3 bottom-3 w-[3px] bg-base-300"
+                              style={{
+                                left: `${worldPaddingLeftPx + trackLengthPx}px`,
+                              }}
+                            />
+
+                            {/* Tick grid */}
+                            <div
+                              className="absolute inset-0 opacity-30"
+                              style={{
+                                background:
+                                  "repeating-linear-gradient(90deg, transparent, transparent 29px, rgba(0,0,0,0.10) 30px)",
+                              }}
+                            />
+
+                            {/* Lanes */}
+                            {Array.from({ length: LANE_COUNT }).map((_, i) => {
+                              const top = i * (laneHeightPx + laneGapPx);
+                              return (
+                                <div
+                                  key={i}
+                                  className="absolute left-0 right-0 rounded-xl"
+                                  style={{
+                                    top: `${top}px`,
+                                    height: `${laneHeightPx}px`,
+                                    background:
+                                      "linear-gradient(180deg, rgba(0,0,0,0.04), rgba(0,0,0,0.02)), repeating-linear-gradient(90deg, rgba(0,0,0,0.00), rgba(0,0,0,0.00) 10px, rgba(0,0,0,0.05) 11px)",
+                                    border: "1px solid rgba(0,0,0,0.06)",
+                                  }}
+                                />
+                              );
+                            })}
+                          </div>
+
+                          {/* Giraffes */}
+                          {Array.from({ length: LANE_COUNT }).map((_, i) => {
+                            const d = Number(currentDistances[i] ?? 0);
+                            const prev = Number(prevDistances[i] ?? 0);
+                            const delta = Math.max(0, d - prev); // 1..10 normally (per on-chain)
+                            const isWinner = verifiedWinner === i;
+
+                            // Tie the SVG animation speed to the *per-tick* movement delta.
+                            // Movement uses the same frames array as the on-chain sim; this only changes visuals.
+                            const speedFactor = Math.min(3, Math.max(0.6, delta / 4));
+                            const durationMs = 2000 / speedFactor;
+
+                            const x =
+                              worldPaddingLeftPx +
+                              (Math.min(trackLength, Math.max(0, d)) / trackLength) * trackLengthPx;
+                            const y = i * (laneHeightPx + laneGapPx) + laneHeightPx / 2;
+
+                            return (
+                              <div
+                                key={i}
+                                className="absolute"
+                                style={{
+                                  left: `${x}px`,
+                                  top: `${y}px`,
+                                  transform: "translate(-50%, -50%)",
+                                  transition: `left ${transitionMs}ms linear`,
+                                  filter: isWinner ? "drop-shadow(0 6px 10px rgba(0,0,0,0.25))" : undefined,
+                                }}
+                              >
+                                <GiraffeAnimated
+                                  idPrefix={`lane-${i}`}
+                                  durationMs={durationMs}
+                                  playing={isPlaying}
+                                  sizePx={78}
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               <details className="collapse collapse-arrow bg-base-100">
