@@ -1448,6 +1448,11 @@ const deployedContracts = {
         },
         {
           type: "error",
+          name: "PreviousRaceNotSettled",
+          inputs: [],
+        },
+        {
+          type: "error",
           name: "RaceNotReady",
           inputs: [],
         },

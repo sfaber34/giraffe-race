@@ -110,6 +110,7 @@ contract AnimalRace {
     error EntryPoolFull();
     error InvalidCloseBlock();
     error AnimalsAlreadyFinalized();
+    error PreviousRaceNotSettled();
 
     modifier onlyOwner() {
         if (msg.sender != owner) revert NotOwner();
@@ -166,6 +167,12 @@ contract AnimalRace {
     }
 
     function _createRace(uint64 closeBlock) internal returns (uint256 raceId) {
+        // Only allow one open race at a time: previous race must be settled before creating a new one.
+        if (nextRaceId > 0) {
+            Race storage prev = races[nextRaceId - 1];
+            if (!prev.settled) revert PreviousRaceNotSettled();
+        }
+
         // Need at least SUBMISSION_CLOSE_OFFSET_BLOCKS blocks between creation and submission close,
         // and another SUBMISSION_CLOSE_OFFSET_BLOCKS blocks between submission close and betting close.
         // (With the current constants, that's 20 blocks total.)

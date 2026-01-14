@@ -233,6 +233,7 @@ export const HomeRacePrototype = () => {
   const canSubmit = status === "submissions_open";
   const canBet = status === "betting_open";
   const lineupFinalized = (parsedAnimals?.assignedCount ?? 0) === 4;
+  const bettingInputsDisabled = !lineupFinalized || !canBet;
   const isOwner =
     !!connectedAddress && !!ownerAddress && connectedAddress.toLowerCase() === (ownerAddress as string).toLowerCase();
 
@@ -576,37 +577,13 @@ export const HomeRacePrototype = () => {
               One bet per address per race. Betting opens once the lane lineup is finalized.
             </p>
 
-            {!lineupFinalized ? (
-              <div className="alert alert-info">
-                <div className="flex flex-col gap-1">
-                  <div className="text-sm font-medium">Waiting on lane lineup</div>
-                  <div className="text-xs opacity-70">
-                    After submissions close, anyone can finalize the lineup. Once it’s finalized, you can bet while the
-                    betting window is open.
-                  </div>
-                  <button
-                    className="btn btn-sm btn-outline mt-2 self-start"
-                    disabled={!animalRaceContract || latestRaceId === undefined || !canBet}
-                    onClick={async () => {
-                      if (latestRaceId === undefined) return;
-                      await writeAnimalRaceAsync({
-                        functionName: "finalizeRaceAnimals",
-                        args: [latestRaceId],
-                      } as any);
-                    }}
-                  >
-                    Finalize lane lineup
-                  </button>
-                </div>
-              </div>
-            ) : null}
-
             <div className="flex flex-wrap gap-2">
               {Array.from({ length: LANE_COUNT }).map((_, lane) => (
                 <button
                   key={lane}
                   className={`btn btn-sm ${betLane === lane ? "btn-primary" : "btn-outline"}`}
                   onClick={() => setBetLane(lane as 0 | 1 | 2 | 3)}
+                  disabled={bettingInputsDisabled}
                   type="button"
                 >
                   {lineupFinalized && parsedAnimals?.tokenIds?.[lane] && parsedAnimals.tokenIds[lane] !== 0n ? (
@@ -622,11 +599,16 @@ export const HomeRacePrototype = () => {
               ))}
             </div>
 
-            <EtherInput
-              placeholder="Bet amount (ETH)"
-              onValueChange={({ valueInEth }) => setBetAmountEth(valueInEth)}
-              style={{ width: "100%" }}
-            />
+            <div className={bettingInputsDisabled ? "opacity-50 pointer-events-none" : ""}>
+              <EtherInput
+                placeholder="Bet amount (ETH)"
+                onValueChange={({ valueInEth }) => {
+                  if (bettingInputsDisabled) return;
+                  setBetAmountEth(valueInEth);
+                }}
+                style={{ width: "100%" }}
+              />
+            </div>
 
             <button
               className="btn btn-primary"

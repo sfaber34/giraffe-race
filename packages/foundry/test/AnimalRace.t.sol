@@ -239,5 +239,15 @@ contract AnimalRaceTest is Test {
         vm.expectRevert(AnimalRace.BettingNotOpen.selector);
         race.placeBet{ value: 1 ether }(raceId, 0);
     }
+
+    function testCannotCreateNewRaceUntilPreviousSettled() public {
+        vm.roll(700);
+        vm.prank(owner);
+        race.createRace();
+
+        vm.prank(owner);
+        vm.expectRevert(AnimalRace.PreviousRaceNotSettled.selector);
+        race.createRace();
+    }
 }
 
