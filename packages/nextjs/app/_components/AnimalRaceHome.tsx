@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Address } from "@scaffold-ui/components";
 import { Hex, formatEther, isHex, toHex } from "viem";
 import { usePublicClient } from "wagmi";
@@ -34,6 +34,10 @@ export const AnimalRaceHome = () => {
   const [isMining, setIsMining] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState<1 | 2 | 3>(2);
   const [scaleFactor, setScaleFactor] = useState(1);
+  const [raceStarted, setRaceStarted] = useState(false);
+  const [startDelayRemainingMs, setStartDelayRemainingMs] = useState(3000);
+  const startDelayEndAtRef = useRef<number | null>(null);
+  const startDelayTimeoutRef = useRef<number | null>(null);
 
   const { data: animalRaceContract, isLoading: isAnimalRaceLoading } = useDeployedContractInfo({
     contractName: "AnimalRace",
@@ -108,6 +112,8 @@ export const AnimalRaceHome = () => {
 
   useEffect(() => {
     setFrame(0);
+    setRaceStarted(false);
+    setStartDelayRemainingMs(3000);
   }, [parsed?.seed]);
 
   const [viewportEl, setViewportEl] = useState<HTMLDivElement | null>(null);
@@ -115,6 +121,51 @@ export const AnimalRaceHome = () => {
     setViewportEl(el);
   }, []);
   const [viewportWidthPx, setViewportWidthPx] = useState(0);
+
+  // Start-delay logic: hold the racers at the start line for 3s, then begin ticking.
+  useEffect(() => {
+    // Only apply the start delay at the beginning of a run.
+    if (!simulation) return;
+    if (!isPlaying) return;
+    if (raceStarted) return;
+    if (frame !== 0) return;
+
+    // Clean any prior timer (shouldn't happen often, but keeps it robust).
+    if (startDelayTimeoutRef.current) {
+      window.clearTimeout(startDelayTimeoutRef.current);
+      startDelayTimeoutRef.current = null;
+    }
+
+    const remaining = Math.max(0, Math.floor(startDelayRemainingMs));
+    startDelayEndAtRef.current = Date.now() + remaining;
+
+    startDelayTimeoutRef.current = window.setTimeout(() => {
+      startDelayTimeoutRef.current = null;
+      startDelayEndAtRef.current = null;
+      setRaceStarted(true);
+      setStartDelayRemainingMs(0);
+    }, remaining);
+
+    return () => {
+      if (startDelayTimeoutRef.current) {
+        window.clearTimeout(startDelayTimeoutRef.current);
+        startDelayTimeoutRef.current = null;
+      }
+      if (startDelayEndAtRef.current !== null) {
+        const left = Math.max(0, startDelayEndAtRef.current - Date.now());
+        setStartDelayRemainingMs(left);
+        startDelayEndAtRef.current = null;
+      }
+    };
+  }, [simulation, isPlaying, raceStarted, frame, startDelayRemainingMs]);
+
+  // If the user manually advances frames, don't enforce the start delay.
+  useEffect(() => {
+    if (frame > 0 && !raceStarted) {
+      setRaceStarted(true);
+      setStartDelayRemainingMs(0);
+    }
+  }, [frame, raceStarted]);
 
   useEffect(() => {
     const el = viewportEl;
@@ -132,6 +183,7 @@ export const AnimalRaceHome = () => {
   useEffect(() => {
     if (!isPlaying) return;
     if (!simulation) return;
+    if (!raceStarted) return;
 
     const id = window.setInterval(
       () => {
@@ -141,7 +193,7 @@ export const AnimalRaceHome = () => {
     );
 
     return () => window.clearInterval(id);
-  }, [isPlaying, simulation, lastFrameIndex, playbackSpeed]);
+  }, [isPlaying, simulation, raceStarted, lastFrameIndex, playbackSpeed]);
 
   const currentDistances = frames[frame] ?? [0, 0, 0, 0];
   const trackLength = 1000;
@@ -153,6 +205,8 @@ export const AnimalRaceHome = () => {
 
   const stepBy = (delta: -1 | 1) => {
     setIsPlaying(false);
+    setRaceStarted(true);
+    setStartDelayRemainingMs(0);
     setFrame(prev => {
       const next = prev + delta;
       if (next < 0) return 0;
@@ -398,7 +452,15 @@ export const AnimalRaceHome = () => {
                   3x
                 </button>
               </div>
-              <button className="btn btn-sm" onClick={() => setFrame(0)} disabled={!simulation}>
+              <button
+                className="btn btn-sm"
+                onClick={() => {
+                  setFrame(0);
+                  setRaceStarted(false);
+                  setStartDelayRemainingMs(3000);
+                }}
+                disabled={!simulation}
+              >
                 Reset
               </button>
               <button className="btn btn-sm" onClick={() => stepBy(-1)} disabled={!simulation || frame === 0}>
@@ -633,7 +695,7 @@ export const AnimalRaceHome = () => {
                                 <GiraffeAnimated
                                   idPrefix={`lane-${i}`}
                                   durationMs={durationMs}
-                                  playing={isPlaying}
+                                  playing={isPlaying && raceStarted}
                                   sizePx={giraffeSizePx}
                                 />
                               </div>
