@@ -135,6 +135,10 @@ export function GiraffeAnimated({
   const [svgMarkup, setSvgMarkup] = useState<string | null>(null);
   const hostRef = useRef<HTMLDivElement | null>(null);
   const animationsRef = useRef<Animation[]>([]);
+  const targetRateRef = useRef(1);
+  const currentRateRef = useRef<number | null>(null);
+  const rateRafRef = useRef<number | null>(null);
+  const rateLastTsRef = useRef<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -256,31 +260,69 @@ export function GiraffeAnimated({
 
   // Apply rate changes without restarting animations.
   useEffect(() => {
-    let anims = animationsRef.current;
-    if (!anims.length) {
-      const host = hostRef.current;
-      const svg = host?.querySelector("svg.giraffe-svg");
-      if (svg) {
-        try {
-          anims = svg.getAnimations({ subtree: true });
-          animationsRef.current = anims;
-        } catch {
-          // ignore
+    // Treat `playbackRate` as a target and smooth toward it (prevents choppy tick-to-tick speed changes).
+    const nextTarget = Number.isFinite(playbackRate) ? Math.max(0, playbackRate) : 1;
+    targetRateRef.current = nextTarget;
+  }, [playbackRate]);
+
+  // Smoothly apply rate changes via RAF to avoid "snapping" animation speed each tick.
+  useEffect(() => {
+    // Cancel any in-flight loop.
+    if (rateRafRef.current) cancelAnimationFrame(rateRafRef.current);
+    rateRafRef.current = null;
+    rateLastTsRef.current = null;
+    currentRateRef.current = null;
+
+    const RATE_SMOOTH_TIME_MS = 500; // bigger = smoother, smaller = snappier
+
+    const step = (now: number) => {
+      const last = rateLastTsRef.current;
+      rateLastTsRef.current = now;
+      const dt = last === null ? 16 : Math.min(64, Math.max(0, now - last));
+
+      let anims = animationsRef.current;
+      if (!anims.length) {
+        const host = hostRef.current;
+        const svg = host?.querySelector("svg.giraffe-svg");
+        if (svg) {
+          try {
+            anims = svg.getAnimations({ subtree: true });
+            animationsRef.current = anims;
+          } catch {
+            // ignore
+          }
         }
       }
-    }
-    if (!anims.length) return;
 
-    const rate = Number.isFinite(playbackRate) ? Math.max(0, playbackRate) : 1;
+      if (anims.length) {
+        const target = targetRateRef.current;
+        const current = currentRateRef.current ?? target;
+        const alpha = 1 - Math.exp(-dt / Math.max(1, RATE_SMOOTH_TIME_MS));
+        const next = current + (target - current) * alpha;
+        currentRateRef.current = next;
 
-    for (const a of anims) {
-      try {
-        a.playbackRate = rate === 0 ? 0.0001 : rate;
-      } catch {
-        // ignore
+        const applied = next <= 0 ? 0.0001 : next;
+        for (const a of anims) {
+          try {
+            a.playbackRate = applied;
+          } catch {
+            // ignore
+          }
+        }
       }
-    }
-  }, [playbackRate]);
+
+      rateRafRef.current = requestAnimationFrame(step);
+    };
+
+    rateRafRef.current = requestAnimationFrame(step);
+
+    return () => {
+      if (rateRafRef.current) cancelAnimationFrame(rateRafRef.current);
+      rateRafRef.current = null;
+      rateLastTsRef.current = null;
+      currentRateRef.current = null;
+    };
+  }, [svgMarkup]);
 
   // Apply play/pause without resetting the timeline.
   useEffect(() => {
