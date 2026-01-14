@@ -130,11 +130,13 @@ export const AnimalRaceHome = () => {
     setCameraScrollEl(el);
   }, []);
   const [cameraX, setCameraX] = useState(0);
-  const cameraAnimRafRef = useRef<number | null>(null);
-  const cameraAnimFromRef = useRef(0);
-  const cameraAnimToRef = useRef(0);
-  const cameraAnimStartRef = useRef(0);
-  const cameraAnimDurationRef = useRef(0);
+  // Camera smoothing: continuously ease scrollLeft toward the computed cameraX target.
+  const cameraTargetXRef = useRef(0);
+  const cameraSmoothRafRef = useRef<number | null>(null);
+  const cameraSmoothLastTsRef = useRef<number | null>(null);
+  const playbackSpeedRef = useRef(playbackSpeed);
+  const cameraSpringXRef = useRef<number | null>(null);
+  const cameraSpringVRef = useRef(0);
 
   // Start-delay logic: hold the racers at the start line for 3s, then begin ticking.
   useEffect(() => {
@@ -239,8 +241,14 @@ export const AnimalRaceHome = () => {
       return;
     }
 
-    const leader = Math.max(...currentDistances.map(x => Number(x ?? 0)));
-    const leaderX = worldPaddingLeftPx + (leader / trackLength) * trackLengthPx;
+    const distances = currentDistances.map(x => Number(x ?? 0));
+    const maxDist = Math.max(...distances);
+    const maxRunnerX = worldPaddingLeftPx + (maxDist / trackLength) * trackLengthPx;
+
+    // Use the average position of all runners as the camera focal point.
+    // This makes the camera feel less "twitchy" than chasing the instantaneous leader.
+    const avgDist = distances.length ? distances.reduce((sum, d) => sum + d, 0) / distances.length : 0;
+    const focalX = worldPaddingLeftPx + (avgDist / trackLength) * trackLengthPx;
 
     // Keep the leader fully visible (account for sprite width), not just the leader point.
     const spriteHalf = giraffeSizePx / 2;
@@ -252,19 +260,24 @@ export const AnimalRaceHome = () => {
     // 1) Start: no camera movement.
     // 2) Mid-race: follow leader, keeping them toward the right side of the viewport.
     // 3) Finish approach: stop slewing once the finish line is visible on the right side.
-    const followStartThresholdScreenX = viewportWorldWidth * 0.84;
+    const followStartThresholdScreenX = viewportWorldWidth * 0.5;
     const followStartX = Math.max(minLeaderScreenX, followStartThresholdScreenX);
 
-    const targetLeaderScreenX = viewportWorldWidth * 0.8;
-    const desiredLeaderScreenX = Math.min(maxLeaderScreenX, Math.max(minLeaderScreenX, targetLeaderScreenX));
+    // When panning, keep the pack closer to center (was ~80% toward the right edge).
+    const targetFocalScreenX = viewportWorldWidth * 0.5;
+    const desiredFocalScreenX = Math.min(maxLeaderScreenX, Math.max(minLeaderScreenX, targetFocalScreenX));
 
     const maxCameraX = Math.max(0, worldWidthPx - viewportWorldWidth);
 
     const finishInset = 150;
     const freezeX = Math.min(maxCameraX, Math.max(0, finishLineX - (viewportWorldWidth - finishInset)));
 
-    const followX = Math.min(maxCameraX, Math.max(0, leaderX - desiredLeaderScreenX));
-    const nextCameraX = leaderX < followStartX ? 0 : Math.min(followX, freezeX);
+    const followFocalX = Math.min(maxCameraX, Math.max(0, focalX - desiredFocalScreenX));
+    // Ensure the furthest runner doesn't slip past the right edge during follow.
+    const keepMaxVisibleX = Math.min(maxCameraX, Math.max(0, maxRunnerX - maxLeaderScreenX));
+    const followX = Math.max(followFocalX, keepMaxVisibleX);
+
+    const nextCameraX = maxRunnerX < followStartX ? 0 : Math.min(followX, freezeX);
     setCameraX(nextCameraX);
   }, [
     simulation,
@@ -278,48 +291,64 @@ export const AnimalRaceHome = () => {
     giraffeSizePx,
   ]);
 
-  // Drive camera via scrollLeft, smoothly tweening between tick targets.
+  useEffect(() => {
+    playbackSpeedRef.current = playbackSpeed;
+  }, [playbackSpeed]);
+
+  useEffect(() => {
+    cameraTargetXRef.current = Math.max(0, cameraX);
+  }, [cameraX]);
+
+  // Drive camera via scrollLeft with spring smoothing (less choppy when target updates in discrete ticks).
   useEffect(() => {
     const el = cameraScrollEl;
     if (!el) return;
-
-    const durationMs = Math.max(1, Math.floor(120 / playbackSpeed));
-    const from = el.scrollLeft;
-    const to = Math.max(0, cameraX);
-
-    // Cancel any in-flight tween.
-    if (cameraAnimRafRef.current) {
-      cancelAnimationFrame(cameraAnimRafRef.current);
-      cameraAnimRafRef.current = null;
-    }
-
-    cameraAnimFromRef.current = from;
-    cameraAnimToRef.current = to;
-    cameraAnimStartRef.current = performance.now();
-    cameraAnimDurationRef.current = durationMs;
+    cameraSmoothLastTsRef.current = null;
+    cameraSpringXRef.current = null;
+    cameraSpringVRef.current = 0;
 
     const step = (now: number) => {
-      const t0 = cameraAnimStartRef.current;
-      const d = cameraAnimDurationRef.current;
-      const p = d <= 0 ? 1 : Math.min(1, Math.max(0, (now - t0) / d));
-      const x = cameraAnimFromRef.current + (cameraAnimToRef.current - cameraAnimFromRef.current) * p;
-      el.scrollLeft = x;
-      if (p < 1) {
-        cameraAnimRafRef.current = requestAnimationFrame(step);
-      } else {
-        cameraAnimRafRef.current = null;
-      }
+      const last = cameraSmoothLastTsRef.current;
+      cameraSmoothLastTsRef.current = now;
+      const dt = last === null ? 16 : Math.min(64, Math.max(0, now - last));
+      const dtSec = dt / 1000;
+
+      const target = cameraTargetXRef.current;
+      const maxScroll = Math.max(0, el.scrollWidth - el.clientWidth);
+
+      // Critically-damped spring (Unity-style SmoothDamp) toward `target`.
+      // Smaller smoothTime = snappier. Scale down with playbackSpeed so faster playback doesn't feel too laggy.
+      const smoothTimeSec = Math.max(0.05, 0.55 / playbackSpeedRef.current);
+      const omega = 2 / smoothTimeSec;
+      const x = omega * dtSec;
+      const exp = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
+
+      const current = cameraSpringXRef.current ?? el.scrollLeft;
+      const change = current - target;
+      const temp = (cameraSpringVRef.current + omega * change) * dtSec;
+      const newVel = (cameraSpringVRef.current - omega * temp) * exp;
+      const newPos = target + (change + temp) * exp;
+
+      cameraSpringVRef.current = newVel;
+      cameraSpringXRef.current = Math.max(0, Math.min(maxScroll, newPos));
+      el.scrollLeft = cameraSpringXRef.current;
+
+      cameraSmoothRafRef.current = requestAnimationFrame(step);
     };
 
-    cameraAnimRafRef.current = requestAnimationFrame(step);
+    // Cancel any prior loop (shouldn't happen often, but keeps it robust).
+    if (cameraSmoothRafRef.current) {
+      cancelAnimationFrame(cameraSmoothRafRef.current);
+      cameraSmoothRafRef.current = null;
+    }
+    cameraSmoothRafRef.current = requestAnimationFrame(step);
 
     return () => {
-      if (cameraAnimRafRef.current) {
-        cancelAnimationFrame(cameraAnimRafRef.current);
-        cameraAnimRafRef.current = null;
-      }
+      if (cameraSmoothRafRef.current) cancelAnimationFrame(cameraSmoothRafRef.current);
+      cameraSmoothRafRef.current = null;
+      cameraSmoothLastTsRef.current = null;
     };
-  }, [cameraScrollEl, cameraX, playbackSpeed]);
+  }, [cameraScrollEl]);
 
   const verifiedWinner = parsed?.settled ? parsed.winner : null;
   const simulatedWinner = simulation ? simulation.winner : null;
