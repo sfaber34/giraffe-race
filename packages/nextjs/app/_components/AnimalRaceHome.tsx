@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Address } from "@scaffold-ui/components";
 import { Hex, formatEther, isHex, toHex } from "viem";
 import { usePublicClient } from "wagmi";
@@ -110,11 +110,14 @@ export const AnimalRaceHome = () => {
     setFrame(0);
   }, [parsed?.seed]);
 
-  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const [viewportEl, setViewportEl] = useState<HTMLDivElement | null>(null);
+  const viewportRefCb = useCallback((el: HTMLDivElement | null) => {
+    setViewportEl(el);
+  }, []);
   const [viewportWidthPx, setViewportWidthPx] = useState(0);
 
   useEffect(() => {
-    const el = viewportRef.current;
+    const el = viewportEl;
     if (!el) return;
 
     const ro = new ResizeObserver(entries => {
@@ -124,7 +127,7 @@ export const AnimalRaceHome = () => {
     ro.observe(el);
     setViewportWidthPx(el.getBoundingClientRect().width);
     return () => ro.disconnect();
-  }, []);
+  }, [viewportEl]);
 
   useEffect(() => {
     if (!isPlaying) return;
@@ -467,6 +470,7 @@ export const AnimalRaceHome = () => {
                   const worldPaddingLeftPx = 80;
                   const worldPaddingRightPx = 140;
                   const pxPerUnit = 3;
+                  const giraffeSizePx = 78;
                   const trackLengthPx = trackLength * pxPerUnit;
                   const worldWidthPx = worldPaddingLeftPx + trackLengthPx + worldPaddingRightPx;
                   const transitionMs = Math.floor(120 / playbackSpeed);
@@ -474,14 +478,42 @@ export const AnimalRaceHome = () => {
                   const leader = Math.max(...currentDistances.map(x => Number(x ?? 0)));
                   const leaderX = worldPaddingLeftPx + (leader / trackLength) * trackLengthPx;
                   const viewportWorldWidth = viewportWidthPx > 0 ? viewportWidthPx / Math.max(0.25, scaleFactor) : 0;
-                  const cameraLead = 0.6; // keep leader ~60% across the viewport
-                  const unclampedCameraX = leaderX - viewportWorldWidth * cameraLead;
+
+                  const finishLineX = worldPaddingLeftPx + trackLengthPx;
+
+                  // Keep the leader fully visible (account for sprite width), not just the leader point.
+                  const spriteHalf = giraffeSizePx / 2;
+                  const spritePad = 12; // extra safety padding so it doesn't kiss the edge
+                  const minLeaderScreenX = spriteHalf + spritePad;
+                  const maxLeaderScreenX = Math.max(minLeaderScreenX, viewportWorldWidth - (spriteHalf + spritePad));
                   const maxCameraX = Math.max(0, worldWidthPx - viewportWorldWidth);
-                  const cameraX = Math.min(maxCameraX, Math.max(0, unclampedCameraX));
+
+                  // Camera behavior:
+                  // 1) Start: no camera movement (cameraX=0).
+                  // 2) Mid-race: follow leader, keeping them toward the right side.
+                  // 3) Finish approach: stop slewing once the finish line is visible on the right side.
+                  const followStartThresholdScreenX = viewportWorldWidth * 0.84;
+                  const followStartX = Math.max(minLeaderScreenX, followStartThresholdScreenX);
+
+                  const targetLeaderScreenX = viewportWorldWidth * 0.8; // keep leader near the right
+                  const desiredLeaderScreenX = Math.min(
+                    maxLeaderScreenX,
+                    Math.max(minLeaderScreenX, targetLeaderScreenX),
+                  );
+
+                  // Camera position that keeps the finish line visible on the right with a small inset.
+                  const finishInset = 18;
+                  const freezeX = Math.min(maxCameraX, Math.max(0, finishLineX - (viewportWorldWidth - finishInset)));
+
+                  // If we haven't reached the follow threshold yet, stay in state (1).
+                  const followXUnclamped = leaderX - desiredLeaderScreenX;
+                  const followX = Math.min(maxCameraX, Math.max(0, followXUnclamped));
+
+                  const cameraX = viewportWorldWidth <= 0 ? 0 : leaderX < followStartX ? 0 : Math.min(followX, freezeX);
 
                   return (
                     <div
-                      ref={viewportRef}
+                      ref={viewportRefCb}
                       className="relative w-full rounded-2xl bg-base-100 border border-base-300 overflow-hidden"
                       style={{ height: `${LANE_COUNT * (laneHeightPx + laneGapPx) - laneGapPx}px` }}
                     >
@@ -602,7 +634,7 @@ export const AnimalRaceHome = () => {
                                   idPrefix={`lane-${i}`}
                                   durationMs={durationMs}
                                   playing={isPlaying}
-                                  sizePx={78}
+                                  sizePx={giraffeSizePx}
                                 />
                               </div>
                             );
