@@ -711,8 +711,21 @@ export const AnimalRaceHome = () => {
                                     style={{
                                       top: `${top}px`,
                                       height: `${laneHeightPx}px`,
-                                      background:
-                                        "linear-gradient(180deg, rgba(0,0,0,0.04), rgba(0,0,0,0.02)), repeating-linear-gradient(90deg, rgba(0,0,0,0.00), rgba(0,0,0,0.00) 10px, rgba(0,0,0,0.05) 11px)",
+                                      // Dirt-ish lane texture: base tint + speckles + subtle ruts.
+                                      // (Pure CSS, no assets; tuned to remain readable on light/dark themes.)
+                                      background: [
+                                        // soft lighting
+                                        "linear-gradient(180deg, rgba(255,255,255,0.06), rgba(0,0,0,0.10))",
+                                        // dirt tint
+                                        "linear-gradient(90deg, rgba(168,118,72,0.20), rgba(168,118,72,0.12))",
+                                        // speckles
+                                        "radial-gradient(circle at 20% 30%, rgba(0,0,0,0.12) 0 1px, transparent 2px)",
+                                        "radial-gradient(circle at 70% 60%, rgba(0,0,0,0.10) 0 1px, transparent 2px)",
+                                        "radial-gradient(circle at 40% 80%, rgba(255,255,255,0.06) 0 1px, transparent 2px)",
+                                        // subtle ruts/striations
+                                        "repeating-linear-gradient(90deg, rgba(0,0,0,0.00), rgba(0,0,0,0.00) 10px, rgba(0,0,0,0.06) 11px)",
+                                      ].join(", "),
+                                      backgroundSize: "auto, auto, 18px 18px, 22px 22px, 26px 26px, auto",
                                       border: "1px solid rgba(0,0,0,0.06)",
                                     }}
                                   />
