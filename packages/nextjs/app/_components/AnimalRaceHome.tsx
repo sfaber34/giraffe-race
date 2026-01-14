@@ -260,7 +260,7 @@ export const AnimalRaceHome = () => {
 
     const maxCameraX = Math.max(0, worldWidthPx - viewportWorldWidth);
 
-    const finishInset = 50;
+    const finishInset = 150;
     const freezeX = Math.min(maxCameraX, Math.max(0, finishLineX - (viewportWorldWidth - finishInset)));
 
     const followX = Math.min(maxCameraX, Math.max(0, leaderX - desiredLeaderScreenX));
@@ -365,7 +365,7 @@ export const AnimalRaceHome = () => {
   };
 
   return (
-    <div className="flex flex-col gap-8 w-full max-w-4xl px-6 py-10">
+    <div className="flex flex-col gap-8 w-full px-6 py-10">
       <div className="card bg-base-200 shadow">
         <div className="card-body gap-2">
           <div className="flex items-center justify-between">
@@ -731,7 +731,7 @@ export const AnimalRaceHome = () => {
                               // Movement uses the same frames array as the on-chain sim; this only changes visuals.
                               // Delta ranges from 1 to speedRange (10) based on on-chain simulation.
                               const MIN_ANIMATION_SPEED_FACTOR = 2.0;
-                              const MAX_ANIMATION_SPEED_FACTOR = 4.0;
+                              const MAX_ANIMATION_SPEED_FACTOR = 5.0;
                               const minDelta = 1;
                               const maxDelta = SPEED_RANGE;
                               const t = Math.max(0, Math.min(1, (delta - minDelta) / (maxDelta - minDelta)));
