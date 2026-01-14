@@ -10,6 +10,8 @@ import { simulateRaceFromSeed } from "~~/utils/race/simulateRace";
 
 const LANE_COUNT = 4 as const;
 const LANE_EMOJI = "🦒";
+// Simulation constants (keep in sync with AnimalRace.sol)
+const SPEED_RANGE = 10;
 
 const LaneName = ({ tokenId, fallback }: { tokenId: bigint; fallback: string }) => {
   const enabled = tokenId !== 0n;
@@ -32,12 +34,12 @@ export const AnimalRaceHome = () => {
   const [isPlaying, setIsPlaying] = useState(true);
   const [frame, setFrame] = useState(0);
   const [isMining, setIsMining] = useState(false);
-  const [playbackSpeed, setPlaybackSpeed] = useState<1 | 2 | 3>(2);
-  const [scaleFactor, setScaleFactor] = useState(1);
+  const [playbackSpeed, setPlaybackSpeed] = useState<1 | 2 | 3>(1);
   const [raceStarted, setRaceStarted] = useState(false);
   const [startDelayRemainingMs, setStartDelayRemainingMs] = useState(3000);
   const startDelayEndAtRef = useRef<number | null>(null);
   const startDelayTimeoutRef = useRef<number | null>(null);
+  const [svgResetNonce, setSvgResetNonce] = useState(0);
 
   const { data: animalRaceContract, isLoading: isAnimalRaceLoading } = useDeployedContractInfo({
     contractName: "AnimalRace",
@@ -102,7 +104,7 @@ export const AnimalRaceHome = () => {
       // Keep these in sync with `AnimalRace.sol` constants
       animalCount: LANE_COUNT,
       maxTicks: 500,
-      speedRange: 10,
+      speedRange: SPEED_RANGE,
       trackLength: 1000,
     });
   }, [parsed, canSimulate]);
@@ -114,6 +116,7 @@ export const AnimalRaceHome = () => {
     setFrame(0);
     setRaceStarted(false);
     setStartDelayRemainingMs(3000);
+    setSvgResetNonce(n => n + 1);
   }, [parsed?.seed]);
 
   const [viewportEl, setViewportEl] = useState<HTMLDivElement | null>(null);
@@ -127,6 +130,11 @@ export const AnimalRaceHome = () => {
     setCameraScrollEl(el);
   }, []);
   const [cameraX, setCameraX] = useState(0);
+  const cameraAnimRafRef = useRef<number | null>(null);
+  const cameraAnimFromRef = useRef(0);
+  const cameraAnimToRef = useRef(0);
+  const cameraAnimStartRef = useRef(0);
+  const cameraAnimDurationRef = useRef(0);
 
   // Start-delay logic: hold the racers at the start line for 3s, then begin ticking.
   useEffect(() => {
@@ -148,6 +156,7 @@ export const AnimalRaceHome = () => {
     startDelayTimeoutRef.current = window.setTimeout(() => {
       startDelayTimeoutRef.current = null;
       startDelayEndAtRef.current = null;
+      setSvgResetNonce(n => n + 1); // force feet-on-ground at the exact start moment
       setRaceStarted(true);
       setStartDelayRemainingMs(0);
     }, remaining);
@@ -224,7 +233,7 @@ export const AnimalRaceHome = () => {
       return;
     }
 
-    const viewportWorldWidth = viewportWidthPx > 0 ? viewportWidthPx / Math.max(0.25, scaleFactor) : 0;
+    const viewportWorldWidth = viewportWidthPx > 0 ? viewportWidthPx : 0;
     if (viewportWorldWidth <= 0) {
       setCameraX(0);
       return;
@@ -251,7 +260,7 @@ export const AnimalRaceHome = () => {
 
     const maxCameraX = Math.max(0, worldWidthPx - viewportWorldWidth);
 
-    const finishInset = 18;
+    const finishInset = 50;
     const freezeX = Math.min(maxCameraX, Math.max(0, finishLineX - (viewportWorldWidth - finishInset)));
 
     const followX = Math.min(maxCameraX, Math.max(0, leaderX - desiredLeaderScreenX));
@@ -261,7 +270,6 @@ export const AnimalRaceHome = () => {
     simulation,
     currentDistances,
     viewportWidthPx,
-    scaleFactor,
     trackLength,
     trackLengthPx,
     finishLineX,
@@ -270,11 +278,48 @@ export const AnimalRaceHome = () => {
     giraffeSizePx,
   ]);
 
-  // Drive camera via scrollLeft (avoids transform animation starving SVG CSS animations in some browsers).
+  // Drive camera via scrollLeft, smoothly tweening between tick targets.
   useEffect(() => {
-    if (!cameraScrollEl) return;
-    cameraScrollEl.scrollLeft = Math.max(0, Math.floor(cameraX));
-  }, [cameraScrollEl, cameraX]);
+    const el = cameraScrollEl;
+    if (!el) return;
+
+    const durationMs = Math.max(1, Math.floor(120 / playbackSpeed));
+    const from = el.scrollLeft;
+    const to = Math.max(0, cameraX);
+
+    // Cancel any in-flight tween.
+    if (cameraAnimRafRef.current) {
+      cancelAnimationFrame(cameraAnimRafRef.current);
+      cameraAnimRafRef.current = null;
+    }
+
+    cameraAnimFromRef.current = from;
+    cameraAnimToRef.current = to;
+    cameraAnimStartRef.current = performance.now();
+    cameraAnimDurationRef.current = durationMs;
+
+    const step = (now: number) => {
+      const t0 = cameraAnimStartRef.current;
+      const d = cameraAnimDurationRef.current;
+      const p = d <= 0 ? 1 : Math.min(1, Math.max(0, (now - t0) / d));
+      const x = cameraAnimFromRef.current + (cameraAnimToRef.current - cameraAnimFromRef.current) * p;
+      el.scrollLeft = x;
+      if (p < 1) {
+        cameraAnimRafRef.current = requestAnimationFrame(step);
+      } else {
+        cameraAnimRafRef.current = null;
+      }
+    };
+
+    cameraAnimRafRef.current = requestAnimationFrame(step);
+
+    return () => {
+      if (cameraAnimRafRef.current) {
+        cancelAnimationFrame(cameraAnimRafRef.current);
+        cameraAnimRafRef.current = null;
+      }
+    };
+  }, [cameraScrollEl, cameraX, playbackSpeed]);
 
   const verifiedWinner = parsed?.settled ? parsed.winner : null;
   const simulatedWinner = simulation ? simulation.winner : null;
@@ -535,6 +580,7 @@ export const AnimalRaceHome = () => {
                   setFrame(0);
                   setRaceStarted(false);
                   setStartDelayRemainingMs(3000);
+                  setSvgResetNonce(n => n + 1);
                 }}
                 disabled={!simulation}
               >
@@ -588,23 +634,10 @@ export const AnimalRaceHome = () => {
               </div>
 
               <div className="flex flex-col gap-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-xs opacity-70">Scale</div>
-                  <input
-                    className="range range-xs w-56"
-                    type="range"
-                    min={0.6}
-                    max={1.8}
-                    step={0.05}
-                    value={scaleFactor}
-                    onChange={e => setScaleFactor(Number(e.target.value))}
-                  />
-                  <div className="text-xs tabular-nums opacity-70 w-12 text-right">{scaleFactor.toFixed(2)}x</div>
-                </div>
-
                 {/* Shared track: all lanes update on the same frame/tick (must match on-chain sim) */}
                 {(() => {
                   const transitionMs = Math.floor(120 / playbackSpeed);
+                  const raceIsOver = frame >= lastFrameIndex;
 
                   return (
                     <div
@@ -639,13 +672,7 @@ export const AnimalRaceHome = () => {
                       </div>
 
                       {/* Camera viewport */}
-                      <div
-                        className="absolute inset-0"
-                        style={{
-                          transform: `scale(${scaleFactor})`,
-                          transformOrigin: "top left",
-                        }}
-                      >
+                      <div className="absolute inset-0">
                         <div ref={cameraScrollRefCb} className="absolute inset-0 overflow-hidden">
                           <div
                             className="relative"
@@ -702,7 +729,15 @@ export const AnimalRaceHome = () => {
 
                               // Tie the SVG animation speed to the *per-tick* movement delta.
                               // Movement uses the same frames array as the on-chain sim; this only changes visuals.
-                              const speedFactor = Math.min(3, Math.max(0.6, delta / 4));
+                              // Delta ranges from 1 to speedRange (10) based on on-chain simulation.
+                              const MIN_ANIMATION_SPEED_FACTOR = 2.0;
+                              const MAX_ANIMATION_SPEED_FACTOR = 4.0;
+                              const minDelta = 1;
+                              const maxDelta = SPEED_RANGE;
+                              const t = Math.max(0, Math.min(1, (delta - minDelta) / (maxDelta - minDelta)));
+                              const speedFactor =
+                                MIN_ANIMATION_SPEED_FACTOR +
+                                t * (MAX_ANIMATION_SPEED_FACTOR - MIN_ANIMATION_SPEED_FACTOR);
 
                               const x =
                                 worldPaddingLeftPx +
@@ -723,7 +758,8 @@ export const AnimalRaceHome = () => {
                                   <GiraffeAnimated
                                     idPrefix={`lane-${i}`}
                                     playbackRate={speedFactor}
-                                    playing={isPlaying && raceStarted}
+                                    resetNonce={svgResetNonce}
+                                    playing={isPlaying && raceStarted && !raceIsOver}
                                     sizePx={giraffeSizePx}
                                   />
                                 </div>

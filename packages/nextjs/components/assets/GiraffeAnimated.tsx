@@ -14,6 +14,10 @@ type Props = {
    */
   playbackRate: number;
   /**
+   * Increment this to force the SVG animations to jump to t=0 (useful to sync all racers at the start pose).
+   */
+  resetNonce?: number;
+  /**
    * If false, pauses the SVG animation (movement is controlled separately by the race renderer).
    */
   playing?: boolean;
@@ -120,7 +124,14 @@ svg.giraffe-svg * {
   return classed.slice(0, insertPoint + 1) + overrideStyle + classed.slice(insertPoint + 1);
 }
 
-export function GiraffeAnimated({ idPrefix, playbackRate, playing = true, sizePx = 72, className }: Props) {
+export function GiraffeAnimated({
+  idPrefix,
+  playbackRate,
+  resetNonce = 0,
+  playing = true,
+  sizePx = 72,
+  className,
+}: Props) {
   const [svgMarkup, setSvgMarkup] = useState<string | null>(null);
   const hostRef = useRef<HTMLDivElement | null>(null);
   const animationsRef = useRef<Animation[]>([]);
@@ -172,6 +183,16 @@ export function GiraffeAnimated({ idPrefix, playbackRate, playing = true, sizePx
           const anims = svg.getAnimations({ subtree: true });
           if (anims.length > 0) {
             animationsRef.current = anims;
+
+            // Ensure a deterministic start pose while we're staging (or if we just mounted).
+            // This prevents "random mid-run" frozen poses if we pause shortly after mount.
+            for (const a of anims) {
+              try {
+                a.currentTime = 0;
+              } catch {
+                // ignore
+              }
+            }
             return;
           }
         } catch {
@@ -192,6 +213,46 @@ export function GiraffeAnimated({ idPrefix, playbackRate, playing = true, sizePx
       animationsRef.current = [];
     };
   }, [svgMarkup]);
+
+  // Hard reset to t=0 when requested (without recreating the SVG subtree).
+  useEffect(() => {
+    let anims = animationsRef.current;
+    if (!anims.length) {
+      const host = hostRef.current;
+      const svg = host?.querySelector("svg.giraffe-svg");
+      if (svg) {
+        try {
+          anims = svg.getAnimations({ subtree: true });
+          animationsRef.current = anims;
+        } catch {
+          // ignore
+        }
+      }
+    }
+    if (!anims.length) return;
+
+    for (const a of anims) {
+      try {
+        a.currentTime = 0;
+      } catch {
+        // ignore
+      }
+    }
+
+    // Apply paused/running state after seek, so we "start on the ground" and then take off cleanly.
+    for (const a of anims) {
+      try {
+        if (!playing) {
+          a.pause();
+        } else {
+          a.play();
+        }
+      } catch {
+        // ignore
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetNonce]);
 
   // Apply rate changes without restarting animations.
   useEffect(() => {
