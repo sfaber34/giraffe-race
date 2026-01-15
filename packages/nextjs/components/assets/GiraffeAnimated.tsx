@@ -273,7 +273,7 @@ export function GiraffeAnimated({
     rateLastTsRef.current = null;
     currentRateRef.current = null;
 
-    const RATE_SMOOTH_TIME_MS = 500; // bigger = smoother, smaller = snappier
+    const RATE_SMOOTH_TIME_MS = 200; // bigger = smoother, smaller = snappier
 
     const step = (now: number) => {
       const last = rateLastTsRef.current;
