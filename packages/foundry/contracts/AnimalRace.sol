@@ -71,6 +71,7 @@ contract AnimalRace {
         uint256 raceId;
         uint8 status;
         uint8 betAnimal;
+        uint256 betTokenId;
         uint128 betAmount;
         uint8 winner;
         uint256 payout;
@@ -438,6 +439,7 @@ contract AnimalRace {
                 out.raceId = rid;
                 out.status = s;
                 out.betAnimal = b.animal;
+                out.betTokenId = raceAnimals[rid].tokenIds[b.animal];
                 out.betAmount = b.amount;
                 out.winner = 0;
                 out.payout = 0;
@@ -451,6 +453,7 @@ contract AnimalRace {
                 out.raceId = rid;
                 out.status = 2;
                 out.betAnimal = b.animal;
+                out.betTokenId = raceAnimals[rid].tokenIds[b.animal];
                 out.betAmount = b.amount;
                 out.winner = w;
                 out.payout = 0;
@@ -464,6 +467,7 @@ contract AnimalRace {
             out.raceId = rid;
             out.status = 3;
             out.betAnimal = b.animal;
+            out.betTokenId = raceAnimals[rid].tokenIds[b.animal];
             out.betAmount = b.amount;
             out.winner = w;
             out.payout = p;

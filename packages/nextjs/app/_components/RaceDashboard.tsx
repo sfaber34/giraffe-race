@@ -304,6 +304,7 @@ export const RaceDashboard = () => {
       raceId: BigInt(out?.raceId ?? 0),
       status: Number(out?.status ?? 0) as 0 | 1 | 2 | 3,
       betAnimal: Number(out?.betAnimal ?? 0) as 0 | 1 | 2 | 3,
+      betTokenId: BigInt(out?.betTokenId ?? 0),
       betAmount: BigInt(out?.betAmount ?? 0),
       winner: Number(out?.winner ?? 0) as 0 | 1 | 2 | 3,
       payout: BigInt(out?.payout ?? 0),
@@ -443,6 +444,9 @@ export const RaceDashboard = () => {
   const verifiedWinner = parsed?.settled ? parsed.winner : null;
   const simulatedWinner = simulation ? simulation.winner : null;
   const winnersMatch = verifiedWinner !== null && simulatedWinner !== null && verifiedWinner === simulatedWinner;
+  const raceIsOver = !!simulation && frame >= lastFrameIndex;
+  const revealOutcome = raceIsOver;
+  const revealedWinner = revealOutcome ? verifiedWinner : null;
 
   // ---- Track + camera geometry (restored camera-follow viewport) ----
   const laneHeightPx = 86;
@@ -599,8 +603,8 @@ export const RaceDashboard = () => {
 
   return (
     <div className="flex flex-col w-full">
-      {/* Keep mine controls pinned, but never above the site header / wallet dropdown */}
-      <div className="sticky top-[72px] z-10 bg-base-100/80 backdrop-blur border-b border-base-200">
+      {/* Mine controls: stay at top of page content (non-sticky) */}
+      <div className="bg-base-100/80 backdrop-blur border-b border-base-200">
         <div className="mx-auto w-full max-w-6xl px-6 py-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-col">
@@ -629,6 +633,257 @@ export const RaceDashboard = () => {
             Single on-demand flow: start race (or submit), wait for submissions to close, finalize lineup, bet, settle,
             replay, claim.
           </p>
+        </div>
+
+        {/* Replay is the hero element */}
+        <div className="card bg-base-200 shadow w-full">
+          <div className="card-body gap-4">
+            <div className="flex items-center justify-between">
+              <h2 className="card-title">Race replay</h2>
+              <div className="flex items-center gap-2">
+                <div className="join">
+                  <button
+                    className={`btn btn-sm join-item ${playbackSpeed === 1 ? "btn-active" : ""}`}
+                    onClick={() => setPlaybackSpeed(1)}
+                    disabled={!simulation}
+                  >
+                    1x
+                  </button>
+                  <button
+                    className={`btn btn-sm join-item ${playbackSpeed === 2 ? "btn-active" : ""}`}
+                    onClick={() => setPlaybackSpeed(2)}
+                    disabled={!simulation}
+                  >
+                    2x
+                  </button>
+                  <button
+                    className={`btn btn-sm join-item ${playbackSpeed === 3 ? "btn-active" : ""}`}
+                    onClick={() => setPlaybackSpeed(3)}
+                    disabled={!simulation}
+                  >
+                    3x
+                  </button>
+                </div>
+                <button
+                  className="btn btn-sm"
+                  onClick={() => {
+                    setFrame(0);
+                    setRaceStarted(false);
+                    setStartDelayRemainingMs(3000);
+                    setSvgResetNonce(n => n + 1);
+                  }}
+                  disabled={!simulation}
+                >
+                  Reset
+                </button>
+                <button className="btn btn-sm" onClick={() => stepBy(-1)} disabled={!simulation || frame === 0}>
+                  ◀︎ Tick
+                </button>
+                <button
+                  className="btn btn-sm"
+                  onClick={() => stepBy(1)}
+                  disabled={!simulation || frame >= lastFrameIndex}
+                >
+                  Tick ▶︎
+                </button>
+                <button className="btn btn-sm btn-primary" onClick={() => setIsPlaying(p => !p)} disabled={!simulation}>
+                  {isPlaying ? "Pause" : "Play"}
+                </button>
+              </div>
+            </div>
+
+            {!parsed ? (
+              <div className="alert alert-info">
+                <span className="text-sm">Start a race to see status and replay.</span>
+              </div>
+            ) : !parsed.settled ? (
+              <div className="alert alert-info">
+                <span className="text-sm">Race isn’t settled yet, so the seed is unknown. Settle it to replay.</span>
+              </div>
+            ) : !simulation ? (
+              <div className="alert alert-warning">
+                <span className="text-sm">Missing/invalid seed. Try settling the race again.</span>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                <div className="flex justify-between text-sm opacity-70">
+                  <span>
+                    Tick: <span className="font-semibold opacity-100">{frame}</span> / {lastFrameIndex}
+                  </span>
+                  <span>
+                    Finish: <span className="font-semibold opacity-100">{TRACK_LENGTH}</span>
+                  </span>
+                </div>
+
+                {revealOutcome ? (
+                  <>
+                    <div className="flex justify-between text-sm">
+                      <span className="opacity-70">Winner</span>
+                      <span className="font-semibold">
+                        {revealedWinner === null ? (
+                          "-"
+                        ) : (
+                          <>
+                            {LANE_EMOJI}{" "}
+                            {parsedAnimals ? (
+                              <LaneName
+                                tokenId={parsedAnimals.tokenIds[revealedWinner] ?? 0n}
+                                fallback={`Lane ${revealedWinner}`}
+                              />
+                            ) : (
+                              `Lane ${revealedWinner}`
+                            )}
+                          </>
+                        )}
+                      </span>
+                    </div>
+
+                    {verifiedWinner !== null && simulatedWinner !== null ? (
+                      <div className={`alert ${winnersMatch ? "alert-success" : "alert-warning"}`}>
+                        <span className="text-sm">
+                          {winnersMatch
+                            ? "Verified: simulation matches on-chain winner."
+                            : "Mismatch: check seed/constants."}
+                        </span>
+                      </div>
+                    ) : null}
+                  </>
+                ) : (
+                  <div className="text-sm opacity-70">Winner is hidden until the replay finishes.</div>
+                )}
+
+                <div
+                  ref={viewportRefCb}
+                  className="relative w-full rounded-2xl bg-base-100 border border-base-300 overflow-hidden"
+                  style={{ height: `${trackHeightPx}px` }}
+                >
+                  {/* Fixed lane labels */}
+                  <div className="absolute left-3 top-3 bottom-3 z-10 flex flex-col justify-between pointer-events-none">
+                    {Array.from({ length: LANE_COUNT }).map((_, i) => {
+                      const d = Number(currentDistances[i] ?? 0);
+                      const isWinner = revealedWinner === i;
+                      return (
+                        <div
+                          key={i}
+                          className="flex items-center gap-2 text-xs opacity-80"
+                          style={{ height: `${laneHeightPx}px` }}
+                        >
+                          <span className="font-medium whitespace-nowrap">
+                            Lane {i}
+                            {isWinner ? " (winner)" : ""}
+                          </span>
+                          <span className="opacity-60 tabular-nums">· {d}</span>
+                          <span className="opacity-60">
+                            {parsedAnimals ? (
+                              <LaneName tokenId={parsedAnimals.tokenIds[i] ?? 0n} fallback={`Lane ${i}`} />
+                            ) : null}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Camera viewport */}
+                  <div className="absolute inset-0">
+                    <div ref={cameraScrollRefCb} className="absolute inset-0 overflow-hidden">
+                      <div className="relative" style={{ width: `${worldWidthPx}px`, height: `${trackHeightPx}px` }}>
+                        {/* Track background */}
+                        <div className="absolute inset-0">
+                          <div
+                            className="absolute top-3 bottom-3 w-[3px] bg-base-300"
+                            style={{ left: `${worldPaddingLeftPx}px` }}
+                          />
+                          <div
+                            className="absolute top-3 bottom-3 w-[3px] bg-base-300"
+                            style={{ left: `${worldPaddingLeftPx + trackLengthPx}px` }}
+                          />
+                          <div
+                            className="absolute inset-0 opacity-30"
+                            style={{
+                              background:
+                                "repeating-linear-gradient(90deg, transparent, transparent 29px, rgba(0,0,0,0.10) 30px)",
+                            }}
+                          />
+                          {Array.from({ length: LANE_COUNT }).map((_, i) => {
+                            const top = i * (laneHeightPx + laneGapPx);
+                            return (
+                              <div
+                                key={i}
+                                className="absolute left-0 right-0 rounded-xl"
+                                style={{
+                                  top: `${top}px`,
+                                  height: `${laneHeightPx}px`,
+                                  background: [
+                                    "linear-gradient(180deg, rgba(255,255,255,0.06), rgba(0,0,0,0.10))",
+                                    "linear-gradient(90deg, rgba(168,118,72,0.20), rgba(168,118,72,0.12))",
+                                    "radial-gradient(circle at 20% 30%, rgba(0,0,0,0.12) 0 1px, transparent 2px)",
+                                    "radial-gradient(circle at 70% 60%, rgba(0,0,0,0.10) 0 1px, transparent 2px)",
+                                    "radial-gradient(circle at 40% 80%, rgba(255,255,255,0.06) 0 1px, transparent 2px)",
+                                    "repeating-linear-gradient(90deg, rgba(0,0,0,0.00), rgba(0,0,0,0.00) 10px, rgba(0,0,0,0.06) 11px)",
+                                  ].join(", "),
+                                  backgroundSize: "auto, auto, 18px 18px, 22px 22px, 26px 26px, auto",
+                                  border: "1px solid rgba(0,0,0,0.06)",
+                                }}
+                              />
+                            );
+                          })}
+                        </div>
+
+                        {/* Giraffes */}
+                        {Array.from({ length: LANE_COUNT }).map((_, i) => {
+                          const d = Number(currentDistances[i] ?? 0);
+                          const prev = Number(prevDistances[i] ?? 0);
+                          const delta = Math.max(0, d - prev);
+                          const isWinner = revealedWinner === i;
+
+                          const MIN_ANIMATION_SPEED_FACTOR = 2.0;
+                          const MAX_ANIMATION_SPEED_FACTOR = 5.0;
+                          const minDelta = 1;
+                          const maxDelta = SPEED_RANGE;
+                          const t = Math.max(0, Math.min(1, (delta - minDelta) / (maxDelta - minDelta)));
+                          const speedFactor =
+                            MIN_ANIMATION_SPEED_FACTOR + t * (MAX_ANIMATION_SPEED_FACTOR - MIN_ANIMATION_SPEED_FACTOR);
+
+                          const x =
+                            worldPaddingLeftPx +
+                            (Math.min(TRACK_LENGTH, Math.max(0, d)) / TRACK_LENGTH) * trackLengthPx;
+                          const y = i * (laneHeightPx + laneGapPx) + laneHeightPx / 2;
+
+                          return (
+                            <div
+                              key={i}
+                              className="absolute left-0 top-0"
+                              style={{
+                                transform: `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%)`,
+                                transition: `transform ${Math.floor(120 / playbackSpeed)}ms linear`,
+                                willChange: "transform",
+                                filter: isWinner ? "drop-shadow(0 6px 10px rgba(0,0,0,0.25))" : undefined,
+                              }}
+                            >
+                              <GiraffeAnimated
+                                idPrefix={`lane-${i}`}
+                                playbackRate={speedFactor}
+                                resetNonce={svgResetNonce}
+                                playing={isPlaying && raceStarted && frame < lastFrameIndex}
+                                sizePx={giraffeSizePx}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <details className="collapse collapse-arrow bg-base-100">
+                  <summary className="collapse-title text-sm font-medium">Seed (bytes32)</summary>
+                  <div className="collapse-content">
+                    <code className="text-xs break-all">{parsed.seed}</code>
+                  </div>
+                </details>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -774,8 +1029,14 @@ export const RaceDashboard = () => {
                     </div>
                     <div className="flex justify-between">
                       <span className="opacity-70">Your bet</span>
-                      <span className="font-semibold">
-                        Lane {nextClaim.betAnimal} · {formatEther(nextClaim.betAmount)} ETH
+                      <span className="font-semibold text-right">
+                        {LANE_EMOJI}{" "}
+                        {nextClaim.betTokenId !== 0n ? (
+                          <LaneName tokenId={nextClaim.betTokenId} fallback={`Lane ${nextClaim.betAnimal}`} />
+                        ) : (
+                          `Lane ${nextClaim.betAnimal}`
+                        )}{" "}
+                        · {formatEther(nextClaim.betAmount)} ETH
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -785,14 +1046,16 @@ export const RaceDashboard = () => {
                           ? "Not claimable yet"
                           : nextClaim.status === 1
                             ? "Will settle then resolve"
-                            : nextClaim.status === 2
-                              ? `Lost (winner lane ${nextClaim.winner})`
-                              : `Won (winner lane ${nextClaim.winner})`}
+                            : !revealOutcome
+                              ? "Hidden until replay finishes"
+                              : nextClaim.status === 2
+                                ? "Lost"
+                                : "Won"}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="opacity-70">Estimated payout</span>
-                      <span className="font-mono">{formatEther(nextClaim.payout)} ETH</span>
+                      <span className="font-mono">{revealOutcome ? `${formatEther(nextClaim.payout)} ETH` : "—"}</span>
                     </div>
                   </div>
                 )}
@@ -803,7 +1066,7 @@ export const RaceDashboard = () => {
                     await writeAnimalRaceAsync({ functionName: "claim" } as any);
                   }}
                 >
-                  Claim next result
+                  Claim payout
                 </button>
                 <div className="text-xs opacity-70">
                   {nextClaim?.hasClaim && nextClaim.status === 1
@@ -896,68 +1159,109 @@ export const RaceDashboard = () => {
                       Betting opens after submissions close and the lineup is finalized.
                     </p>
 
-                    <div className="flex flex-wrap gap-2">
-                      {Array.from({ length: LANE_COUNT }).map((_, lane) => (
-                        <button
-                          key={lane}
-                          className={`btn btn-sm ${betLane === lane ? "btn-primary" : "btn-outline"}`}
-                          onClick={() => setBetLane(lane as 0 | 1 | 2 | 3)}
-                          disabled={!canBet}
-                          type="button"
-                        >
-                          {lineupFinalized && parsedAnimals?.tokenIds?.[lane] && parsedAnimals.tokenIds[lane] !== 0n ? (
-                            <>
-                              {LANE_EMOJI} <LaneName tokenId={parsedAnimals.tokenIds[lane]} fallback={`Lane ${lane}`} />
-                            </>
+                    {status === "betting_closed" && !parsed?.settled ? (
+                      <div className="alert alert-info">
+                        <div className="flex flex-col gap-2 w-full">
+                          <div className="font-medium">Betting is closed. Waiting for settlement.</div>
+                          {connectedAddress ? (
+                            myBet?.hasBet ? (
+                              <div className="text-sm">
+                                You bet on{" "}
+                                <span className="font-semibold">
+                                  {(() => {
+                                    const tokenId = parsedAnimals?.tokenIds?.[myBet.animal] ?? 0n;
+                                    return tokenId !== 0n ? (
+                                      <>
+                                        {LANE_EMOJI} <LaneName tokenId={tokenId} fallback={`Lane ${myBet.animal}`} />
+                                      </>
+                                    ) : (
+                                      `Lane ${myBet.animal}`
+                                    );
+                                  })()}
+                                </span>{" "}
+                                for <span className="font-semibold">{formatEther(myBet.amount)} ETH</span>.
+                              </div>
+                            ) : (
+                              <div className="text-sm">You didn’t place a bet for this race.</div>
+                            )
                           ) : (
-                            <>
-                              Lane {lane} {LANE_EMOJI}
-                            </>
+                            <div className="text-sm">Connect your wallet to see what you bet.</div>
                           )}
-                        </button>
-                      ))}
-                    </div>
-
-                    <div className={!canBet ? "opacity-50 pointer-events-none" : ""}>
-                      <EtherInput
-                        placeholder="Bet amount (ETH)"
-                        onValueChange={({ valueInEth }) => {
-                          if (!canBet) return;
-                          setBetAmountEth(valueInEth);
-                        }}
-                        style={{ width: "100%" }}
-                      />
-                    </div>
-
-                    <button
-                      className="btn btn-primary"
-                      disabled={
-                        !animalRaceContract || !connectedAddress || !canBet || !placeBetValue || !!myBet?.hasBet
-                      }
-                      onClick={async () => {
-                        if (!placeBetValue) return;
-                        await writeAnimalRaceAsync({
-                          functionName: "placeBet",
-                          args: [betLane],
-                          value: placeBetValue,
-                        } as any);
-                        setBetAmountEth("");
-                      }}
-                    >
-                      Place bet
-                    </button>
-
-                    {!canBet ? (
-                      <div className="text-xs opacity-70">
-                        {status !== "betting_open"
-                          ? "Betting is only available during the betting window."
-                          : !lineupFinalized
-                            ? "Finalize the lineup to reveal which NFTs are racing."
-                            : "—"}
+                          <div className="text-xs opacity-70">
+                            Once the race is settled, the replay becomes available and you can claim your payout if you
+                            won.
+                          </div>
+                        </div>
                       </div>
-                    ) : myBet?.hasBet ? (
-                      <div className="text-xs opacity-70">You already placed a bet for this race.</div>
-                    ) : null}
+                    ) : (
+                      <>
+                        <div className="flex flex-wrap gap-2">
+                          {Array.from({ length: LANE_COUNT }).map((_, lane) => (
+                            <button
+                              key={lane}
+                              className={`btn btn-sm ${betLane === lane ? "btn-primary" : "btn-outline"}`}
+                              onClick={() => setBetLane(lane as 0 | 1 | 2 | 3)}
+                              disabled={!canBet}
+                              type="button"
+                            >
+                              {lineupFinalized &&
+                              parsedAnimals?.tokenIds?.[lane] &&
+                              parsedAnimals.tokenIds[lane] !== 0n ? (
+                                <>
+                                  {LANE_EMOJI}{" "}
+                                  <LaneName tokenId={parsedAnimals.tokenIds[lane]} fallback={`Lane ${lane}`} />
+                                </>
+                              ) : (
+                                <>
+                                  Lane {lane} {LANE_EMOJI}
+                                </>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className={!canBet ? "opacity-50 pointer-events-none" : ""}>
+                          <EtherInput
+                            placeholder="Bet amount (ETH)"
+                            onValueChange={({ valueInEth }) => {
+                              if (!canBet) return;
+                              setBetAmountEth(valueInEth);
+                            }}
+                            style={{ width: "100%" }}
+                          />
+                        </div>
+
+                        <button
+                          className="btn btn-primary"
+                          disabled={
+                            !animalRaceContract || !connectedAddress || !canBet || !placeBetValue || !!myBet?.hasBet
+                          }
+                          onClick={async () => {
+                            if (!placeBetValue) return;
+                            await writeAnimalRaceAsync({
+                              functionName: "placeBet",
+                              args: [betLane],
+                              value: placeBetValue,
+                            } as any);
+                            setBetAmountEth("");
+                          }}
+                        >
+                          Place bet
+                        </button>
+
+                        {!canBet ? (
+                          <div className="text-xs opacity-70">
+                            {status !== "betting_open"
+                              ? "Betting is only available during the betting window."
+                              : !lineupFinalized
+                                ? "Finalize the lineup to reveal which NFTs are racing."
+                                : "—"}
+                          </div>
+                        ) : myBet?.hasBet ? (
+                          <div className="text-xs opacity-70">You already placed a bet for this race.</div>
+                        ) : null}
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1006,258 +1310,6 @@ export const RaceDashboard = () => {
                   <div className="mt-2 text-xs opacity-70">No lane data yet.</div>
                 )}
               </div>
-
-              <div className="divider my-1" />
-
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold">Race replay</h3>
-                <div className="flex items-center gap-2">
-                  <div className="join">
-                    <button
-                      className={`btn btn-sm join-item ${playbackSpeed === 1 ? "btn-active" : ""}`}
-                      onClick={() => setPlaybackSpeed(1)}
-                      disabled={!simulation}
-                    >
-                      1x
-                    </button>
-                    <button
-                      className={`btn btn-sm join-item ${playbackSpeed === 2 ? "btn-active" : ""}`}
-                      onClick={() => setPlaybackSpeed(2)}
-                      disabled={!simulation}
-                    >
-                      2x
-                    </button>
-                    <button
-                      className={`btn btn-sm join-item ${playbackSpeed === 3 ? "btn-active" : ""}`}
-                      onClick={() => setPlaybackSpeed(3)}
-                      disabled={!simulation}
-                    >
-                      3x
-                    </button>
-                  </div>
-                  <button
-                    className="btn btn-sm"
-                    onClick={() => {
-                      setFrame(0);
-                      setRaceStarted(false);
-                      setStartDelayRemainingMs(3000);
-                      setSvgResetNonce(n => n + 1);
-                    }}
-                    disabled={!simulation}
-                  >
-                    Reset
-                  </button>
-                  <button className="btn btn-sm" onClick={() => stepBy(-1)} disabled={!simulation || frame === 0}>
-                    ◀︎ Tick
-                  </button>
-                  <button
-                    className="btn btn-sm"
-                    onClick={() => stepBy(1)}
-                    disabled={!simulation || frame >= lastFrameIndex}
-                  >
-                    Tick ▶︎
-                  </button>
-                  <button
-                    className="btn btn-sm btn-primary"
-                    onClick={() => setIsPlaying(p => !p)}
-                    disabled={!simulation}
-                  >
-                    {isPlaying ? "Pause" : "Play"}
-                  </button>
-                </div>
-              </div>
-
-              {!parsed ? (
-                <div className="alert alert-info">
-                  <span className="text-sm">Start a race to see status and replay.</span>
-                </div>
-              ) : !parsed.settled ? (
-                <div className="alert alert-info">
-                  <span className="text-sm">Race isn’t settled yet, so the seed is unknown. Settle it to replay.</span>
-                </div>
-              ) : !simulation ? (
-                <div className="alert alert-warning">
-                  <span className="text-sm">Missing/invalid seed. Try settling the race again.</span>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-3">
-                  <div className="flex justify-between text-sm opacity-70">
-                    <span>
-                      Tick: <span className="font-semibold opacity-100">{frame}</span> / {lastFrameIndex}
-                    </span>
-                    <span>
-                      Finish: <span className="font-semibold opacity-100">{TRACK_LENGTH}</span>
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between text-sm">
-                    <span className="opacity-70">Verified winner (on-chain)</span>
-                    <span className="font-semibold">
-                      {verifiedWinner === null ? (
-                        "-"
-                      ) : (
-                        <>
-                          {LANE_EMOJI}{" "}
-                          {parsedAnimals ? (
-                            <LaneName
-                              tokenId={parsedAnimals.tokenIds[verifiedWinner] ?? 0n}
-                              fallback={`Lane ${verifiedWinner}`}
-                            />
-                          ) : (
-                            `Lane ${verifiedWinner}`
-                          )}
-                        </>
-                      )}
-                    </span>
-                  </div>
-
-                  {verifiedWinner !== null && simulatedWinner !== null ? (
-                    <div className={`alert ${winnersMatch ? "alert-success" : "alert-warning"}`}>
-                      <span className="text-sm">
-                        {winnersMatch
-                          ? "Verified: simulation matches on-chain winner."
-                          : "Mismatch: check seed/constants."}
-                      </span>
-                    </div>
-                  ) : null}
-
-                  <div
-                    ref={viewportRefCb}
-                    className="relative w-full rounded-2xl bg-base-100 border border-base-300 overflow-hidden"
-                    style={{ height: `${trackHeightPx}px` }}
-                  >
-                    {/* Fixed lane labels */}
-                    <div className="absolute left-3 top-3 bottom-3 z-10 flex flex-col justify-between pointer-events-none">
-                      {Array.from({ length: LANE_COUNT }).map((_, i) => {
-                        const d = Number(currentDistances[i] ?? 0);
-                        const isWinner = verifiedWinner === i;
-                        return (
-                          <div
-                            key={i}
-                            className="flex items-center gap-2 text-xs opacity-80"
-                            style={{ height: `${laneHeightPx}px` }}
-                          >
-                            <span className="font-medium whitespace-nowrap">
-                              Lane {i}
-                              {isWinner ? " (winner)" : ""}
-                            </span>
-                            <span className="opacity-60 tabular-nums">· {d}</span>
-                            <span className="opacity-60">
-                              {parsedAnimals ? (
-                                <LaneName tokenId={parsedAnimals.tokenIds[i] ?? 0n} fallback={`Lane ${i}`} />
-                              ) : null}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Camera viewport */}
-                    <div className="absolute inset-0">
-                      <div ref={cameraScrollRefCb} className="absolute inset-0 overflow-hidden">
-                        <div className="relative" style={{ width: `${worldWidthPx}px`, height: `${trackHeightPx}px` }}>
-                          {/* Track background */}
-                          <div className="absolute inset-0">
-                            {/* Start + finish */}
-                            <div
-                              className="absolute top-3 bottom-3 w-[3px] bg-base-300"
-                              style={{ left: `${worldPaddingLeftPx}px` }}
-                            />
-                            <div
-                              className="absolute top-3 bottom-3 w-[3px] bg-base-300"
-                              style={{ left: `${worldPaddingLeftPx + trackLengthPx}px` }}
-                            />
-
-                            {/* Tick grid */}
-                            <div
-                              className="absolute inset-0 opacity-30"
-                              style={{
-                                background:
-                                  "repeating-linear-gradient(90deg, transparent, transparent 29px, rgba(0,0,0,0.10) 30px)",
-                              }}
-                            />
-
-                            {/* Lanes */}
-                            {Array.from({ length: LANE_COUNT }).map((_, i) => {
-                              const top = i * (laneHeightPx + laneGapPx);
-                              return (
-                                <div
-                                  key={i}
-                                  className="absolute left-0 right-0 rounded-xl"
-                                  style={{
-                                    top: `${top}px`,
-                                    height: `${laneHeightPx}px`,
-                                    background: [
-                                      "linear-gradient(180deg, rgba(255,255,255,0.06), rgba(0,0,0,0.10))",
-                                      "linear-gradient(90deg, rgba(168,118,72,0.20), rgba(168,118,72,0.12))",
-                                      "radial-gradient(circle at 20% 30%, rgba(0,0,0,0.12) 0 1px, transparent 2px)",
-                                      "radial-gradient(circle at 70% 60%, rgba(0,0,0,0.10) 0 1px, transparent 2px)",
-                                      "radial-gradient(circle at 40% 80%, rgba(255,255,255,0.06) 0 1px, transparent 2px)",
-                                      "repeating-linear-gradient(90deg, rgba(0,0,0,0.00), rgba(0,0,0,0.00) 10px, rgba(0,0,0,0.06) 11px)",
-                                    ].join(", "),
-                                    backgroundSize: "auto, auto, 18px 18px, 22px 22px, 26px 26px, auto",
-                                    border: "1px solid rgba(0,0,0,0.06)",
-                                  }}
-                                />
-                              );
-                            })}
-                          </div>
-
-                          {/* Giraffes */}
-                          {Array.from({ length: LANE_COUNT }).map((_, i) => {
-                            const d = Number(currentDistances[i] ?? 0);
-                            const prev = Number(prevDistances[i] ?? 0);
-                            const delta = Math.max(0, d - prev);
-                            const isWinner = verifiedWinner === i;
-
-                            const MIN_ANIMATION_SPEED_FACTOR = 2.0;
-                            const MAX_ANIMATION_SPEED_FACTOR = 5.0;
-                            const minDelta = 1;
-                            const maxDelta = SPEED_RANGE;
-                            const t = Math.max(0, Math.min(1, (delta - minDelta) / (maxDelta - minDelta)));
-                            const speedFactor =
-                              MIN_ANIMATION_SPEED_FACTOR +
-                              t * (MAX_ANIMATION_SPEED_FACTOR - MIN_ANIMATION_SPEED_FACTOR);
-
-                            const x =
-                              worldPaddingLeftPx +
-                              (Math.min(TRACK_LENGTH, Math.max(0, d)) / TRACK_LENGTH) * trackLengthPx;
-                            const y = i * (laneHeightPx + laneGapPx) + laneHeightPx / 2;
-
-                            return (
-                              <div
-                                key={i}
-                                className="absolute left-0 top-0"
-                                style={{
-                                  transform: `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%)`,
-                                  transition: `transform ${Math.floor(120 / playbackSpeed)}ms linear`,
-                                  willChange: "transform",
-                                  filter: isWinner ? "drop-shadow(0 6px 10px rgba(0,0,0,0.25))" : undefined,
-                                }}
-                              >
-                                <GiraffeAnimated
-                                  idPrefix={`lane-${i}`}
-                                  playbackRate={speedFactor}
-                                  resetNonce={svgResetNonce}
-                                  playing={isPlaying && raceStarted && frame < lastFrameIndex}
-                                  sizePx={giraffeSizePx}
-                                />
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <details className="collapse collapse-arrow bg-base-100">
-                    <summary className="collapse-title text-sm font-medium">Seed (bytes32)</summary>
-                    <div className="collapse-content">
-                      <code className="text-xs break-all">{parsed.seed}</code>
-                    </div>
-                  </details>
-                </div>
-              )}
             </div>
           </div>
         </div>

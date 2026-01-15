@@ -922,6 +922,11 @@ const deployedContracts = {
                   internalType: "uint8",
                 },
                 {
+                  name: "betTokenId",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
                   name: "betAmount",
                   type: "uint128",
                   internalType: "uint128",
