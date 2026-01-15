@@ -12,10 +12,9 @@ import "../contracts/AnimalNFT.sol";
  */
 contract DeployAnimalRace is ScaffoldETHDeploy {
     function run() external ScaffoldEthDeployerRunner {
-        // For local testing, it's often useful to have a stable "owner" address regardless of which account deploys.
-        // You can override this by setting `ANIMAL_RACE_OWNER` in your env.
-        address ownerForGame = vm.envOr("ANIMAL_RACE_OWNER", address(0x668887c62AF23E42aB10105CB4124CF2C656F331));
-        address houseForGame = ownerForGame;
+        // House address: owns the 4 house animals used to fill empty lanes.
+        // You can override this by setting `ANIMAL_RACE_HOUSE` in your env.
+        address houseForGame = vm.envOr("ANIMAL_RACE_HOUSE", address(0x668887c62AF23E42aB10105CB4124CF2C656F331));
 
         // Deploy the AnimalNFT collection (permissionless mint).
         // We'll mint the initial "house animals" to `houseForGame`.
@@ -28,7 +27,7 @@ contract DeployAnimalRace is ScaffoldETHDeploy {
         houseTokenIds[3] = animalNft.mint(houseForGame, "house-4");
 
         // Deploy the race contract with the NFT + house configuration.
-        new AnimalRace(ownerForGame, address(animalNft), houseForGame, houseTokenIds);
+        new AnimalRace(address(animalNft), houseForGame, houseTokenIds);
     }
 }
 

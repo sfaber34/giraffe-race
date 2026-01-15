@@ -715,11 +715,6 @@ const deployedContracts = {
           type: "constructor",
           inputs: [
             {
-              name: "_owner",
-              type: "address",
-              internalType: "address",
-            },
-            {
               name: "_animalNft",
               type: "address",
               internalType: "address",
@@ -831,35 +826,10 @@ const deployedContracts = {
         {
           type: "function",
           name: "claim",
-          inputs: [
-            {
-              name: "raceId",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
+          inputs: [],
           outputs: [
             {
               name: "payout",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          stateMutability: "nonpayable",
-        },
-        {
-          type: "function",
-          name: "createRace",
-          inputs: [
-            {
-              name: "closeBlock",
-              type: "uint64",
-              internalType: "uint64",
-            },
-          ],
-          outputs: [
-            {
-              name: "raceId",
               type: "uint256",
               internalType: "uint256",
             },
@@ -882,13 +852,7 @@ const deployedContracts = {
         {
           type: "function",
           name: "finalizeRaceAnimals",
-          inputs: [
-            {
-              name: "raceId",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
+          inputs: [],
           outputs: [],
           stateMutability: "nonpayable",
         },
@@ -896,11 +860,6 @@ const deployedContracts = {
           type: "function",
           name: "getBet",
           inputs: [
-            {
-              name: "raceId",
-              type: "uint256",
-              internalType: "uint256",
-            },
             {
               name: "bettor",
               type: "address",
@@ -929,13 +888,7 @@ const deployedContracts = {
         {
           type: "function",
           name: "getRace",
-          inputs: [
-            {
-              name: "raceId",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
+          inputs: [],
           outputs: [
             {
               name: "closeBlock",
@@ -973,13 +926,7 @@ const deployedContracts = {
         {
           type: "function",
           name: "getRaceAnimals",
-          inputs: [
-            {
-              name: "raceId",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
+          inputs: [],
           outputs: [
             {
               name: "assignedCount",
@@ -995,6 +942,67 @@ const deployedContracts = {
               name: "originalOwners",
               type: "address[4]",
               internalType: "address[4]",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getNextClaim",
+          inputs: [
+            {
+              name: "bettor",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "out",
+              type: "tuple",
+              internalType: "struct AnimalRace.NextClaimView",
+              components: [
+                {
+                  name: "hasClaim",
+                  type: "bool",
+                  internalType: "bool",
+                },
+                {
+                  name: "raceId",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "status",
+                  type: "uint8",
+                  internalType: "uint8",
+                },
+                {
+                  name: "betAnimal",
+                  type: "uint8",
+                  internalType: "uint8",
+                },
+                {
+                  name: "betAmount",
+                  type: "uint128",
+                  internalType: "uint128",
+                },
+                {
+                  name: "winner",
+                  type: "uint8",
+                  internalType: "uint8",
+                },
+                {
+                  name: "payout",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "closeBlock",
+                  type: "uint64",
+                  internalType: "uint64",
+                },
+              ],
             },
           ],
           stateMutability: "view",
@@ -1046,26 +1054,8 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "owner",
-          inputs: [],
-          outputs: [
-            {
-              name: "",
-              type: "address",
-              internalType: "address",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
           name: "placeBet",
           inputs: [
-            {
-              name: "raceId",
-              type: "uint256",
-              internalType: "uint256",
-            },
             {
               name: "animal",
               type: "uint8",
@@ -1078,15 +1068,22 @@ const deployedContracts = {
         {
           type: "function",
           name: "settleRace",
-          inputs: [
+          inputs: [],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "latestRaceId",
+          inputs: [],
+          outputs: [
             {
               name: "raceId",
               type: "uint256",
               internalType: "uint256",
             },
           ],
-          outputs: [],
-          stateMutability: "nonpayable",
+          stateMutability: "view",
         },
         {
           type: "function",
@@ -1129,11 +1126,6 @@ const deployedContracts = {
           type: "function",
           name: "submitAnimal",
           inputs: [
-            {
-              name: "raceId",
-              type: "uint256",
-              internalType: "uint256",
-            },
             {
               name: "tokenId",
               type: "uint256",

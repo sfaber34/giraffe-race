@@ -31,7 +31,6 @@ contract AnimalRace {
     uint16 public constant MAX_TICKS = 500;
     uint8 public constant SPEED_RANGE = 10; // speeds per tick: 1-10
 
-    address public owner;
     address public house;
     IERC721 public animalNft;
 
@@ -67,6 +66,17 @@ contract AnimalRace {
         bool claimed;
     }
 
+    struct NextClaimView {
+        bool hasClaim;
+        uint256 raceId;
+        uint8 status;
+        uint8 betAnimal;
+        uint128 betAmount;
+        uint8 winner;
+        uint256 payout;
+        uint64 closeBlock;
+    }
+
     uint256 public nextRaceId;
     mapping(uint256 => Race) private races;
     mapping(uint256 => mapping(address => Bet)) private bets;
@@ -74,6 +84,11 @@ contract AnimalRace {
     mapping(uint256 => mapping(address => bool)) private hasSubmittedAnimal;
     mapping(uint256 => RaceEntry[]) private raceEntries;
     mapping(uint256 => mapping(uint256 => bool)) private tokenEntered;
+
+    // Per-user list of races they participated in (one bet per race).
+    mapping(address => uint256[]) private bettorRaceIds;
+    // Next index in `bettorRaceIds[msg.sender]` to resolve/claim.
+    mapping(address => uint256) private nextClaimIndex;
 
     // Fixed pool of house animals used to auto-fill empty lanes.
     // These are NOT escrowed by default (no approvals required); we just reference them as house-owned racers.
@@ -87,8 +102,8 @@ contract AnimalRace {
     event AnimalAssigned(uint256 indexed raceId, uint256 indexed tokenId, address indexed originalOwner, uint8 lane);
     event HouseAnimalAssigned(uint256 indexed raceId, uint256 indexed tokenId, uint8 lane);
 
-    error NotOwner();
     error InvalidRace();
+    error NoClaimableBets();
     error BettingClosed();
     error BettingNotOpen();
     error SubmissionsClosed();
@@ -108,17 +123,10 @@ contract AnimalRace {
     error NotTokenOwner();
     error TokenAlreadyEntered();
     error EntryPoolFull();
-    error InvalidCloseBlock();
     error AnimalsAlreadyFinalized();
     error PreviousRaceNotSettled();
 
-    modifier onlyOwner() {
-        if (msg.sender != owner) revert NotOwner();
-        _;
-    }
-
-    constructor(address _owner, address _animalNft, address _house, uint256[ANIMAL_COUNT] memory _houseAnimalTokenIds) {
-        owner = _owner;
+    constructor(address _animalNft, address _house, uint256[ANIMAL_COUNT] memory _houseAnimalTokenIds) {
         animalNft = IERC721(_animalNft);
         house = _house;
         houseAnimalTokenIds = _houseAnimalTokenIds;
@@ -156,28 +164,31 @@ contract AnimalRace {
         return _simulate(seed);
     }
 
+    function latestRaceId() public view returns (uint256 raceId) {
+        if (nextRaceId == 0) revert InvalidRace();
+        return nextRaceId - 1;
+    }
+
+    function _activeRaceId() internal view returns (uint256 raceId) {
+        if (nextRaceId == 0) revert InvalidRace();
+        raceId = nextRaceId - 1;
+        if (races[raceId].settled) revert InvalidRace();
+    }
+
     /// @notice Convenience: create a race that closes 20 blocks from now.
-    function createRace() external onlyOwner returns (uint256 raceId) {
-        return _createRace(uint64(block.number + DEFAULT_BETTING_CLOSE_OFFSET_BLOCKS));
+    function createRace() external returns (uint256 raceId) {
+        return _createRace();
     }
 
-    /// @notice Create a race with an explicit close block.
-    function createRace(uint64 closeBlock) external onlyOwner returns (uint256 raceId) {
-        return _createRace(closeBlock);
-    }
-
-    function _createRace(uint64 closeBlock) internal returns (uint256 raceId) {
+    function _createRace() internal returns (uint256 raceId) {
         // Only allow one open race at a time: previous race must be settled before creating a new one.
         if (nextRaceId > 0) {
             Race storage prev = races[nextRaceId - 1];
             if (!prev.settled) revert PreviousRaceNotSettled();
         }
 
-        // Need at least SUBMISSION_CLOSE_OFFSET_BLOCKS blocks between creation and submission close,
-        // and another SUBMISSION_CLOSE_OFFSET_BLOCKS blocks between submission close and betting close.
-        // (With the current constants, that's 20 blocks total.)
-        if (closeBlock <= block.number) revert InvalidCloseBlock();
-        if (closeBlock < uint64(block.number) + DEFAULT_BETTING_CLOSE_OFFSET_BLOCKS) revert InvalidCloseBlock();
+        // Fixed schedule: prevents griefers from setting a far-future close block.
+        uint64 closeBlock = uint64(block.number + DEFAULT_BETTING_CLOSE_OFFSET_BLOCKS);
 
         raceId = nextRaceId++;
         Race storage r = races[raceId];
@@ -186,11 +197,11 @@ contract AnimalRace {
         emit RaceCreated(raceId, closeBlock);
     }
 
-    function placeBet(uint256 raceId, uint8 animal) external payable {
+    function placeBet(uint8 animal) external payable {
         if (animal >= ANIMAL_COUNT) revert InvalidAnimal();
 
+        uint256 raceId = _activeRaceId();
         Race storage r = races[raceId];
-        if (r.closeBlock == 0) revert InvalidRace();
         if (block.number >= r.closeBlock) revert BettingClosed();
         if (block.number < _submissionCloseBlock(r.closeBlock)) revert BettingNotOpen();
 
@@ -208,6 +219,7 @@ contract AnimalRace {
         r.totalPot += msg.value;
         r.totalOnAnimal[animal] += msg.value;
 
+        bettorRaceIds[msg.sender].push(raceId);
         emit BetPlaced(raceId, msg.sender, animal, msg.value);
     }
 
@@ -219,9 +231,15 @@ contract AnimalRace {
      *      "Valid" at settlement time means the current owner still matches the original submitter.
      *      If an entrant becomes invalid (transferred away), they're treated as a no-show.
      */
-    function submitAnimal(uint256 raceId, uint256 tokenId) external {
+    function submitAnimal(uint256 tokenId) external {
+        // "Presence starts the race": if there is no active race (none yet, or latest is settled),
+        // create a new one with the fixed schedule.
+        if (nextRaceId == 0 || races[nextRaceId - 1].settled) {
+            _createRace();
+        }
+
+        uint256 raceId = _activeRaceId();
         Race storage r = races[raceId];
-        if (r.closeBlock == 0) revert InvalidRace();
         // Submissions close earlier than betting.
         if (block.number >= _submissionCloseBlock(r.closeBlock)) revert SubmissionsClosed();
         if (r.settled) revert AlreadySettled();
@@ -252,9 +270,9 @@ contract AnimalRace {
      *      Entropy uses `blockhash(submissionCloseBlock - 1)` so it's available starting at
      *      `submissionCloseBlock` (the first block where submissions are closed).
      */
-    function finalizeRaceAnimals(uint256 raceId) external {
+    function finalizeRaceAnimals() external {
+        uint256 raceId = _activeRaceId();
         Race storage r = races[raceId];
-        if (r.closeBlock == 0) revert InvalidRace();
         if (r.settled) revert AlreadySettled();
         if (r.animalsFinalized) revert AnimalsAlreadyFinalized();
 
@@ -264,7 +282,12 @@ contract AnimalRace {
         _finalizeAnimals(raceId);
     }
 
-    function settleRace(uint256 raceId) external {
+    function settleRace() external {
+        uint256 raceId = _activeRaceId();
+        _settleRace(raceId);
+    }
+
+    function _settleRace(uint256 raceId) internal {
         Race storage r = races[raceId];
         if (r.closeBlock == 0) revert InvalidRace();
         if (r.settled) revert AlreadySettled();
@@ -290,33 +313,57 @@ contract AnimalRace {
         emit RaceSettled(raceId, simSeed, r.winner);
     }
 
-    function claim(uint256 raceId) external returns (uint256 payout) {
-        Race storage r = races[raceId];
-        if (r.closeBlock == 0) revert InvalidRace();
-        if (!r.settled) revert NotSettled();
+    /// @notice Resolve the caller's next unsettled bet (winner pays out, loser resolves to 0).
+    /// @dev This avoids needing a `raceId` parameter while still supporting claims from older races.
+    function claim() external returns (uint256 payout) {
+        uint256[] storage ids = bettorRaceIds[msg.sender];
+        uint256 idx = nextClaimIndex[msg.sender];
+        if (idx >= ids.length) revert NoClaimableBets();
 
-        Bet storage b = bets[raceId][msg.sender];
-        if (b.amount == 0) revert ZeroBet();
-        if (b.claimed) revert AlreadyClaimed();
-        if (b.animal != r.winner) revert NotWinner();
+        while (idx < ids.length) {
+            uint256 raceId = ids[idx];
+            Race storage r = races[raceId];
 
-        uint256 winnersTotal = r.totalOnAnimal[r.winner];
-        // winnersTotal should be > 0 because caller bet on winner, but keep it safe.
-        payout = winnersTotal == 0 ? 0 : (r.totalPot * uint256(b.amount)) / winnersTotal;
+            // Fully on-demand settlement: if the race is ready, let this call settle it.
+            if (!r.settled) {
+                _settleRace(raceId);
+            }
 
-        b.claimed = true;
+            Bet storage b = bets[raceId][msg.sender];
+            // If already resolved, move on.
+            if (b.amount == 0 || b.claimed) {
+                idx++;
+                continue;
+            }
 
-        (bool ok,) = msg.sender.call{ value: payout }("");
-        if (!ok) revert TransferFailed();
+            b.claimed = true;
+            nextClaimIndex[msg.sender] = idx + 1;
 
-        emit Claimed(raceId, msg.sender, payout);
+            // Losers resolve to 0 to allow advancing through history.
+            if (b.animal != r.winner) {
+                emit Claimed(raceId, msg.sender, 0);
+                return 0;
+            }
+
+            uint256 winnersTotal = r.totalOnAnimal[r.winner];
+            payout = winnersTotal == 0 ? 0 : (r.totalPot * uint256(b.amount)) / winnersTotal;
+
+            (bool ok,) = msg.sender.call{value: payout}("");
+            if (!ok) revert TransferFailed();
+
+            emit Claimed(raceId, msg.sender, payout);
+            return payout;
+        }
+
+        nextClaimIndex[msg.sender] = ids.length;
+        revert NoClaimableBets();
     }
 
     // -----------------------
     // Views (for UI / replay)
     // -----------------------
 
-    function getRace(uint256 raceId)
+    function getRace()
         external
         view
         returns (
@@ -328,17 +375,18 @@ contract AnimalRace {
             uint256[4] memory totalOnAnimal
         )
     {
+        uint256 raceId = latestRaceId();
         Race storage r = races[raceId];
-        if (r.closeBlock == 0) revert InvalidRace();
         return (r.closeBlock, r.settled, r.winner, r.seed, r.totalPot, r.totalOnAnimal);
     }
 
-    function getBet(uint256 raceId, address bettor) external view returns (uint128 amount, uint8 animal, bool claimed) {
+    function getBet(address bettor) external view returns (uint128 amount, uint8 animal, bool claimed) {
+        uint256 raceId = latestRaceId();
         Bet storage b = bets[raceId][bettor];
         return (b.amount, b.animal, b.claimed);
     }
 
-    function getRaceAnimals(uint256 raceId)
+    function getRaceAnimals()
         external
         view
         returns (
@@ -347,11 +395,83 @@ contract AnimalRace {
             address[4] memory originalOwners
         )
     {
-        Race storage r = races[raceId];
-        if (r.closeBlock == 0) revert InvalidRace();
+        uint256 raceId = latestRaceId();
 
         RaceAnimals storage ra = raceAnimals[raceId];
         return (ra.assignedCount, ra.tokenIds, ra.originalOwners);
+    }
+
+    /**
+     * @notice UI helper: preview what `claim()` would do next for `bettor`.
+     * @dev `status` meanings:
+     * 0 = next bet exists but would revert if claimed now (race not ready OR blockhash unavailable)
+     * 1 = next bet exists and `claim()` would first settle the race (high gas), then resolve this bet
+     * 2 = next bet exists, race is settled, bet lost (claim would resolve to 0)
+     * 3 = next bet exists, race is settled, bet won (payout shown)
+     */
+    function getNextClaim(address bettor)
+        external
+        view
+        returns (NextClaimView memory out)
+    {
+        uint256[] storage ids = bettorRaceIds[bettor];
+        uint256 idx = nextClaimIndex[bettor];
+        if (idx >= ids.length) return out;
+
+        while (idx < ids.length) {
+            uint256 rid = ids[idx];
+            Bet storage b = bets[rid][bettor];
+            if (b.amount == 0 || b.claimed) {
+                idx++;
+                continue;
+            }
+
+            Race storage r = races[rid];
+            uint64 cb = r.closeBlock;
+
+            if (!r.settled) {
+                // Would `claim()` be able to settle right now?
+                bool ready = cb != 0 && block.number > cb;
+                bool bhLikelyAvailable = ready && (block.number - cb) <= 256;
+                uint8 s = bhLikelyAvailable ? 1 : 0;
+                out.hasClaim = true;
+                out.raceId = rid;
+                out.status = s;
+                out.betAnimal = b.animal;
+                out.betAmount = b.amount;
+                out.winner = 0;
+                out.payout = 0;
+                out.closeBlock = cb;
+                return out;
+            }
+
+            uint8 w = r.winner;
+            if (b.animal != w) {
+                out.hasClaim = true;
+                out.raceId = rid;
+                out.status = 2;
+                out.betAnimal = b.animal;
+                out.betAmount = b.amount;
+                out.winner = w;
+                out.payout = 0;
+                out.closeBlock = cb;
+                return out;
+            }
+
+            uint256 winnersTotal = r.totalOnAnimal[w];
+            uint256 p = winnersTotal == 0 ? 0 : (r.totalPot * uint256(b.amount)) / winnersTotal;
+            out.hasClaim = true;
+            out.raceId = rid;
+            out.status = 3;
+            out.betAnimal = b.animal;
+            out.betAmount = b.amount;
+            out.winner = w;
+            out.payout = p;
+            out.closeBlock = cb;
+            return out;
+        }
+
+        return out;
     }
 
     function _submissionCloseBlock(uint64 bettingCloseBlock) internal pure returns (uint64) {

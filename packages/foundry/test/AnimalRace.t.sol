@@ -33,7 +33,7 @@ contract AnimalRaceTest is Test {
             houseTokenIds[i] = animalNft.mint(owner, string(abi.encodePacked("house-", vm.toString(i))));
         }
 
-        race = new AnimalRace(owner, address(animalNft), owner, houseTokenIds);
+        race = new AnimalRace(address(animalNft), owner, houseTokenIds);
         vm.deal(alice, 10 ether);
         vm.deal(bob, 10 ether);
     }
@@ -86,24 +86,18 @@ contract AnimalRaceTest is Test {
     }
 
     function _placeBet(address bettor, uint256 raceId, uint8 animal, uint256 value) internal {
+        // raceId arg kept only for call sites; contract uses the current race internally.
+        raceId; // silence unused warning
         vm.prank(bettor);
-        (bool ok, bytes memory data) = address(race).call{ value: value }(
-            abi.encodeWithSelector(AnimalRace.placeBet.selector, raceId, animal)
-        );
-        if (!ok) {
-            assembly {
-                revert(add(data, 32), mload(data))
-            }
-        }
+        race.placeBet{value: value}(animal);
     }
 
     function testSettleIsDeterministicFromSeed() public {
         vm.roll(100);
-        vm.prank(owner);
         uint256 raceId = race.createRace();
 
         uint64 closeBlock;
-        (closeBlock,,,,,) = race.getRace(raceId);
+        (closeBlock,,,,,) = race.getRace();
         uint64 submissionCloseBlock = closeBlock - 10;
 
         // Set the lineup entropy blockhash so finalize (triggered during placeBet) doesn't revert.
@@ -125,9 +119,9 @@ contract AnimalRaceTest is Test {
         bytes32 simSeed = keccak256(abi.encodePacked(baseSeed, "RACE_SIM"));
         uint8 expected = _expectedWinner(simSeed);
 
-        race.settleRace(raceId);
+        race.settleRace();
 
-        (, bool settled, uint8 winner, bytes32 storedSeed,,) = race.getRace(raceId);
+        (, bool settled, uint8 winner, bytes32 storedSeed,,) = race.getRace();
         assertTrue(settled);
         assertEq(winner, expected);
         assertEq(storedSeed, simSeed);
@@ -135,10 +129,9 @@ contract AnimalRaceTest is Test {
 
     function testCannotBetTwice() public {
         vm.roll(10);
-        vm.prank(owner);
         uint256 raceId = race.createRace();
         uint64 closeBlock;
-        (closeBlock,,,,,) = race.getRace(raceId);
+        (closeBlock,,,,,) = race.getRace();
         uint64 submissionCloseBlock = closeBlock - 10;
 
         bytes32 forcedLineupBh = keccak256("forced lineup blockhash 2");
@@ -154,11 +147,10 @@ contract AnimalRaceTest is Test {
 
     function testClaimPayoutProRata() public {
         vm.roll(200);
-        vm.prank(owner);
         uint256 raceId = race.createRace();
 
         uint64 closeBlock;
-        (closeBlock,,,,,) = race.getRace(raceId);
+        (closeBlock,,,,,) = race.getRace();
         uint64 submissionCloseBlock = closeBlock - 10;
 
         bytes32 forcedLineupBh = keccak256("forced lineup blockhash 3");
@@ -176,8 +168,9 @@ contract AnimalRaceTest is Test {
         uint8 w;
         for (uint256 i = 0; i < 50; i++) {
             forcedBh = keccak256(abi.encodePacked("bh", i));
-            bytes32 seed = keccak256(abi.encodePacked(forcedBh, raceId, address(race)));
-            w = _expectedWinner(seed);
+            bytes32 baseSeed = keccak256(abi.encodePacked(forcedBh, raceId, address(race)));
+            bytes32 simSeed = keccak256(abi.encodePacked(baseSeed, "RACE_SIM"));
+            w = _expectedWinner(simSeed);
             if (w == 0) break;
         }
         assertEq(w, 0);
@@ -185,15 +178,15 @@ contract AnimalRaceTest is Test {
         vm.roll(uint256(closeBlock));
         vm.setBlockhash(uint256(closeBlock), forcedBh);
         vm.roll(uint256(closeBlock) + 1);
-        race.settleRace(raceId);
+        race.settleRace();
 
         uint256 aliceBalBefore = alice.balance;
         uint256 bobBalBefore = bob.balance;
 
         vm.prank(alice);
-        uint256 alicePayout = race.claim(raceId);
+        uint256 alicePayout = race.claim();
         vm.prank(bob);
-        uint256 bobPayout = race.claim(raceId);
+        uint256 bobPayout = race.claim();
 
         // Total pot = 4 ETH, winnersTotal = 4 ETH
         // Alice payout = 4 * 1/4 = 1 ETH
@@ -206,26 +199,24 @@ contract AnimalRaceTest is Test {
 
     function testSettleRevertsIfBlockhashUnavailable() public {
         vm.roll(1000);
-        vm.prank(owner);
         uint256 raceId = race.createRace();
 
         uint64 closeBlock;
-        (closeBlock,,,,,) = race.getRace(raceId);
+        (closeBlock,,,,,) = race.getRace();
 
         // Move far ahead so blockhash is unavailable (returns 0)
         vm.roll(uint256(closeBlock) + 300);
 
         vm.expectRevert(AnimalRace.BlockhashUnavailable.selector);
-        race.settleRace(raceId);
+        race.settleRace();
     }
 
     function testCannotSubmitAfterSubmissionsClose() public {
         vm.roll(500);
-        vm.prank(owner);
         uint256 raceId = race.createRace();
 
         uint64 closeBlock;
-        (closeBlock,,,,,) = race.getRace(raceId);
+        (closeBlock,,,,,) = race.getRace();
         uint64 submissionCloseBlock = closeBlock - 10;
 
         vm.prank(alice);
@@ -234,32 +225,64 @@ contract AnimalRaceTest is Test {
         vm.roll(uint256(submissionCloseBlock));
         vm.prank(alice);
         vm.expectRevert(AnimalRace.SubmissionsClosed.selector);
-        race.submitAnimal(raceId, aliceTokenId);
+        race.submitAnimal(aliceTokenId);
     }
 
     function testCannotBetBeforeSubmissionsClose() public {
         vm.roll(600);
-        vm.prank(owner);
         uint256 raceId = race.createRace();
 
         uint64 closeBlock;
-        (closeBlock,,,,,) = race.getRace(raceId);
+        (closeBlock,,,,,) = race.getRace();
         uint64 submissionCloseBlock = closeBlock - 10;
 
         vm.roll(uint256(submissionCloseBlock - 1));
-        vm.prank(alice);
         vm.expectRevert(AnimalRace.BettingNotOpen.selector);
-        _placeBet(alice, raceId, 0, 1 ether);
+        vm.prank(alice);
+        race.placeBet{value: 1 ether}(0);
     }
 
     function testCannotCreateNewRaceUntilPreviousSettled() public {
         vm.roll(700);
-        vm.prank(owner);
         race.createRace();
 
-        vm.prank(owner);
         vm.expectRevert(AnimalRace.PreviousRaceNotSettled.selector);
         race.createRace();
+    }
+
+    function testGas_CoordinatorFlow_With50Entrants() public {
+        vm.roll(1000);
+        uint256 raceId = race.createRace();
+
+        uint64 closeBlock;
+        (closeBlock,,,,,) = race.getRace();
+        uint64 submissionCloseBlock = closeBlock - 10;
+
+        // Finalization entropy uses blockhash(submissionCloseBlock - 1).
+        bytes32 forcedLineupBh = keccak256("forced lineup blockhash 50 entrants");
+        vm.roll(uint256(submissionCloseBlock - 1));
+        vm.setBlockhash(uint256(submissionCloseBlock - 1), forcedLineupBh);
+
+        // 50 unique entrants submit one token each.
+        for (uint256 i = 0; i < 50; i++) {
+            address entrant = address(uint160(0x1000 + i));
+            vm.prank(entrant);
+            uint256 tokenId = animalNft.mint(entrant, string(abi.encodePacked("entrant-", vm.toString(i))));
+
+            vm.prank(entrant);
+            race.submitAnimal(tokenId);
+        }
+
+        // Betting opens after submissions close, so finalize at submissionCloseBlock.
+        vm.roll(uint256(submissionCloseBlock));
+        race.finalizeRaceAnimals();
+
+        // Settlement entropy uses blockhash(closeBlock).
+        bytes32 forcedBh = keccak256("forced settle blockhash 50 entrants");
+        vm.roll(uint256(closeBlock));
+        vm.setBlockhash(uint256(closeBlock), forcedBh);
+        vm.roll(uint256(closeBlock) + 1);
+        race.settleRace();
     }
 
     function _bps(uint256 wins, uint256 total) internal pure returns (uint256) {
@@ -286,11 +309,10 @@ contract AnimalRaceTest is Test {
         for (uint256 i = 0; i < racesInBatch; i++) {
             uint256 globalI = batchIndex * racesInBatch + i;
             vm.roll(startBlock + i * 50);
-            vm.prank(owner);
             uint256 raceId = race.createRace();
 
             uint64 closeBlock;
-            (closeBlock,,,,,) = race.getRace(raceId);
+            (closeBlock,,,,,) = race.getRace();
             uint64 submissionCloseBlock = closeBlock - 10;
 
             // Finalization entropy uses blockhash(submissionCloseBlock - 1).
@@ -298,18 +320,18 @@ contract AnimalRaceTest is Test {
             vm.roll(uint256(submissionCloseBlock - 1));
             vm.setBlockhash(uint256(submissionCloseBlock - 1), forcedLineupBh);
             vm.roll(uint256(submissionCloseBlock));
-            race.finalizeRaceAnimals(raceId);
+            race.finalizeRaceAnimals();
 
-            (, uint256[4] memory tokenIds,) = race.getRaceAnimals(raceId);
+            (, uint256[4] memory tokenIds,) = race.getRaceAnimals();
 
             // Settlement entropy uses blockhash(closeBlock).
             bytes32 forcedBh = keccak256(abi.encodePacked("settle", globalI));
             vm.roll(uint256(closeBlock));
             vm.setBlockhash(uint256(closeBlock), forcedBh);
             vm.roll(uint256(closeBlock) + 1);
-            race.settleRace(raceId);
+            race.settleRace();
 
-            (, bool settled, uint8 winner,,,) = race.getRace(raceId);
+            (, bool settled, uint8 winner,,,) = race.getRace();
             assertTrue(settled);
             assertLt(winner, 4);
 

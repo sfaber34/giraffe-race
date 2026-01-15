@@ -1,12 +1,12 @@
 "use client";
 
 import type { NextPage } from "next";
-import { AnimalRaceHome } from "~~/app/_components/AnimalRaceHome";
+import { RaceDashboard } from "~~/app/_components/RaceDashboard";
 
 const RaceView: NextPage = () => {
   return (
     <div className="flex items-center flex-col grow">
-      <AnimalRaceHome />
+      <RaceDashboard />
     </div>
   );
 };
