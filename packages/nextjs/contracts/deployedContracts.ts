@@ -838,6 +838,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "claimNextWinningPayout",
+          inputs: [],
+          outputs: [
+            {
+              name: "payout",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
           name: "createRace",
           inputs: [],
           outputs: [
@@ -941,6 +954,72 @@ const deployedContracts = {
         {
           type: "function",
           name: "getNextClaim",
+          inputs: [
+            {
+              name: "bettor",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "out",
+              type: "tuple",
+              internalType: "struct AnimalRace.NextClaimView",
+              components: [
+                {
+                  name: "hasClaim",
+                  type: "bool",
+                  internalType: "bool",
+                },
+                {
+                  name: "raceId",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "status",
+                  type: "uint8",
+                  internalType: "uint8",
+                },
+                {
+                  name: "betAnimal",
+                  type: "uint8",
+                  internalType: "uint8",
+                },
+                {
+                  name: "betTokenId",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "betAmount",
+                  type: "uint128",
+                  internalType: "uint128",
+                },
+                {
+                  name: "winner",
+                  type: "uint8",
+                  internalType: "uint8",
+                },
+                {
+                  name: "payout",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "closeBlock",
+                  type: "uint64",
+                  internalType: "uint64",
+                },
+              ],
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getNextWinningClaim",
           inputs: [
             {
               name: "bettor",
@@ -1134,6 +1213,25 @@ const deployedContracts = {
               name: "totalOnAnimal",
               type: "uint256[4]",
               internalType: "uint256[4]",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getWinningClaimRemaining",
+          inputs: [
+            {
+              name: "bettor",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "remaining",
+              type: "uint256",
+              internalType: "uint256",
             },
           ],
           stateMutability: "view",

@@ -197,7 +197,10 @@ export const RaceDashboard = () => {
   }, [latestRaceId]);
 
   const viewingRaceId = viewRaceId ?? latestRaceId;
-  const isViewingLatest = viewingRaceId !== null && latestRaceId !== null && viewingRaceId === latestRaceId;
+  // Treat "no race yet" (and the brief initial-load null state) as "viewing latest" so core actions
+  // like "Start race" / "Submit NFT" aren't incorrectly disabled on a fresh chain.
+  const isViewingLatest =
+    !hasAnyRace || viewingRaceId === null || latestRaceId === null || viewingRaceId === latestRaceId;
 
   const { data: raceData } = useScaffoldReadContract({
     contractName: "AnimalRace",
@@ -304,36 +307,37 @@ export const RaceDashboard = () => {
     };
   }, [myBetData]);
 
-  const { data: nextClaimData } = useScaffoldReadContract({
+  const { data: nextWinningClaimData } = useScaffoldReadContract({
     contractName: "AnimalRace",
-    functionName: "getNextClaim",
+    functionName: "getNextWinningClaim",
     args: [connectedAddress],
     query: { enabled: !!animalRaceContract && !!connectedAddress },
   });
 
-  const { data: claimRemainingData } = useScaffoldReadContract({
+  const { data: winningClaimRemainingData } = useScaffoldReadContract({
     contractName: "AnimalRace",
-    functionName: "getClaimRemaining",
+    functionName: "getWinningClaimRemaining",
     args: [connectedAddress],
     query: { enabled: !!animalRaceContract && !!connectedAddress },
   });
 
-  const claimRemaining = useMemo(() => {
-    if (claimRemainingData === undefined || claimRemainingData === null) return null;
+  const winningClaimRemaining = useMemo(() => {
+    if (winningClaimRemainingData === undefined || winningClaimRemainingData === null) return null;
     try {
-      return BigInt(claimRemainingData as any);
+      return BigInt(winningClaimRemainingData as any);
     } catch {
       return null;
     }
-  }, [claimRemainingData]);
+  }, [winningClaimRemainingData]);
 
-  const nextClaim = useMemo(() => {
-    if (!nextClaimData) return null;
-    // `getNextClaim` returns a struct (tuple)
-    const out = nextClaimData as any;
+  const nextWinningClaim = useMemo(() => {
+    if (!nextWinningClaimData) return null;
+    // `getNextWinningClaim` returns a struct (tuple)
+    const out = nextWinningClaimData as any;
     return {
       hasClaim: Boolean(out?.hasClaim),
       raceId: BigInt(out?.raceId ?? 0),
+      // Always 3 for a settled win; included for compatibility with the shared struct.
       status: Number(out?.status ?? 0) as 0 | 1 | 2 | 3,
       betAnimal: Number(out?.betAnimal ?? 0) as 0 | 1 | 2 | 3,
       betTokenId: BigInt(out?.betTokenId ?? 0),
@@ -342,13 +346,18 @@ export const RaceDashboard = () => {
       payout: BigInt(out?.payout ?? 0),
       closeBlock: BigInt(out?.closeBlock ?? 0),
     };
-  }, [nextClaimData]);
+  }, [nextWinningClaimData]);
 
-  const canClaimNow = useMemo(() => {
-    if (!nextClaim?.hasClaim) return false;
-    // status 1 = claim will settle first; 2/3 = already settled
-    return nextClaim.status === 1 || nextClaim.status === 2 || nextClaim.status === 3;
-  }, [nextClaim]);
+  const [jumpToNextWinningClaimAfterClaim, setJumpToNextWinningClaimAfterClaim] = useState(false);
+
+  useEffect(() => {
+    if (!jumpToNextWinningClaimAfterClaim) return;
+    // After a successful claim, jump to the next winning claim race (if any).
+    if (nextWinningClaim?.hasClaim) {
+      setViewRaceId(nextWinningClaim.raceId);
+    }
+    setJumpToNextWinningClaimAfterClaim(false);
+  }, [jumpToNextWinningClaimAfterClaim, nextWinningClaim?.hasClaim, nextWinningClaim?.raceId]);
 
   const { writeContractAsync: writeAnimalRaceAsync } = useScaffoldWriteContract({ contractName: "AnimalRace" });
 
@@ -704,13 +713,7 @@ export const RaceDashboard = () => {
                     Latest
                   </button>
                 </div>
-                <button
-                  className="btn btn-sm btn-outline"
-                  disabled={!nextClaim?.hasClaim || viewingRaceId === nextClaim?.raceId}
-                  onClick={() => setViewRaceId(nextClaim?.raceId ?? null)}
-                >
-                  Jump to claim
-                </button>
+                {/* Claim UX is handled in the Claim panel; keep replay controls focused on replay */}
                 <div className="join">
                   <button
                     className={`btn btn-sm join-item ${playbackSpeed === 1 ? "btn-active" : ""}`}
@@ -1095,79 +1098,62 @@ export const RaceDashboard = () => {
 
               <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between">
-                  <div className="text-sm font-medium">Claim</div>
-                  {connectedAddress && claimRemaining !== null ? (
+                  <div className="text-sm font-medium">Claim payout</div>
+                  {connectedAddress && winningClaimRemaining !== null && winningClaimRemaining > 0n ? (
                     <div className="badge badge-outline">
-                      {claimRemaining.toString()}
+                      {winningClaimRemaining.toString()}
                       <span className="ml-1 opacity-70">pending</span>
                     </div>
                   ) : null}
                 </div>
                 {!connectedAddress ? (
                   <div className="text-xs opacity-70">Connect wallet to see your next claim.</div>
-                ) : !nextClaim ? (
+                ) : !nextWinningClaim ? (
                   <div className="text-xs opacity-70">Loading claim status…</div>
-                ) : !nextClaim.hasClaim ? (
-                  <div className="text-xs opacity-70">No claimable bets.</div>
+                ) : !nextWinningClaim.hasClaim ? (
+                  <div className="text-xs opacity-70">No claimable payouts.</div>
                 ) : (
                   <div className="text-xs">
                     <div className="flex justify-between">
-                      <span className="opacity-70">Next claim race</span>
-                      <span className="font-mono">{nextClaim.raceId.toString()}</span>
+                      <span className="opacity-70">Next payout race</span>
+                      <span className="font-mono">{nextWinningClaim.raceId.toString()}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="opacity-70">Your bet</span>
                       <span className="font-semibold text-right">
                         {LANE_EMOJI}{" "}
-                        {nextClaim.betTokenId !== 0n ? (
-                          <LaneName tokenId={nextClaim.betTokenId} fallback={`Lane ${nextClaim.betAnimal}`} />
+                        {nextWinningClaim.betTokenId !== 0n ? (
+                          <LaneName
+                            tokenId={nextWinningClaim.betTokenId}
+                            fallback={`Lane ${nextWinningClaim.betAnimal}`}
+                          />
                         ) : (
-                          `Lane ${nextClaim.betAnimal}`
+                          `Lane ${nextWinningClaim.betAnimal}`
                         )}{" "}
-                        · {formatEther(nextClaim.betAmount)} ETH
+                        · {formatEther(nextWinningClaim.betAmount)} ETH
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="opacity-70">Outcome</span>
-                      <span className="font-semibold">
-                        {nextClaim.status === 0
-                          ? "Not claimable yet"
-                          : nextClaim.status === 1
-                            ? "Will settle then resolve"
-                            : !revealOutcome
-                              ? "Hidden until replay finishes"
-                              : nextClaim.status === 2
-                                ? "Lost"
-                                : "Won"}
-                      </span>
+                      <span className="font-semibold">Won</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="opacity-70">Estimated payout</span>
-                      <span className="font-mono">{revealOutcome ? `${formatEther(nextClaim.payout)} ETH` : "—"}</span>
+                      <span className="font-mono">{formatEther(nextWinningClaim.payout)} ETH</span>
                     </div>
                   </div>
                 )}
                 <button
-                  className="btn btn-sm btn-outline"
-                  disabled={!nextClaim?.hasClaim || viewingRaceId === null || viewingRaceId === nextClaim?.raceId}
-                  onClick={() => setViewRaceId(nextClaim?.raceId ?? null)}
-                >
-                  View claim race
-                </button>
-                <button
                   className="btn btn-sm btn-primary"
-                  disabled={!animalRaceContract || !connectedAddress || !nextClaim?.hasClaim || !canClaimNow}
+                  disabled={!animalRaceContract || !connectedAddress || !nextWinningClaim?.hasClaim}
                   onClick={async () => {
-                    await writeAnimalRaceAsync({ functionName: "claim" } as any);
+                    await writeAnimalRaceAsync({ functionName: "claimNextWinningPayout" } as any);
+                    setJumpToNextWinningClaimAfterClaim(true);
                   }}
                 >
                   Claim payout
                 </button>
-                <div className="text-xs opacity-70">
-                  {nextClaim?.hasClaim && nextClaim.status === 1
-                    ? "Note: this claim will also settle the race (higher gas)."
-                    : "Claim is enabled only when it won't revert."}
-                </div>
+                <div className="text-xs opacity-70">Claim is enabled only when you have a payout to claim.</div>
               </div>
             </div>
           </div>

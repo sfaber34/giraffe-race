@@ -360,6 +360,60 @@ contract AnimalRace {
         revert NoClaimableBets();
     }
 
+    /**
+     * @notice Claim the caller's next *winning* payout.
+     * @dev This function will advance through (and mark as resolved) any losses so users only ever "claim" money.
+     * It may also settle races on-demand (same as `claim()`), so gas can be higher.
+     *
+     * Reverts with `NoClaimableBets()` if there is no winning payout remaining for the caller.
+     */
+    function claimNextWinningPayout() external returns (uint256 payout) {
+        uint256[] storage ids = bettorRaceIds[msg.sender];
+        uint256 idx = nextClaimIndex[msg.sender];
+        if (idx >= ids.length) revert NoClaimableBets();
+
+        while (idx < ids.length) {
+            uint256 raceId = ids[idx];
+            Race storage r = races[raceId];
+
+            // On-demand settlement (same behavior as `claim()`).
+            if (!r.settled) {
+                _settleRace(raceId);
+            }
+
+            Bet storage b = bets[raceId][msg.sender];
+            // Skip already resolved entries.
+            if (b.amount == 0 || b.claimed) {
+                idx++;
+                continue;
+            }
+
+            // Resolve losses silently (advance the queue without "claiming" money).
+            if (b.animal != r.winner) {
+                b.claimed = true;
+                idx++;
+                nextClaimIndex[msg.sender] = idx;
+                continue;
+            }
+
+            // Winner: pay out.
+            b.claimed = true;
+            nextClaimIndex[msg.sender] = idx + 1;
+
+            uint256 winnersTotal = r.totalOnAnimal[r.winner];
+            payout = winnersTotal == 0 ? 0 : (r.totalPot * uint256(b.amount)) / winnersTotal;
+
+            (bool ok,) = msg.sender.call{value: payout}("");
+            if (!ok) revert TransferFailed();
+
+            emit Claimed(raceId, msg.sender, payout);
+            return payout;
+        }
+
+        nextClaimIndex[msg.sender] = ids.length;
+        revert NoClaimableBets();
+    }
+
     // -----------------------
     // Views (for UI / replay)
     // -----------------------
@@ -446,6 +500,56 @@ contract AnimalRace {
         uint256 idx = nextClaimIndex[bettor];
         if (idx >= ids.length) return 0;
         return ids.length - idx;
+    }
+
+    /// @notice How many *winning payouts* remain for the caller (settled, unclaimed, winning bets only).
+    function getWinningClaimRemaining(address bettor) external view returns (uint256 remaining) {
+        uint256[] storage ids = bettorRaceIds[bettor];
+        uint256 idx = nextClaimIndex[bettor];
+        if (idx >= ids.length) return 0;
+
+        for (uint256 i = idx; i < ids.length; i++) {
+            uint256 rid = ids[i];
+            Bet storage b = bets[rid][bettor];
+            if (b.amount == 0 || b.claimed) continue;
+
+            Race storage r = races[rid];
+            if (!r.settled) continue;
+            if (b.animal != r.winner) continue;
+
+            remaining++;
+        }
+    }
+
+    /// @notice UI helper: preview the caller's next *winning payout* (settled wins only).
+    function getNextWinningClaim(address bettor) external view returns (NextClaimView memory out) {
+        uint256[] storage ids = bettorRaceIds[bettor];
+        uint256 idx = nextClaimIndex[bettor];
+        if (idx >= ids.length) return out;
+
+        for (uint256 i = idx; i < ids.length; i++) {
+            uint256 rid = ids[i];
+            Bet storage b = bets[rid][bettor];
+            if (b.amount == 0 || b.claimed) continue;
+
+            Race storage r = races[rid];
+            if (!r.settled) continue;
+            if (b.animal != r.winner) continue;
+
+            uint256 winnersTotal = r.totalOnAnimal[r.winner];
+            uint256 p = winnersTotal == 0 ? 0 : (r.totalPot * uint256(b.amount)) / winnersTotal;
+
+            out.hasClaim = true;
+            out.raceId = rid;
+            out.status = 3;
+            out.betAnimal = b.animal;
+            out.betTokenId = raceAnimals[rid].tokenIds[b.animal];
+            out.betAmount = b.amount;
+            out.winner = r.winner;
+            out.payout = p;
+            out.closeBlock = r.closeBlock;
+            return out;
+        }
     }
 
     /**
