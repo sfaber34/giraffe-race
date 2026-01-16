@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Address, EtherInput } from "@scaffold-ui/components";
+import { EtherInput } from "@scaffold-ui/components";
 import { Hex, formatEther, isHex, parseEther, toHex } from "viem";
 import { useAccount, useBlockNumber, usePublicClient } from "wagmi";
 import { GiraffeAnimated } from "~~/components/assets/GiraffeAnimated";
@@ -216,12 +216,6 @@ export const RaceDashboard = () => {
     query: { enabled: hasAnyRace && viewingRaceId !== null },
   });
 
-  const { data: houseAddress } = useScaffoldReadContract({
-    contractName: "AnimalRace",
-    functionName: "house",
-    query: { enabled: !!animalRaceContract },
-  });
-
   const parsed = useMemo(() => {
     if (!raceData) return null;
     const [closeBlock, settled, winner, seed, totalPot, totalOnAnimal] = raceData;
@@ -275,6 +269,9 @@ export const RaceDashboard = () => {
     status === "submissions_open" ||
     status === "no_race" || // will auto-create a race
     status === "settled"; // will auto-create the next race
+
+  const showEnterNftCard = !lineupFinalized;
+  const showPlaceBetCard = lineupFinalized || status === "settled";
 
   const placeBetValue = useMemo(() => {
     const v = betAmountEth.trim();
@@ -1171,236 +1168,197 @@ export const RaceDashboard = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="card bg-base-100 border border-base-300">
-                  <div className="card-body gap-3">
-                    <h3 className="font-semibold">Enter an NFT</h3>
-                    <p className="text-sm opacity-70">
-                      Submitting starts a race if none is active. Submissions are open until the submissions-close
-                      block.
-                    </p>
+              <div className="grid grid-cols-1 gap-4">
+                {showEnterNftCard ? (
+                  <div className="card bg-base-100 border border-base-300">
+                    <div className="card-body gap-3">
+                      <h3 className="font-semibold">Enter an NFT</h3>
+                      <p className="text-sm opacity-70">
+                        Submitting starts a race if none is active. Submissions are open until the submissions-close
+                        block.
+                      </p>
 
-                    <label className="form-control w-full">
-                      <div className="label">
-                        <span className="label-text">Your NFTs</span>
-                      </div>
-                      {!connectedAddress ? (
-                        <div className="text-sm opacity-70">Connect your wallet to see your NFTs.</div>
-                      ) : isOwnedTokensLoading ? (
-                        <div className="text-sm opacity-70">Loading your NFTs…</div>
-                      ) : ownedTokenIds.length === 0 ? (
-                        <div className="text-sm opacity-70">You don’t own any AnimalNFTs yet.</div>
-                      ) : (
-                        <select
-                          className="select select-bordered w-full"
-                          value={selectedTokenId?.toString() ?? ""}
-                          onChange={e => setSelectedTokenId(e.target.value ? BigInt(e.target.value) : null)}
-                        >
-                          <option value="" disabled>
-                            Select an NFT…
-                          </option>
-                          {ownedTokenIds.map(tokenId => (
-                            <option key={tokenId.toString()} value={tokenId.toString()}>
-                              {LANE_EMOJI}{" "}
-                              {(ownedTokenNameById[tokenId.toString()] || "").trim()
-                                ? ownedTokenNameById[tokenId.toString()]
-                                : isLoadingOwnedTokenNames
-                                  ? "Loading…"
-                                  : "Unnamed"}
+                      <label className="form-control w-full">
+                        <div className="label">
+                          <span className="label-text">Your NFTs</span>
+                        </div>
+                        {!connectedAddress ? (
+                          <div className="text-sm opacity-70">Connect your wallet to see your NFTs.</div>
+                        ) : isOwnedTokensLoading ? (
+                          <div className="text-sm opacity-70">Loading your NFTs…</div>
+                        ) : ownedTokenIds.length === 0 ? (
+                          <div className="text-sm opacity-70">You don’t own any AnimalNFTs yet.</div>
+                        ) : (
+                          <select
+                            className="select select-bordered w-full"
+                            value={selectedTokenId?.toString() ?? ""}
+                            onChange={e => setSelectedTokenId(e.target.value ? BigInt(e.target.value) : null)}
+                          >
+                            <option value="" disabled>
+                              Select an NFT…
                             </option>
-                          ))}
-                        </select>
-                      )}
-                    </label>
+                            {ownedTokenIds.map(tokenId => (
+                              <option key={tokenId.toString()} value={tokenId.toString()}>
+                                {LANE_EMOJI}{" "}
+                                {(ownedTokenNameById[tokenId.toString()] || "").trim()
+                                  ? ownedTokenNameById[tokenId.toString()]
+                                  : isLoadingOwnedTokenNames
+                                    ? "Loading…"
+                                    : "Unnamed"}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </label>
 
-                    <button
-                      className="btn btn-primary"
-                      disabled={
-                        !animalRaceContract ||
-                        !connectedAddress ||
-                        selectedTokenId === null ||
-                        !canSubmit ||
-                        !isViewingLatest
-                      }
-                      onClick={async () => {
-                        if (selectedTokenId === null) return;
-                        await writeAnimalRaceAsync({ functionName: "submitAnimal", args: [selectedTokenId] } as any);
-                        setSelectedTokenId(null);
-                      }}
-                    >
-                      Submit NFT
-                    </button>
+                      <button
+                        className="btn btn-primary"
+                        disabled={
+                          !animalRaceContract ||
+                          !connectedAddress ||
+                          selectedTokenId === null ||
+                          !canSubmit ||
+                          !isViewingLatest
+                        }
+                        onClick={async () => {
+                          if (selectedTokenId === null) return;
+                          await writeAnimalRaceAsync({ functionName: "submitAnimal", args: [selectedTokenId] } as any);
+                          setSelectedTokenId(null);
+                        }}
+                      >
+                        Submit NFT
+                      </button>
 
-                    {!canSubmit ? (
-                      <div className="text-xs opacity-70">
-                        Submissions are only available during the submissions window.
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-
-                <div className="card bg-base-100 border border-base-300">
-                  <div className="card-body gap-3">
-                    <h3 className="font-semibold">Place a bet</h3>
-                    <p className="text-sm opacity-70">
-                      Betting opens after submissions close and the lineup is finalized.
-                    </p>
-
-                    {status === "betting_closed" && !parsed?.settled ? (
-                      <div className="alert alert-info">
-                        <div className="flex flex-col gap-2 w-full">
-                          <div className="font-medium">Betting is closed. Waiting for settlement.</div>
-                          {connectedAddress ? (
-                            myBet?.hasBet ? (
-                              <div className="text-sm">
-                                You bet on{" "}
-                                <span className="font-semibold">
-                                  {(() => {
-                                    const tokenId = parsedAnimals?.tokenIds?.[myBet.animal] ?? 0n;
-                                    return tokenId !== 0n ? (
-                                      <>
-                                        {LANE_EMOJI} <LaneName tokenId={tokenId} fallback={`Lane ${myBet.animal}`} />
-                                      </>
-                                    ) : (
-                                      `Lane ${myBet.animal}`
-                                    );
-                                  })()}
-                                </span>{" "}
-                                for <span className="font-semibold">{formatEther(myBet.amount)} ETH</span>.
-                              </div>
-                            ) : (
-                              <div className="text-sm">You didn’t place a bet for this race.</div>
-                            )
-                          ) : (
-                            <div className="text-sm">Connect your wallet to see what you bet.</div>
-                          )}
-                          <div className="text-xs opacity-70">
-                            Once the race is settled, the replay becomes available and you can claim your payout if you
-                            won.
-                          </div>
+                      {!canSubmit ? (
+                        <div className="text-xs opacity-70">
+                          Submissions are only available during the submissions window.
                         </div>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="flex flex-wrap gap-2">
-                          {Array.from({ length: LANE_COUNT }).map((_, lane) => (
-                            <button
-                              key={lane}
-                              className={`btn btn-sm ${betLane === lane ? "btn-primary" : "btn-outline"}`}
-                              onClick={() => setBetLane(lane as 0 | 1 | 2 | 3)}
-                              disabled={!canBet}
-                              type="button"
-                            >
-                              {lineupFinalized &&
-                              parsedAnimals?.tokenIds?.[lane] &&
-                              parsedAnimals.tokenIds[lane] !== 0n ? (
-                                <>
-                                  {LANE_EMOJI}{" "}
-                                  <LaneName tokenId={parsedAnimals.tokenIds[lane]} fallback={`Lane ${lane}`} />
-                                </>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
+
+                {showPlaceBetCard ? (
+                  <div className="card bg-base-100 border border-base-300">
+                    <div className="card-body gap-3">
+                      <h3 className="font-semibold">Place a bet</h3>
+                      <p className="text-sm opacity-70">
+                        Betting opens after submissions close and the lineup is finalized.
+                      </p>
+
+                      {status === "betting_closed" && !parsed?.settled ? (
+                        <div className="alert alert-info">
+                          <div className="flex flex-col gap-2 w-full">
+                            <div className="font-medium">Betting is closed. Waiting for settlement.</div>
+                            {connectedAddress ? (
+                              myBet?.hasBet ? (
+                                <div className="text-sm">
+                                  You bet on{" "}
+                                  <span className="font-semibold">
+                                    {(() => {
+                                      const tokenId = parsedAnimals?.tokenIds?.[myBet.animal] ?? 0n;
+                                      return tokenId !== 0n ? (
+                                        <>
+                                          {LANE_EMOJI} <LaneName tokenId={tokenId} fallback={`Lane ${myBet.animal}`} />
+                                        </>
+                                      ) : (
+                                        `Lane ${myBet.animal}`
+                                      );
+                                    })()}
+                                  </span>{" "}
+                                  for <span className="font-semibold">{formatEther(myBet.amount)} ETH</span>.
+                                </div>
                               ) : (
-                                <>
-                                  Lane {lane} {LANE_EMOJI}
-                                </>
-                              )}
-                            </button>
-                          ))}
-                        </div>
-
-                        <div className={!canBet ? "opacity-50 pointer-events-none" : ""}>
-                          <EtherInput
-                            placeholder="Bet amount (ETH)"
-                            onValueChange={({ valueInEth }) => {
-                              if (!canBet) return;
-                              setBetAmountEth(valueInEth);
-                            }}
-                            style={{ width: "100%" }}
-                          />
-                        </div>
-
-                        <button
-                          className="btn btn-primary"
-                          disabled={
-                            !animalRaceContract ||
-                            !connectedAddress ||
-                            !canBet ||
-                            !placeBetValue ||
-                            !!myBet?.hasBet ||
-                            !isViewingLatest
-                          }
-                          onClick={async () => {
-                            if (!placeBetValue) return;
-                            await writeAnimalRaceAsync({
-                              functionName: "placeBet",
-                              args: [betLane],
-                              value: placeBetValue,
-                            } as any);
-                            setBetAmountEth("");
-                          }}
-                        >
-                          Place bet
-                        </button>
-
-                        {!canBet ? (
-                          <div className="text-xs opacity-70">
-                            {status !== "betting_open"
-                              ? "Betting is only available during the betting window."
-                              : !lineupFinalized
-                                ? "Finalize the lineup to reveal which NFTs are racing."
-                                : "—"}
-                          </div>
-                        ) : myBet?.hasBet ? (
-                          <div className="text-xs opacity-70">You already placed a bet for this race.</div>
-                        ) : null}
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="divider my-1" />
-
-              <div className="text-sm">
-                <div className="flex justify-between">
-                  <span className="opacity-70">Lane NFTs</span>
-                  <span>{parsedAnimals ? `${parsedAnimals.assignedCount}/4 assigned` : "-"}</span>
-                </div>
-
-                {parsedAnimals ? (
-                  <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {Array.from({ length: LANE_COUNT }).map((_, lane) => {
-                      const tokenId = parsedAnimals.tokenIds[lane] ?? 0n;
-                      const owner = parsedAnimals.originalOwners[lane];
-                      const isHouse =
-                        !!houseAddress && owner?.toLowerCase?.() === (houseAddress as string).toLowerCase();
-
-                      return (
-                        <div key={lane} className="rounded-xl bg-base-100 border border-base-300 px-3 py-2">
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="font-medium">
-                              Lane {lane}: {LANE_EMOJI} <LaneName tokenId={tokenId} fallback={`Lane ${lane}`} />
-                            </div>
+                                <div className="text-sm">You didn’t place a bet for this race.</div>
+                              )
+                            ) : (
+                              <div className="text-sm">Connect your wallet to see what you bet.</div>
+                            )}
                             <div className="text-xs opacity-70">
-                              {tokenId === 0n ? "Unassigned" : isHouse ? "House" : "Submitted"}
+                              Once the race is settled, the replay becomes available and you can claim your payout if
+                              you won.
                             </div>
                           </div>
-                          {tokenId !== 0n ? (
-                            <div className="mt-1 flex justify-between items-center text-xs">
-                              <span className="opacity-70">Owner</span>
-                              <span className="text-right">
-                                <Address address={owner} chain={targetNetwork} />
-                              </span>
-                            </div>
-                          ) : (
-                            <div className="text-xs opacity-70 mt-1">No NFT assigned yet.</div>
-                          )}
                         </div>
-                      );
-                    })}
+                      ) : (
+                        <>
+                          <div className="flex flex-col gap-2 w-full">
+                            {Array.from({ length: LANE_COUNT }).map((_, lane) => (
+                              <button
+                                key={lane}
+                                className={`btn w-full justify-between ${
+                                  betLane === lane ? "btn-primary" : "btn-outline"
+                                }`}
+                                onClick={() => setBetLane(lane as 0 | 1 | 2 | 3)}
+                                disabled={!canBet}
+                                type="button"
+                              >
+                                {lineupFinalized &&
+                                parsedAnimals?.tokenIds?.[lane] &&
+                                parsedAnimals.tokenIds[lane] !== 0n ? (
+                                  <>
+                                    {LANE_EMOJI}{" "}
+                                    <LaneName tokenId={parsedAnimals.tokenIds[lane]} fallback={`Lane ${lane}`} />
+                                  </>
+                                ) : (
+                                  <>
+                                    Lane {lane} {LANE_EMOJI}
+                                  </>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+
+                          <div className={!canBet ? "opacity-50 pointer-events-none" : ""}>
+                            <EtherInput
+                              placeholder="Bet amount (ETH)"
+                              onValueChange={({ valueInEth }) => {
+                                if (!canBet) return;
+                                setBetAmountEth(valueInEth);
+                              }}
+                              style={{ width: "100%" }}
+                            />
+                          </div>
+
+                          <button
+                            className="btn btn-primary"
+                            disabled={
+                              !animalRaceContract ||
+                              !connectedAddress ||
+                              !canBet ||
+                              !placeBetValue ||
+                              !!myBet?.hasBet ||
+                              !isViewingLatest
+                            }
+                            onClick={async () => {
+                              if (!placeBetValue) return;
+                              await writeAnimalRaceAsync({
+                                functionName: "placeBet",
+                                args: [betLane],
+                                value: placeBetValue,
+                              } as any);
+                              setBetAmountEth("");
+                            }}
+                          >
+                            Place bet
+                          </button>
+
+                          {!canBet ? (
+                            <div className="text-xs opacity-70">
+                              {status !== "betting_open"
+                                ? "Betting is only available during the betting window."
+                                : !lineupFinalized
+                                  ? "Finalize the lineup to reveal which NFTs are racing."
+                                  : "—"}
+                            </div>
+                          ) : myBet?.hasBet ? (
+                            <div className="text-xs opacity-70">You already placed a bet for this race.</div>
+                          ) : null}
+                        </>
+                      )}
+                    </div>
                   </div>
-                ) : (
-                  <div className="mt-2 text-xs opacity-70">No lane data yet.</div>
-                )}
+                ) : null}
               </div>
             </div>
           </div>
