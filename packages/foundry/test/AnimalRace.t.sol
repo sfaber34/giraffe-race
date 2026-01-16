@@ -23,8 +23,10 @@ contract AnimalRaceTest is Test {
     uint256 internal constant TRACK_LENGTH = 1000;
     uint256 internal constant MAX_TICKS = 500;
     uint256 internal constant SPEED_RANGE = 10;
-    uint256 internal constant STATS_BATCH_SIZE = 200;
-    uint256 internal constant STATS_BATCHES = 10; // 10 * 200 = 2000 races total (expected)
+    // These win-distribution "stats" tests are intentionally heavy and are mostly for manual inspection.
+    // With readiness (extra state updates per settle), we reduce the batch size to avoid OOG in CI/default runs.
+    uint256 internal constant STATS_BATCH_SIZE = 50;
+    uint256 internal constant STATS_BATCHES = 10; // 10 * 50 = 500 races total (expected)
     string internal constant STATS_DIR = "./tmp/win-stats";
 
     function setUp() public {
@@ -34,8 +36,55 @@ contract AnimalRaceTest is Test {
         }
 
         race = new AnimalRace(address(animalNft), owner, houseTokenIds);
+        animalNft.setRaceContract(address(race));
         vm.deal(alice, 10 ether);
         vm.deal(bob, 10 ether);
+    }
+
+    function testReadinessStartsAt10AndDecreasesAfterRace() public {
+        vm.roll(100);
+        uint256 raceId = race.createRace();
+
+        uint64 closeBlock;
+        (closeBlock,,,,,) = race.getRace();
+        uint64 submissionCloseBlock = closeBlock - 10;
+
+        // Finalization entropy uses blockhash(submissionCloseBlock - 1).
+        bytes32 forcedLineupBh = keccak256("forced lineup blockhash readiness");
+        vm.roll(uint256(submissionCloseBlock - 1));
+        vm.setBlockhash(uint256(submissionCloseBlock - 1), forcedLineupBh);
+        vm.roll(uint256(submissionCloseBlock));
+        race.finalizeRaceAnimals();
+
+        // Snapshot should show "fresh" readiness.
+        uint8[4] memory snap = race.getRaceReadinessById(raceId);
+        for (uint256 i = 0; i < 4; i++) {
+            assertEq(uint256(snap[i]), 10);
+            assertEq(uint256(animalNft.readinessOf(houseTokenIds[i])), 10);
+        }
+
+        // Settlement entropy uses blockhash(closeBlock).
+        bytes32 forcedBh = keccak256("forced settle blockhash readiness");
+        vm.roll(uint256(closeBlock));
+        vm.setBlockhash(uint256(closeBlock), forcedBh);
+        vm.roll(uint256(closeBlock) + 1);
+        race.settleRace();
+
+        // After settling, every participant's readiness should decrease by 1.
+        for (uint256 i = 0; i < 4; i++) {
+            assertEq(uint256(animalNft.readinessOf(houseTokenIds[i])), 9);
+        }
+    }
+
+    function testReadinessFloorsAt1() public {
+        // Directly exercise the floor behavior via the authorized race address.
+        vm.startPrank(address(race));
+        for (uint256 i = 0; i < 20; i++) {
+            animalNft.decreaseReadiness(houseTokenIds[0]);
+        }
+        vm.stopPrank();
+
+        assertEq(uint256(animalNft.readinessOf(houseTokenIds[0])), 1);
     }
 
     function _expectedWinner(bytes32 seed) internal pure returns (uint8) {

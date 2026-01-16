@@ -197,6 +197,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "decreaseReadiness",
+          inputs: [
+            {
+              name: "tokenId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
           name: "getApproved",
           inputs: [
             {
@@ -347,6 +360,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "owner",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "ownerOf",
           inputs: [
             {
@@ -363,6 +389,45 @@ const deployedContracts = {
             },
           ],
           stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "raceContract",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "readinessOf",
+          inputs: [
+            {
+              name: "tokenId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "uint8",
+              internalType: "uint8",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "renounceOwnership",
+          inputs: [],
+          outputs: [],
+          stateMutability: "nonpayable",
         },
         {
           type: "function",
@@ -428,6 +493,19 @@ const deployedContracts = {
               name: "approved",
               type: "bool",
               internalType: "bool",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "setRaceContract",
+          inputs: [
+            {
+              name: "_race",
+              type: "address",
+              internalType: "address",
             },
           ],
           outputs: [],
@@ -527,6 +605,19 @@ const deployedContracts = {
           stateMutability: "nonpayable",
         },
         {
+          type: "function",
+          name: "transferOwnership",
+          inputs: [
+            {
+              name: "newOwner",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
           type: "event",
           name: "Approval",
           inputs: [
@@ -572,6 +663,25 @@ const deployedContracts = {
               type: "bool",
               indexed: false,
               internalType: "bool",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "OwnershipTransferred",
+          inputs: [
+            {
+              name: "previousOwner",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "newOwner",
+              type: "address",
+              indexed: true,
+              internalType: "address",
             },
           ],
           anonymous: false,
@@ -704,9 +814,31 @@ const deployedContracts = {
             },
           ],
         },
+        {
+          type: "error",
+          name: "OwnableInvalidOwner",
+          inputs: [
+            {
+              name: "owner",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+        },
+        {
+          type: "error",
+          name: "OwnableUnauthorizedAccount",
+          inputs: [
+            {
+              name: "account",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+        },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 2,
+      deployedOnBlock: 3,
     },
     AnimalRace: {
       address: "0x0c8e79f3534b00d9a3d4a856b665bf4ebc22f2ba",
@@ -818,7 +950,7 @@ const deployedContracts = {
             {
               name: "",
               type: "address",
-              internalType: "contract IERC721",
+              internalType: "contract IAnimalNFT",
             },
           ],
           stateMutability: "view",
@@ -1219,6 +1351,38 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "getRaceReadiness",
+          inputs: [],
+          outputs: [
+            {
+              name: "readiness",
+              type: "uint8[4]",
+              internalType: "uint8[4]",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getRaceReadinessById",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "readiness",
+              type: "uint8[4]",
+              internalType: "uint8[4]",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "getWinningClaimRemaining",
           inputs: [
             {
@@ -1322,6 +1486,35 @@ const deployedContracts = {
               name: "seed",
               type: "bytes32",
               internalType: "bytes32",
+            },
+          ],
+          outputs: [
+            {
+              name: "winner",
+              type: "uint8",
+              internalType: "uint8",
+            },
+            {
+              name: "distances",
+              type: "uint16[4]",
+              internalType: "uint16[4]",
+            },
+          ],
+          stateMutability: "pure",
+        },
+        {
+          type: "function",
+          name: "simulateWithReadiness",
+          inputs: [
+            {
+              name: "seed",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+            {
+              name: "readiness",
+              type: "uint8[4]",
+              internalType: "uint8[4]",
             },
           ],
           outputs: [
@@ -1694,7 +1887,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 3,
+      deployedOnBlock: 5,
     },
   },
 } as const;

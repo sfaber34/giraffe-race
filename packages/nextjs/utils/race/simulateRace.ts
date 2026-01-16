@@ -8,22 +8,39 @@ export type RaceSimulation = {
   ticks: number;
 };
 
+const clampReadiness = (r: number) => {
+  if (!Number.isFinite(r)) return 10;
+  const x = Math.floor(r);
+  if (x < 1) return 1;
+  if (x > 10) return 10;
+  return x;
+};
+
+// Match Solidity: 7000 + (readiness-1) * 3000 / 9
+const readinessBps = (readiness: number) => {
+  const r = clampReadiness(readiness);
+  return 7000 + Math.floor(((r - 1) * 3000) / 9);
+};
+
 export function simulateRaceFromSeed({
   seed,
   animalCount = 4,
   maxTicks = 500,
   speedRange = 10,
   trackLength = 1000,
+  readiness,
 }: {
   seed: Hex;
   animalCount?: number;
   maxTicks?: number;
   speedRange?: number;
   trackLength?: number;
+  readiness?: number[]; // length should match animalCount; defaults to all 10 (fresh)
 }): RaceSimulation {
   const dice = new DeterministicDice(seed);
   const distances = Array.from({ length: animalCount }, () => 0);
   const frames: number[][] = [distances.slice()];
+  const bps = Array.from({ length: animalCount }, (_, i) => readinessBps(readiness?.[i] ?? 10));
 
   let finished = false;
   let ticks = 0;
@@ -31,7 +48,9 @@ export function simulateRaceFromSeed({
   for (let t = 0; t < maxTicks; t++) {
     for (let a = 0; a < animalCount; a++) {
       const r = dice.roll(BigInt(speedRange)); // 0..speedRange-1
-      distances[a] += Number(r + 1n); // 1..speedRange
+      const baseSpeed = Number(r + 1n); // 1..speedRange
+      const scaled = Math.floor((baseSpeed * bps[a]!) / 10_000);
+      distances[a] += Math.max(1, scaled);
     }
     frames.push(distances.slice());
     ticks = t + 1;

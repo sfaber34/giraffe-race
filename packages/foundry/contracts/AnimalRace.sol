@@ -4,6 +4,11 @@ pragma solidity ^0.8.19;
 import { DeterministicDice } from "./libraries/DeterministicDice.sol";
 import { IERC721 } from "../lib/openzeppelin-contracts/contracts/token/ERC721/IERC721.sol";
 
+interface IAnimalNFT is IERC721 {
+    function readinessOf(uint256 tokenId) external view returns (uint8);
+    function decreaseReadiness(uint256 tokenId) external;
+}
+
 /**
  * @title AnimalRace
  * @notice Simple on-chain betting game: 4 identical animals, winner picked deterministically from a seed.
@@ -32,7 +37,7 @@ contract AnimalRace {
     uint8 public constant SPEED_RANGE = 10; // speeds per tick: 1-10
 
     address public house;
-    IERC721 public animalNft;
+    IAnimalNFT public animalNft;
 
     struct Race {
         // Betting close block (formerly "closeBlock" in v1).
@@ -82,6 +87,8 @@ contract AnimalRace {
     mapping(uint256 => Race) private races;
     mapping(uint256 => mapping(address => Bet)) private bets;
     mapping(uint256 => RaceAnimals) private raceAnimals;
+    // Snapshot of readiness (1-10) for each lane at lineup finalization time.
+    mapping(uint256 => uint8[4]) private raceReadiness;
     mapping(uint256 => mapping(address => bool)) private hasSubmittedAnimal;
     mapping(uint256 => RaceEntry[]) private raceEntries;
     mapping(uint256 => mapping(uint256 => bool)) private tokenEntered;
@@ -128,7 +135,7 @@ contract AnimalRace {
     error PreviousRaceNotSettled();
 
     constructor(address _animalNft, address _house, uint256[ANIMAL_COUNT] memory _houseAnimalTokenIds) {
-        animalNft = IERC721(_animalNft);
+        animalNft = IAnimalNFT(_animalNft);
         house = _house;
         houseAnimalTokenIds = _houseAnimalTokenIds;
 
@@ -163,6 +170,16 @@ contract AnimalRace {
      */
     function simulate(bytes32 seed) external pure returns (uint8 winner, uint16[ANIMAL_COUNT] memory distances) {
         return _simulate(seed);
+    }
+
+    /// @notice Deterministically simulate a race from a seed + lane readiness snapshot.
+    /// @dev Matches settlement behavior after readiness was introduced.
+    function simulateWithReadiness(bytes32 seed, uint8[ANIMAL_COUNT] calldata readiness)
+        external
+        pure
+        returns (uint8 winner, uint16[ANIMAL_COUNT] memory distances)
+    {
+        return _simulateWithReadiness(seed, readiness);
     }
 
     function latestRaceId() public view returns (uint256 raceId) {
@@ -304,12 +321,14 @@ contract AnimalRace {
         // Make sure lineup is finalized (it should have been finalized during betting window,
         // but keep settlement robust).
         _ensureAnimalsFinalized(raceId);
-        (uint8 w,) = _simulate(simSeed);
+        (uint8 w,) = _simulateWithReadiness(simSeed, raceReadiness[raceId]);
 
         r.settled = true;
         r.winner = w;
         // Store the simulation seed so the race can be replayed off-chain.
         r.seed = simSeed;
+
+        _decreaseReadinessAfterRace(raceId);
 
         emit RaceSettled(raceId, simSeed, r.winner);
     }
@@ -493,6 +512,16 @@ contract AnimalRace {
         return (ra.assignedCount, ra.tokenIds, ra.originalOwners);
     }
 
+    function getRaceReadiness() external view returns (uint8[4] memory readiness) {
+        uint256 raceId = latestRaceId();
+        return raceReadiness[raceId];
+    }
+
+    /// @notice Read lane readiness snapshot for a specific race id (UI helper for replay).
+    function getRaceReadinessById(uint256 raceId) external view returns (uint8[4] memory readiness) {
+        return raceReadiness[raceId];
+    }
+
     /// @notice How many unresolved bets remain in the caller's claim queue.
     /// @dev This counts both winning payouts and losing resolutions (which still must be claimed to advance).
     function getClaimRemaining(address bettor) external view returns (uint256 remaining) {
@@ -655,6 +684,17 @@ contract AnimalRace {
         bytes32 fillSeed = keccak256(abi.encodePacked(baseSeed, "HOUSE_FILL"));
 
         _finalizeAnimalsFromPool(raceId, fillSeed);
+
+        // Snapshot readiness for each lane at finalization time.
+        RaceAnimals storage raSnapshot = raceAnimals[raceId];
+        for (uint8 lane = 0; lane < ANIMAL_COUNT; lane++) {
+            uint8 rr = animalNft.readinessOf(raSnapshot.tokenIds[lane]);
+            // Defensive clamps (AnimalNFT should already return 1..10).
+            if (rr == 0) rr = 10;
+            if (rr > 10) rr = 10;
+            if (rr < 1) rr = 1;
+            raceReadiness[raceId][lane] = rr;
+        }
         r.animalsFinalized = true;
 
         RaceAnimals storage ra = raceAnimals[raceId];
@@ -741,17 +781,60 @@ contract AnimalRace {
         ra.assignedCount = ANIMAL_COUNT;
     }
 
+    function _decreaseReadinessAfterRace(uint256 raceId) internal {
+        RaceAnimals storage ra = raceAnimals[raceId];
+        for (uint8 lane = 0; lane < ANIMAL_COUNT; lane++) {
+            uint256 tokenId = ra.tokenIds[lane];
+            if (tokenId != 0) {
+                animalNft.decreaseReadiness(tokenId);
+            }
+        }
+    }
+
+    function _readinessBps(uint8 readiness) internal pure returns (uint16) {
+        // Map readiness 1..10 -> 0.70x..1.00x (basis points).
+        // readiness 10 => 10000 bps, readiness 1 => 7000 bps
+        if (readiness == 0) readiness = 10;
+        if (readiness > 10) readiness = 10;
+        if (readiness < 1) readiness = 1;
+        // 7000 + (readiness-1) * 3000/9
+        return uint16(7000 + (uint256(readiness - 1) * 3000) / 9);
+    }
+
+    function _scaledSpeed(uint256 baseSpeed, uint16 multiplierBps) internal pure returns (uint16) {
+        // baseSpeed is in [1..SPEED_RANGE]. Apply multiplier and floor, but keep a minimum of 1.
+        uint256 s = (baseSpeed * uint256(multiplierBps)) / 10_000;
+        if (s == 0) return 1;
+        return uint16(s);
+    }
+
     function _simulate(bytes32 seed) internal pure returns (uint8 winner, uint16[4] memory distances) {
+        // Backwards-compatible default (fresh animals).
+        uint8[4] memory readiness = [uint8(10), 10, 10, 10];
+        return _simulateWithReadiness(seed, readiness);
+    }
+
+    function _simulateWithReadiness(bytes32 seed, uint8[4] memory readiness)
+        internal
+        pure
+        returns (uint8 winner, uint16[4] memory distances)
+    {
         DeterministicDice.Dice memory dice = DeterministicDice.create(seed);
 
         bool finished = false;
+
+        uint16[4] memory bps;
+        for (uint8 a = 0; a < ANIMAL_COUNT; a++) {
+            bps[a] = _readinessBps(readiness[a]);
+        }
 
         for (uint256 t = 0; t < MAX_TICKS; t++) {
             for (uint256 a = 0; a < ANIMAL_COUNT; a++) {
                 (uint256 r, DeterministicDice.Dice memory updatedDice) = dice.roll(SPEED_RANGE);
                 dice = updatedDice;
-                // speed in [1..SPEED_RANGE]
-                distances[a] += uint16(r + 1);
+                // base speed in [1..SPEED_RANGE], scaled by readiness multiplier
+                uint256 baseSpeed = r + 1;
+                distances[a] += _scaledSpeed(baseSpeed, bps[uint8(a)]);
             }
 
             // Check finish after each tick

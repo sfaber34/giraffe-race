@@ -18,7 +18,7 @@ export const AnimalNfts = () => {
   const publicClient = usePublicClient({ chainId: targetNetwork.id });
 
   const [mintName, setMintName] = useState("");
-  const [ownedNfts, setOwnedNfts] = useState<{ tokenId: bigint; name: string }[]>([]);
+  const [ownedNfts, setOwnedNfts] = useState<{ tokenId: bigint; name: string; readiness: number }[]>([]);
   const [isLoadingOwnedNfts, setIsLoadingOwnedNfts] = useState(false);
 
   const { data: animalNftContract } = useDeployedContractInfo({
@@ -63,46 +63,66 @@ export const AnimalNfts = () => {
           return;
         }
 
-        const nameCalls = ownedTokenIds.map(id => ({
-          address: animalNftContract.address as `0x${string}`,
-          abi: animalNftContract.abi as any,
-          functionName: "nameOf",
-          args: [id],
-        }));
+        const calls = ownedTokenIds.flatMap(id => [
+          {
+            address: animalNftContract.address as `0x${string}`,
+            abi: animalNftContract.abi as any,
+            functionName: "nameOf",
+            args: [id],
+          },
+          {
+            address: animalNftContract.address as `0x${string}`,
+            abi: animalNftContract.abi as any,
+            functionName: "readinessOf",
+            args: [id],
+          },
+        ]);
 
-        let names:
-          | { result?: string }[]
+        let results:
+          | { result?: unknown }[]
           | {
               status: "success" | "failure";
-              result?: string;
+              result?: unknown;
             }[];
 
         try {
-          names = (await publicClient.multicall({
-            contracts: nameCalls as any,
+          results = (await publicClient.multicall({
+            contracts: calls as any,
             allowFailure: true,
           })) as any;
         } catch {
-          const results = await Promise.allSettled(
-            ownedTokenIds.map(id =>
+          const settled = await Promise.allSettled(
+            ownedTokenIds.flatMap(id => [
               (publicClient as any).readContract({
                 address: animalNftContract.address as `0x${string}`,
                 abi: animalNftContract.abi as any,
                 functionName: "nameOf",
                 args: [id],
               }),
-            ),
+              (publicClient as any).readContract({
+                address: animalNftContract.address as `0x${string}`,
+                abi: animalNftContract.abi as any,
+                functionName: "readinessOf",
+                args: [id],
+              }),
+            ]),
           );
-          names = results.map(r =>
+          results = settled.map(r =>
             r.status === "fulfilled" ? { status: "success", result: r.value } : { status: "failure" },
           );
         }
 
+        const clampReadiness = (n: number) => Math.max(1, Math.min(10, Math.floor(n)));
+
         setOwnedNfts(
-          ownedTokenIds.map((tokenId, i) => ({
-            tokenId,
-            name: (((names[i] as any)?.result as string | undefined) ?? "").trim(),
-          })),
+          ownedTokenIds.map((tokenId, i) => {
+            const nameIdx = i * 2;
+            const readinessIdx = i * 2 + 1;
+            const name = (((results[nameIdx] as any)?.result as string | undefined) ?? "").trim();
+            const readinessRaw = (results[readinessIdx] as any)?.result;
+            const readiness = clampReadiness(Number(readinessRaw ?? 10));
+            return { tokenId, name, readiness };
+          }),
         );
       } finally {
         setIsLoadingOwnedNfts(false);
@@ -119,7 +139,7 @@ export const AnimalNfts = () => {
         <p className="text-base-content/70">Mint and view your Animal NFTs.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4">
         <div className="card bg-base-200 shadow">
           <div className="card-body gap-3">
             <div className="flex items-center justify-between">
@@ -185,7 +205,7 @@ export const AnimalNfts = () => {
                       <div className="font-medium">
                         {LANE_EMOJI} {nft.name || "(unnamed)"}
                       </div>
-                      <div className="text-xs opacity-70 font-mono">#{nft.tokenId.toString()}</div>
+                      <div className="text-xs opacity-70">Readiness: {nft.readiness}/10</div>
                     </div>
                   </div>
                 ))}

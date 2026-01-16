@@ -27,7 +27,10 @@ contract DeployAnimalRace is ScaffoldETHDeploy {
         houseTokenIds[3] = animalNft.mint(houseForGame, "house-4");
 
         // Deploy the race contract with the NFT + house configuration.
-        new AnimalRace(address(animalNft), houseForGame, houseTokenIds);
+        AnimalRace race = new AnimalRace(address(animalNft), houseForGame, houseTokenIds);
+
+        // Allow the race contract to update readiness after races.
+        animalNft.setRaceContract(address(race));
     }
 }
 

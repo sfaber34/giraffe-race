@@ -216,6 +216,14 @@ export const RaceDashboard = () => {
     query: { enabled: hasAnyRace && viewingRaceId !== null },
   });
 
+  const { data: raceReadinessData } = useScaffoldReadContract({
+    contractName: "AnimalRace",
+    // Added in readiness upgrade; cast to avoid ABI typing mismatch until contracts are regenerated.
+    functionName: "getRaceReadinessById" as any,
+    args: [viewingRaceId ?? 0n],
+    query: { enabled: hasAnyRace && viewingRaceId !== null },
+  } as any);
+
   const parsed = useMemo(() => {
     if (!raceData) return null;
     const [closeBlock, settled, winner, seed, totalPot, totalOnAnimal] = raceData;
@@ -238,6 +246,14 @@ export const RaceDashboard = () => {
       originalOwners: originalOwners as readonly `0x${string}`[],
     };
   }, [raceAnimalsData]);
+
+  const laneReadiness = useMemo(() => {
+    if (!raceReadinessData) return [10, 10, 10, 10];
+    const raw = raceReadinessData as any;
+    const arr = (Array.isArray(raw) ? raw : []) as any[];
+    const clamp = (n: number) => Math.max(1, Math.min(10, Math.floor(n)));
+    return Array.from({ length: LANE_COUNT }, (_, i) => clamp(Number(arr[i] ?? 10)));
+  }, [raceReadinessData]);
 
   const submissionCloseBlock = useMemo(() => {
     if (!parsed) return null;
@@ -396,8 +412,9 @@ export const RaceDashboard = () => {
       maxTicks: MAX_TICKS,
       speedRange: SPEED_RANGE,
       trackLength: TRACK_LENGTH,
+      readiness: laneReadiness,
     });
-  }, [parsed, canSimulate]);
+  }, [parsed, canSimulate, laneReadiness]);
 
   const frames = useMemo(() => simulation?.frames ?? [], [simulation]);
   const lastFrameIndex = Math.max(0, frames.length - 1);
@@ -1246,10 +1263,12 @@ export const RaceDashboard = () => {
                         Betting opens after submissions close and the lineup is finalized.
                       </p>
 
-                      {status === "betting_closed" && !parsed?.settled ? (
+                      {!canBet ? (
                         <div className="alert alert-info">
                           <div className="flex flex-col gap-2 w-full">
-                            <div className="font-medium">Betting is closed. Waiting for settlement.</div>
+                            <div className="font-medium">
+                              {parsed?.settled ? "Race is settled." : "Betting is closed. Waiting for settlement."}
+                            </div>
                             {connectedAddress ? (
                               myBet?.hasBet ? (
                                 <div className="text-sm">
@@ -1275,8 +1294,9 @@ export const RaceDashboard = () => {
                               <div className="text-sm">Connect your wallet to see what you bet.</div>
                             )}
                             <div className="text-xs opacity-70">
-                              Once the race is settled, the replay becomes available and you can claim your payout if
-                              you won.
+                              {parsed?.settled
+                                ? "Replay is available and you can claim your payout if you won."
+                                : "Once the race is settled, the replay becomes available and you can claim your payout if you won."}
                             </div>
                           </div>
                         </div>
@@ -1293,18 +1313,17 @@ export const RaceDashboard = () => {
                                 disabled={!canBet}
                                 type="button"
                               >
-                                {lineupFinalized &&
-                                parsedAnimals?.tokenIds?.[lane] &&
-                                parsedAnimals.tokenIds[lane] !== 0n ? (
-                                  <>
-                                    {LANE_EMOJI}{" "}
+                                <span className="flex items-center gap-2">
+                                  <span>{LANE_EMOJI}</span>
+                                  {lineupFinalized &&
+                                  parsedAnimals?.tokenIds?.[lane] &&
+                                  parsedAnimals.tokenIds[lane] !== 0n ? (
                                     <LaneName tokenId={parsedAnimals.tokenIds[lane]} fallback={`Lane ${lane}`} />
-                                  </>
-                                ) : (
-                                  <>
-                                    Lane {lane} {LANE_EMOJI}
-                                  </>
-                                )}
+                                  ) : (
+                                    <span>Lane {lane}</span>
+                                  )}
+                                </span>
+                                <span className="text-xs opacity-80">Readiness {laneReadiness[lane]}/10</span>
                               </button>
                             ))}
                           </div>
