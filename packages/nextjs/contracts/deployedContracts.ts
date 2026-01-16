@@ -706,7 +706,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 3,
+      deployedOnBlock: 2,
     },
     AnimalRace: {
       address: "0x0c8e79f3534b00d9a3d4a856b665bf4ebc22f2ba",
@@ -887,6 +887,59 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "getBetById",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "bettor",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "amount",
+              type: "uint128",
+              internalType: "uint128",
+            },
+            {
+              name: "animal",
+              type: "uint8",
+              internalType: "uint8",
+            },
+            {
+              name: "claimed",
+              type: "bool",
+              internalType: "bool",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getClaimRemaining",
+          inputs: [
+            {
+              name: "bettor",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "remaining",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "getNextClaim",
           inputs: [
             {
@@ -1008,6 +1061,79 @@ const deployedContracts = {
               name: "originalOwners",
               type: "address[4]",
               internalType: "address[4]",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getRaceAnimalsById",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "assignedCount",
+              type: "uint8",
+              internalType: "uint8",
+            },
+            {
+              name: "tokenIds",
+              type: "uint256[4]",
+              internalType: "uint256[4]",
+            },
+            {
+              name: "originalOwners",
+              type: "address[4]",
+              internalType: "address[4]",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getRaceById",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "closeBlock",
+              type: "uint64",
+              internalType: "uint64",
+            },
+            {
+              name: "settled",
+              type: "bool",
+              internalType: "bool",
+            },
+            {
+              name: "winner",
+              type: "uint8",
+              internalType: "uint8",
+            },
+            {
+              name: "seed",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+            {
+              name: "totalPot",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "totalOnAnimal",
+              type: "uint256[4]",
+              internalType: "uint256[4]",
             },
           ],
           stateMutability: "view",

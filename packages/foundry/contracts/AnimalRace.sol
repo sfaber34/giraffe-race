@@ -381,8 +381,31 @@ contract AnimalRace {
         return (r.closeBlock, r.settled, r.winner, r.seed, r.totalPot, r.totalOnAnimal);
     }
 
+    /// @notice Read a specific race by id (UI helper for browsing history / replay).
+    function getRaceById(uint256 raceId)
+        external
+        view
+        returns (
+            uint64 closeBlock,
+            bool settled,
+            uint8 winner,
+            bytes32 seed,
+            uint256 totalPot,
+            uint256[4] memory totalOnAnimal
+        )
+    {
+        Race storage r = races[raceId];
+        return (r.closeBlock, r.settled, r.winner, r.seed, r.totalPot, r.totalOnAnimal);
+    }
+
     function getBet(address bettor) external view returns (uint128 amount, uint8 animal, bool claimed) {
         uint256 raceId = latestRaceId();
+        Bet storage b = bets[raceId][bettor];
+        return (b.amount, b.animal, b.claimed);
+    }
+
+    /// @notice Read the bet for a specific race id (UI helper for browsing history).
+    function getBetById(uint256 raceId, address bettor) external view returns (uint128 amount, uint8 animal, bool claimed) {
         Bet storage b = bets[raceId][bettor];
         return (b.amount, b.animal, b.claimed);
     }
@@ -400,6 +423,29 @@ contract AnimalRace {
 
         RaceAnimals storage ra = raceAnimals[raceId];
         return (ra.assignedCount, ra.tokenIds, ra.originalOwners);
+    }
+
+    /// @notice Read lane assignments for a specific race id (UI helper for browsing history / replay).
+    function getRaceAnimalsById(uint256 raceId)
+        external
+        view
+        returns (
+            uint8 assignedCount,
+            uint256[4] memory tokenIds,
+            address[4] memory originalOwners
+        )
+    {
+        RaceAnimals storage ra = raceAnimals[raceId];
+        return (ra.assignedCount, ra.tokenIds, ra.originalOwners);
+    }
+
+    /// @notice How many unresolved bets remain in the caller's claim queue.
+    /// @dev This counts both winning payouts and losing resolutions (which still must be claimed to advance).
+    function getClaimRemaining(address bettor) external view returns (uint256 remaining) {
+        uint256[] storage ids = bettorRaceIds[bettor];
+        uint256 idx = nextClaimIndex[bettor];
+        if (idx >= ids.length) return 0;
+        return ids.length - idx;
     }
 
     /**

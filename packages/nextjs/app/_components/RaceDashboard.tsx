@@ -185,16 +185,32 @@ export const RaceDashboard = () => {
   const hasAnyRace = !!animalRaceContract && nextRaceId > 0n;
   const latestRaceId = hasAnyRace ? nextRaceId - 1n : null;
 
+  const [viewRaceId, setViewRaceId] = useState<bigint | null>(null);
+
+  useEffect(() => {
+    if (latestRaceId === null) return;
+    setViewRaceId(prev => {
+      if (prev === null) return latestRaceId;
+      if (prev > latestRaceId) return latestRaceId;
+      return prev;
+    });
+  }, [latestRaceId]);
+
+  const viewingRaceId = viewRaceId ?? latestRaceId;
+  const isViewingLatest = viewingRaceId !== null && latestRaceId !== null && viewingRaceId === latestRaceId;
+
   const { data: raceData } = useScaffoldReadContract({
     contractName: "AnimalRace",
-    functionName: "getRace",
-    query: { enabled: hasAnyRace },
+    functionName: "getRaceById",
+    args: [viewingRaceId ?? 0n],
+    query: { enabled: hasAnyRace && viewingRaceId !== null },
   });
 
   const { data: raceAnimalsData } = useScaffoldReadContract({
     contractName: "AnimalRace",
-    functionName: "getRaceAnimals",
-    query: { enabled: hasAnyRace },
+    functionName: "getRaceAnimalsById",
+    args: [viewingRaceId ?? 0n],
+    query: { enabled: hasAnyRace && viewingRaceId !== null },
   });
 
   const { data: houseAddress } = useScaffoldReadContract({
@@ -271,9 +287,9 @@ export const RaceDashboard = () => {
 
   const { data: myBetData } = useScaffoldReadContract({
     contractName: "AnimalRace",
-    functionName: "getBet",
-    args: [connectedAddress],
-    query: { enabled: !!animalRaceContract && !!connectedAddress && hasAnyRace },
+    functionName: "getBetById",
+    args: [viewingRaceId ?? 0n, connectedAddress],
+    query: { enabled: !!animalRaceContract && !!connectedAddress && hasAnyRace && viewingRaceId !== null },
   });
 
   const myBet = useMemo(() => {
@@ -294,6 +310,22 @@ export const RaceDashboard = () => {
     args: [connectedAddress],
     query: { enabled: !!animalRaceContract && !!connectedAddress },
   });
+
+  const { data: claimRemainingData } = useScaffoldReadContract({
+    contractName: "AnimalRace",
+    functionName: "getClaimRemaining",
+    args: [connectedAddress],
+    query: { enabled: !!animalRaceContract && !!connectedAddress },
+  });
+
+  const claimRemaining = useMemo(() => {
+    if (claimRemainingData === undefined || claimRemainingData === null) return null;
+    try {
+      return BigInt(claimRemainingData as any);
+    } catch {
+      return null;
+    }
+  }, [claimRemainingData]);
 
   const nextClaim = useMemo(() => {
     if (!nextClaimData) return null;
@@ -641,6 +673,44 @@ export const RaceDashboard = () => {
             <div className="flex items-center justify-between">
               <h2 className="card-title">Race replay</h2>
               <div className="flex items-center gap-2">
+                <div className="hidden md:flex items-center gap-2">
+                  <span className="text-xs opacity-70">Viewing</span>
+                  <span className="text-xs font-mono">{viewingRaceId?.toString() ?? "-"}</span>
+                  <span className="text-xs opacity-70">/ Latest</span>
+                  <span className="text-xs font-mono">{latestRaceId?.toString() ?? "-"}</span>
+                </div>
+                <div className="join">
+                  <button
+                    className="btn btn-sm join-item"
+                    disabled={!hasAnyRace || viewingRaceId === null || viewingRaceId === 0n}
+                    onClick={() => setViewRaceId(id => (id === null ? id : id > 0n ? id - 1n : 0n))}
+                  >
+                    Prev
+                  </button>
+                  <button
+                    className="btn btn-sm join-item"
+                    disabled={
+                      !hasAnyRace || viewingRaceId === null || latestRaceId === null || viewingRaceId >= latestRaceId
+                    }
+                    onClick={() => setViewRaceId(id => (id === null ? id : id + 1n))}
+                  >
+                    Next
+                  </button>
+                  <button
+                    className="btn btn-sm join-item"
+                    disabled={!hasAnyRace || latestRaceId === null || viewingRaceId === latestRaceId}
+                    onClick={() => setViewRaceId(latestRaceId)}
+                  >
+                    Latest
+                  </button>
+                </div>
+                <button
+                  className="btn btn-sm btn-outline"
+                  disabled={!nextClaim?.hasClaim || viewingRaceId === nextClaim?.raceId}
+                  onClick={() => setViewRaceId(nextClaim?.raceId ?? null)}
+                >
+                  Jump to claim
+                </button>
                 <div className="join">
                   <button
                     className={`btn btn-sm join-item ${playbackSpeed === 1 ? "btn-active" : ""}`}
@@ -911,7 +981,11 @@ export const RaceDashboard = () => {
               ) : (
                 <div className="text-sm">
                   <div className="flex justify-between">
-                    <span className="opacity-70">Race ID</span>
+                    <span className="opacity-70">Viewing Race ID</span>
+                    <span className="font-mono">{viewingRaceId?.toString() ?? "-"}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="opacity-70">Latest Race ID</span>
                     <span className="font-mono">{latestRaceId?.toString() ?? "-"}</span>
                   </div>
                   <div className="flex justify-between">
@@ -976,10 +1050,16 @@ export const RaceDashboard = () => {
 
               <div className="flex flex-col gap-2">
                 <div className="text-sm font-medium">Race controls</div>
+                {!isViewingLatest ? (
+                  <div className="text-xs opacity-70">
+                    You’re viewing a past race. Switch to <span className="font-semibold">Latest</span> to manage the
+                    active race.
+                  </div>
+                ) : null}
                 <div className="flex flex-wrap gap-2">
                   <button
                     className="btn btn-sm btn-primary"
-                    disabled={!animalRaceContract || activeRaceExists}
+                    disabled={!animalRaceContract || activeRaceExists || !isViewingLatest}
                     onClick={async () => {
                       await writeAnimalRaceAsync({ functionName: "createRace" } as any);
                     }}
@@ -988,7 +1068,7 @@ export const RaceDashboard = () => {
                   </button>
                   <button
                     className="btn btn-sm btn-outline"
-                    disabled={!animalRaceContract || !canFinalize}
+                    disabled={!animalRaceContract || !canFinalize || !isViewingLatest}
                     onClick={async () => {
                       await writeAnimalRaceAsync({ functionName: "finalizeRaceAnimals" } as any);
                     }}
@@ -997,7 +1077,7 @@ export const RaceDashboard = () => {
                   </button>
                   <button
                     className="btn btn-sm btn-outline"
-                    disabled={!animalRaceContract || !canSettle}
+                    disabled={!animalRaceContract || !canSettle || !isViewingLatest}
                     onClick={async () => {
                       await writeAnimalRaceAsync({ functionName: "settleRace" } as any);
                     }}
@@ -1014,7 +1094,15 @@ export const RaceDashboard = () => {
               <div className="divider my-1" />
 
               <div className="flex flex-col gap-2">
-                <div className="text-sm font-medium">Claim</div>
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-medium">Claim</div>
+                  {connectedAddress && claimRemaining !== null ? (
+                    <div className="badge badge-outline">
+                      {claimRemaining.toString()}
+                      <span className="ml-1 opacity-70">pending</span>
+                    </div>
+                  ) : null}
+                </div>
                 {!connectedAddress ? (
                   <div className="text-xs opacity-70">Connect wallet to see your next claim.</div>
                 ) : !nextClaim ? (
@@ -1059,6 +1147,13 @@ export const RaceDashboard = () => {
                     </div>
                   </div>
                 )}
+                <button
+                  className="btn btn-sm btn-outline"
+                  disabled={!nextClaim?.hasClaim || viewingRaceId === null || viewingRaceId === nextClaim?.raceId}
+                  onClick={() => setViewRaceId(nextClaim?.raceId ?? null)}
+                >
+                  View claim race
+                </button>
                 <button
                   className="btn btn-sm btn-primary"
                   disabled={!animalRaceContract || !connectedAddress || !nextClaim?.hasClaim || !canClaimNow}
@@ -1134,7 +1229,13 @@ export const RaceDashboard = () => {
 
                     <button
                       className="btn btn-primary"
-                      disabled={!animalRaceContract || !connectedAddress || selectedTokenId === null || !canSubmit}
+                      disabled={
+                        !animalRaceContract ||
+                        !connectedAddress ||
+                        selectedTokenId === null ||
+                        !canSubmit ||
+                        !isViewingLatest
+                      }
                       onClick={async () => {
                         if (selectedTokenId === null) return;
                         await writeAnimalRaceAsync({ functionName: "submitAnimal", args: [selectedTokenId] } as any);
@@ -1234,7 +1335,12 @@ export const RaceDashboard = () => {
                         <button
                           className="btn btn-primary"
                           disabled={
-                            !animalRaceContract || !connectedAddress || !canBet || !placeBetValue || !!myBet?.hasBet
+                            !animalRaceContract ||
+                            !connectedAddress ||
+                            !canBet ||
+                            !placeBetValue ||
+                            !!myBet?.hasBet ||
+                            !isViewingLatest
                           }
                           onClick={async () => {
                             if (!placeBetValue) return;
