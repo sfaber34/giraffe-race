@@ -250,7 +250,7 @@ contract AnimalRace {
      *      If an entrant becomes invalid (transferred away), they're treated as a no-show.
      */
     function submitAnimal(uint256 tokenId) external {
-        // "Presence starts the race": if there is no active race (none yet, or latest is settled),
+        // "Presence creates the race": if there is no active race (none yet, or latest is settled),
         // create a new one with the fixed schedule.
         if (nextRaceId == 0 || races[nextRaceId - 1].settled) {
             _createRace();

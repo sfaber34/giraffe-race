@@ -198,7 +198,7 @@ export const RaceDashboard = () => {
 
   const viewingRaceId = viewRaceId ?? latestRaceId;
   // Treat "no race yet" (and the brief initial-load null state) as "viewing latest" so core actions
-  // like "Start race" / "Submit NFT" aren't incorrectly disabled on a fresh chain.
+  // like "Create race" / "Submit NFT" aren't incorrectly disabled on a fresh chain.
   const isViewingLatest =
     !hasAnyRace || viewingRaceId === null || latestRaceId === null || viewingRaceId === latestRaceId;
 
@@ -685,7 +685,7 @@ export const RaceDashboard = () => {
         <div className="flex flex-col gap-2">
           <h1 className="text-4xl font-bold">Giraffe Race</h1>
           <p className="text-base-content/70">
-            Single on-demand flow: start race (or submit), wait for submissions to close, finalize lineup, bet, settle,
+            Single on-demand flow: create race (or submit), wait for submissions to close, finalize lineup, bet, settle,
             replay, claim.
           </p>
         </div>
@@ -1081,7 +1081,7 @@ export const RaceDashboard = () => {
                       await writeAnimalRaceAsync({ functionName: "createRace" } as any);
                     }}
                   >
-                    Start race (no entries)
+                    Create race (no entries)
                   </button>
                   <button
                     className="btn btn-sm btn-outline"
@@ -1103,7 +1103,7 @@ export const RaceDashboard = () => {
                   </button>
                 </div>
                 <div className="text-xs opacity-70">
-                  Anyone can start/finalize/settle. Finalize becomes available after submissions close; settle becomes
+                  Anyone can create/finalize/settle. Finalize becomes available after submissions close; settle becomes
                   available after betting closes.
                 </div>
               </div>
