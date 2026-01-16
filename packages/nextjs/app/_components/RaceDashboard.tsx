@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { EtherInput } from "@scaffold-ui/components";
+import { Balance, EtherInput } from "@scaffold-ui/components";
 import { Hex, formatEther, isHex, parseEther, toHex } from "viem";
 import { useAccount, useBlockNumber, usePublicClient } from "wagmi";
 import { GiraffeAnimated } from "~~/components/assets/GiraffeAnimated";
@@ -10,6 +10,7 @@ import {
   useScaffoldReadContract,
   useScaffoldWriteContract,
   useTargetNetwork,
+  useTransactor,
 } from "~~/hooks/scaffold-eth";
 import { simulateRaceFromSeed } from "~~/utils/race/simulateRace";
 
@@ -83,8 +84,11 @@ export const RaceDashboard = () => {
 
   const [isMining, setIsMining] = useState(false);
   const [selectedTokenId, setSelectedTokenId] = useState<bigint | null>(null);
+  const [submittedTokenId, setSubmittedTokenId] = useState<bigint | null>(null);
   const [betLane, setBetLane] = useState<0 | 1 | 2 | 3>(0);
   const [betAmountEth, setBetAmountEth] = useState("");
+  const [fundAmountEth, setFundAmountEth] = useState("");
+  const [isFundingRace, setIsFundingRace] = useState(false);
   const [ownedTokenNameById, setOwnedTokenNameById] = useState<Record<string, string>>({});
   const [isLoadingOwnedTokenNames, setIsLoadingOwnedTokenNames] = useState(false);
 
@@ -102,6 +106,8 @@ export const RaceDashboard = () => {
     contractName: "AnimalRace",
   });
   const { data: animalNftContract } = useDeployedContractInfo({ contractName: "AnimalNFT" });
+
+  const tx = useTransactor();
 
   const { data: ownedTokenIdsData, isLoading: isOwnedTokensLoading } = useScaffoldReadContract({
     contractName: "AnimalNFT",
@@ -185,6 +191,21 @@ export const RaceDashboard = () => {
   const hasAnyRace = !!animalRaceContract && nextRaceId > 0n;
   const latestRaceId = hasAnyRace ? nextRaceId - 1n : null;
 
+  const { data: settledLiabilityData } = useScaffoldReadContract({
+    contractName: "AnimalRace",
+    functionName: "settledLiability",
+    query: { enabled: !!animalRaceContract },
+  });
+  const settledLiability = useMemo(() => {
+    try {
+      return settledLiabilityData === undefined || settledLiabilityData === null
+        ? null
+        : BigInt(settledLiabilityData as any);
+    } catch {
+      return null;
+    }
+  }, [settledLiabilityData]);
+
   const [viewRaceId, setViewRaceId] = useState<bigint | null>(null);
 
   useEffect(() => {
@@ -224,6 +245,13 @@ export const RaceDashboard = () => {
     query: { enabled: hasAnyRace && viewingRaceId !== null },
   } as any);
 
+  const { data: raceOddsData } = useScaffoldReadContract({
+    contractName: "AnimalRace",
+    functionName: "getRaceOddsById" as any,
+    args: [viewingRaceId ?? 0n],
+    query: { enabled: hasAnyRace && viewingRaceId !== null },
+  } as any);
+
   const parsed = useMemo(() => {
     if (!raceData) return null;
     const [closeBlock, settled, winner, seed, totalPot, totalOnAnimal] = raceData;
@@ -246,6 +274,16 @@ export const RaceDashboard = () => {
       originalOwners: originalOwners as readonly `0x${string}`[],
     };
   }, [raceAnimalsData]);
+
+  const parsedOdds = useMemo(() => {
+    if (!raceOddsData) return null;
+    const [oddsSet, oddsBps] = raceOddsData as any;
+    const arr = (Array.isArray(oddsBps) ? oddsBps : []) as any[];
+    return {
+      oddsSet: Boolean(oddsSet),
+      oddsBps: Array.from({ length: LANE_COUNT }, (_, i) => BigInt(arr[i] ?? 0)) as bigint[],
+    };
+  }, [raceOddsData]);
 
   const laneReadiness = useMemo(() => {
     if (!raceReadinessData) return [10, 10, 10, 10];
@@ -277,9 +315,15 @@ export const RaceDashboard = () => {
     return "betting_closed";
   }, [animalRaceContract, hasAnyRace, parsed, blockNumber, submissionCloseBlock]);
 
+  // Reset the local "submitted token" lock when we change race or wallet.
+  useEffect(() => {
+    setSubmittedTokenId(null);
+  }, [connectedAddress, viewingRaceId]);
+
   const lineupFinalized = (parsedAnimals?.assignedCount ?? 0) === 4;
   const canFinalize = status === "betting_open" && !lineupFinalized;
-  const canBet = status === "betting_open" && lineupFinalized;
+  // Contract requires oddsSet (auto-derived at finalization), so avoid enabling bets until odds are loaded+set.
+  const canBet = status === "betting_open" && lineupFinalized && parsedOdds?.oddsSet === true;
   const canSettle = !!parsed && !parsed.settled && blockNumber !== undefined && blockNumber > parsed.closeBlock;
   const canSubmit =
     status === "submissions_open" ||
@@ -288,6 +332,14 @@ export const RaceDashboard = () => {
 
   const showEnterNftCard = !lineupFinalized;
   const showPlaceBetCard = lineupFinalized || status === "settled";
+  const isEnterLocked = submittedTokenId !== null && isViewingLatest;
+
+  const oddsLabelForLane = (lane: number) => {
+    if (!parsedOdds?.oddsSet) return "Odds —";
+    const bps = Number(parsedOdds.oddsBps[lane] ?? 0n);
+    if (!Number.isFinite(bps) || bps <= 0) return "Odds —";
+    return `${(bps / 10_000).toFixed(2)}x`;
+  };
 
   const placeBetValue = useMemo(() => {
     const v = betAmountEth.trim();
@@ -319,6 +371,22 @@ export const RaceDashboard = () => {
       hasBet: amt !== 0n,
     };
   }, [myBetData]);
+
+  const estimatedPayoutWei = useMemo(() => {
+    if (!parsedOdds?.oddsSet) return null;
+    const lane = myBet?.hasBet ? myBet.animal : betLane;
+    const amountWei = myBet?.hasBet ? myBet.amount : placeBetValue;
+    if (!amountWei) return null;
+    const oddsBps = parsedOdds.oddsBps?.[lane] ?? 0n;
+    if (oddsBps <= 0n) return null;
+    return (amountWei * oddsBps) / 10_000n;
+  }, [parsedOdds?.oddsSet, parsedOdds?.oddsBps, placeBetValue, betLane, myBet?.hasBet, myBet?.animal, myBet?.amount]);
+
+  // If the user has already bet, lock the lane highlight to their bet.
+  useEffect(() => {
+    if (!myBet?.hasBet) return;
+    setBetLane(myBet.animal);
+  }, [myBet?.hasBet, myBet?.animal]);
 
   const { data: nextWinningClaimData } = useScaffoldReadContract({
     contractName: "AnimalRace",
@@ -1103,9 +1171,70 @@ export const RaceDashboard = () => {
                   </button>
                 </div>
                 <div className="text-xs opacity-70">
-                  Anyone can create/finalize/settle. Finalize becomes available after submissions close; settle becomes
-                  available after betting closes.
+                  Anyone can create/finalize/settle. Odds are auto-quoted on-chain at lineup finalization based on the
+                  locked readiness snapshot.
                 </div>
+              </div>
+
+              <div className="divider my-1" />
+
+              <div className="flex flex-col gap-2">
+                <div className="text-sm font-medium">Fund bankroll</div>
+                {!animalRaceContract ? (
+                  <div className="text-xs opacity-70">Deploy the contracts first to get the AnimalRace address.</div>
+                ) : (
+                  <>
+                    <div className="text-xs">
+                      <div className="flex justify-between">
+                        <span className="opacity-70">AnimalRace balance</span>
+                        <span className="font-mono">
+                          <Balance address={animalRaceContract.address as `0x${string}`} />
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="opacity-70">Unpaid liability</span>
+                        <span className="font-mono">
+                          {settledLiability === null ? "-" : `${formatEther(settledLiability)} ETH`}
+                        </span>
+                      </div>
+                    </div>
+                    <EtherInput
+                      placeholder="Amount to send (ETH)"
+                      onValueChange={({ valueInEth }) => setFundAmountEth(valueInEth)}
+                      style={{ width: "100%" }}
+                    />
+                    <button
+                      className="btn btn-sm btn-outline"
+                      disabled={
+                        !connectedAddress || !animalRaceContract?.address || isFundingRace || !fundAmountEth.trim()
+                      }
+                      onClick={async () => {
+                        if (!animalRaceContract?.address) return;
+                        const v = fundAmountEth.trim();
+                        if (!v) return;
+                        let value: bigint;
+                        try {
+                          value = parseEther(v as `${number}`);
+                        } catch {
+                          return;
+                        }
+                        if (value <= 0n) return;
+                        try {
+                          setIsFundingRace(true);
+                          await tx({ to: animalRaceContract.address as `0x${string}`, value });
+                        } finally {
+                          setIsFundingRace(false);
+                        }
+                      }}
+                    >
+                      {isFundingRace ? <span className="loading loading-spinner loading-xs" /> : null}
+                      <span>{isFundingRace ? "Funding…" : "Send ETH to AnimalRace"}</span>
+                    </button>
+                    <div className="text-xs opacity-70">
+                      This is just a plain ETH transfer to the contract (used to cover fixed-odds payouts).
+                    </div>
+                  </>
+                )}
               </div>
 
               <div className="divider my-1" />
@@ -1209,7 +1338,11 @@ export const RaceDashboard = () => {
                           <select
                             className="select select-bordered w-full"
                             value={selectedTokenId?.toString() ?? ""}
-                            onChange={e => setSelectedTokenId(e.target.value ? BigInt(e.target.value) : null)}
+                            disabled={isEnterLocked}
+                            onChange={e => {
+                              if (isEnterLocked) return;
+                              setSelectedTokenId(e.target.value ? BigInt(e.target.value) : null);
+                            }}
                           >
                             <option value="" disabled>
                               Select an NFT…
@@ -1234,17 +1367,31 @@ export const RaceDashboard = () => {
                           !animalRaceContract ||
                           !connectedAddress ||
                           selectedTokenId === null ||
+                          isEnterLocked ||
                           !canSubmit ||
                           !isViewingLatest
                         }
                         onClick={async () => {
                           if (selectedTokenId === null) return;
                           await writeAnimalRaceAsync({ functionName: "submitAnimal", args: [selectedTokenId] } as any);
-                          setSelectedTokenId(null);
+                          setSubmittedTokenId(selectedTokenId);
                         }}
                       >
                         Submit NFT
                       </button>
+
+                      {isEnterLocked ? (
+                        <div className="text-xs opacity-70">
+                          Submitted{" "}
+                          <span className="font-semibold">
+                            {LANE_EMOJI}{" "}
+                            {(ownedTokenNameById[submittedTokenId?.toString() ?? ""] || "").trim()
+                              ? ownedTokenNameById[submittedTokenId?.toString() ?? ""]
+                              : `Token #${submittedTokenId?.toString()}`}
+                          </span>
+                          . You can’t change entries after submitting.
+                        </div>
+                      ) : null}
 
                       {!canSubmit ? (
                         <div className="text-xs opacity-70">
@@ -1310,7 +1457,7 @@ export const RaceDashboard = () => {
                                   betLane === lane ? "btn-primary" : "btn-outline"
                                 }`}
                                 onClick={() => setBetLane(lane as 0 | 1 | 2 | 3)}
-                                disabled={!canBet}
+                                disabled={!canBet || !!myBet?.hasBet}
                                 type="button"
                               >
                                 <span className="flex items-center gap-2">
@@ -1323,20 +1470,43 @@ export const RaceDashboard = () => {
                                     <span>Lane {lane}</span>
                                   )}
                                 </span>
-                                <span className="text-xs opacity-80">Readiness {laneReadiness[lane]}/10</span>
+                                <span className="flex flex-col items-end text-xs opacity-80">
+                                  <span>Readiness {laneReadiness[lane]}/10</span>
+                                  {lineupFinalized ? (
+                                    <span className="font-mono opacity-90">{oddsLabelForLane(lane)}</span>
+                                  ) : null}
+                                </span>
                               </button>
                             ))}
                           </div>
 
-                          <div className={!canBet ? "opacity-50 pointer-events-none" : ""}>
+                          {lineupFinalized ? (
+                            <div className="text-xs opacity-70">
+                              {"Odds are fixed and enforced on-chain (derived from the locked readiness snapshot)."}
+                            </div>
+                          ) : null}
+
+                          <div className={!canBet || !!myBet?.hasBet ? "opacity-50 pointer-events-none" : ""}>
                             <EtherInput
                               placeholder="Bet amount (ETH)"
                               onValueChange={({ valueInEth }) => {
-                                if (!canBet) return;
+                                if (!canBet || !!myBet?.hasBet) return;
                                 setBetAmountEth(valueInEth);
                               }}
                               style={{ width: "100%" }}
                             />
+                          </div>
+
+                          <div className="text-sm">
+                            <div className="flex justify-between">
+                              <span className="opacity-70">Estimated payout</span>
+                              <span className="font-mono">
+                                {estimatedPayoutWei === null ? "—" : `${formatEther(estimatedPayoutWei)} ETH`}
+                              </span>
+                            </div>
+                            <div className="text-xs opacity-60">
+                              Includes your stake. Fixed odds are locked at bet time.
+                            </div>
                           </div>
 
                           <button

@@ -840,8 +840,133 @@ const deployedContracts = {
       inheritedFunctions: {},
       deployedOnBlock: 3,
     },
+    ReadinessWinProbTable: {
+      address: "0xb19b36b1456e65e3a6d514d3f715f204bd59f431",
+      abi: [
+        {
+          type: "function",
+          name: "getSorted",
+          inputs: [
+            {
+              name: "a",
+              type: "uint8",
+              internalType: "uint8",
+            },
+            {
+              name: "b",
+              type: "uint8",
+              internalType: "uint8",
+            },
+            {
+              name: "c",
+              type: "uint8",
+              internalType: "uint8",
+            },
+            {
+              name: "d",
+              type: "uint8",
+              internalType: "uint8",
+            },
+          ],
+          outputs: [
+            {
+              name: "probsBps",
+              type: "uint16[4]",
+              internalType: "uint16[4]",
+            },
+          ],
+          stateMutability: "pure",
+        },
+      ],
+      inheritedFunctions: {},
+      deployedOnBlock: 2,
+    },
+    AnimalRaceSimulator: {
+      address: "0x8ce361602b935680e8dec218b820ff5056beb7af",
+      abi: [
+        {
+          type: "function",
+          name: "simulate",
+          inputs: [
+            {
+              name: "seed",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+          ],
+          outputs: [
+            {
+              name: "winner",
+              type: "uint8",
+              internalType: "uint8",
+            },
+            {
+              name: "distances",
+              type: "uint16[4]",
+              internalType: "uint16[4]",
+            },
+          ],
+          stateMutability: "pure",
+        },
+        {
+          type: "function",
+          name: "simulateWithReadiness",
+          inputs: [
+            {
+              name: "seed",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+            {
+              name: "readiness",
+              type: "uint8[4]",
+              internalType: "uint8[4]",
+            },
+          ],
+          outputs: [
+            {
+              name: "winner",
+              type: "uint8",
+              internalType: "uint8",
+            },
+            {
+              name: "distances",
+              type: "uint16[4]",
+              internalType: "uint16[4]",
+            },
+          ],
+          stateMutability: "pure",
+        },
+        {
+          type: "function",
+          name: "winnerWithReadiness",
+          inputs: [
+            {
+              name: "seed",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+            {
+              name: "readiness",
+              type: "uint8[4]",
+              internalType: "uint8[4]",
+            },
+          ],
+          outputs: [
+            {
+              name: "winner",
+              type: "uint8",
+              internalType: "uint8",
+            },
+          ],
+          stateMutability: "pure",
+        },
+      ],
+      inheritedFunctions: {},
+      deployedOnBlock: 3,
+    },
     AnimalRace: {
-      address: "0x0c8e79f3534b00d9a3d4a856b665bf4ebc22f2ba",
+      address: "0xf7cd8fa9b94db2aa972023b379c7f72c65e4de9d",
       abi: [
         {
           type: "constructor",
@@ -861,8 +986,22 @@ const deployedContracts = {
               type: "uint256[4]",
               internalType: "uint256[4]",
             },
+            {
+              name: "_winProbTable",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "_simulator",
+              type: "address",
+              internalType: "address",
+            },
           ],
           stateMutability: "nonpayable",
+        },
+        {
+          type: "receive",
+          stateMutability: "payable",
         },
         {
           type: "function",
@@ -873,6 +1012,19 @@ const deployedContracts = {
               name: "",
               type: "uint8",
               internalType: "uint8",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "HOUSE_EDGE_BPS",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint16",
+              internalType: "uint16",
             },
           ],
           stateMutability: "view",
@@ -1351,6 +1503,30 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "getRaceOddsById",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "oddsSet",
+              type: "bool",
+              internalType: "bool",
+            },
+            {
+              name: "decimalOddsBps",
+              type: "uint32[4]",
+              internalType: "uint32[4]",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "getRaceReadiness",
           inputs: [],
           outputs: [
@@ -1473,10 +1649,41 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "setRaceOdds",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "decimalOddsBps",
+              type: "uint32[4]",
+              internalType: "uint32[4]",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
           name: "settleRace",
           inputs: [],
           outputs: [],
           stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "settledLiability",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
         },
         {
           type: "function",
@@ -1500,7 +1707,7 @@ const deployedContracts = {
               internalType: "uint16[4]",
             },
           ],
-          stateMutability: "pure",
+          stateMutability: "view",
         },
         {
           type: "function",
@@ -1529,7 +1736,20 @@ const deployedContracts = {
               internalType: "uint16[4]",
             },
           ],
-          stateMutability: "pure",
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "simulator",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "contract AnimalRaceSimulator",
+            },
+          ],
+          stateMutability: "view",
         },
         {
           type: "function",
@@ -1582,6 +1802,19 @@ const deployedContracts = {
             },
           ],
           stateMutability: "pure",
+        },
+        {
+          type: "function",
+          name: "winProbTable",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "contract ReadinessWinProbTable",
+            },
+          ],
+          stateMutability: "view",
         },
         {
           type: "event",
@@ -1747,6 +1980,43 @@ const deployedContracts = {
         },
         {
           type: "event",
+          name: "RaceOddsSet",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "odds0Bps",
+              type: "uint32",
+              indexed: false,
+              internalType: "uint32",
+            },
+            {
+              name: "odds1Bps",
+              type: "uint32",
+              indexed: false,
+              internalType: "uint32",
+            },
+            {
+              name: "odds2Bps",
+              type: "uint32",
+              indexed: false,
+              internalType: "uint32",
+            },
+            {
+              name: "odds3Bps",
+              type: "uint32",
+              indexed: false,
+              internalType: "uint32",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
           name: "RaceSettled",
           inputs: [
             {
@@ -1822,6 +2092,11 @@ const deployedContracts = {
         },
         {
           type: "error",
+          name: "InsufficientBankroll",
+          inputs: [],
+        },
+        {
+          type: "error",
           name: "InvalidAnimal",
           inputs: [],
         },
@@ -1832,12 +2107,22 @@ const deployedContracts = {
         },
         {
           type: "error",
+          name: "InvalidOdds",
+          inputs: [],
+        },
+        {
+          type: "error",
           name: "InvalidRace",
           inputs: [],
         },
         {
           type: "error",
           name: "NoClaimableBets",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "NotHouse",
           inputs: [],
         },
         {
@@ -1853,6 +2138,16 @@ const deployedContracts = {
         {
           type: "error",
           name: "NotWinner",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "OddsAlreadySet",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "OddsNotSet",
           inputs: [],
         },
         {

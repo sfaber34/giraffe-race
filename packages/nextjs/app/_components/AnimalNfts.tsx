@@ -20,10 +20,32 @@ export const AnimalNfts = () => {
   const [mintName, setMintName] = useState("");
   const [ownedNfts, setOwnedNfts] = useState<{ tokenId: bigint; name: string; readiness: number }[]>([]);
   const [isLoadingOwnedNfts, setIsLoadingOwnedNfts] = useState(false);
+  const [isAnimalNftDeployedOnChain, setIsAnimalNftDeployedOnChain] = useState<boolean | null>(null);
 
   const { data: animalNftContract } = useDeployedContractInfo({
     contractName: "AnimalNFT",
   });
+
+  useEffect(() => {
+    const run = async () => {
+      if (!publicClient) {
+        setIsAnimalNftDeployedOnChain(null);
+        return;
+      }
+      const addr = animalNftContract?.address as `0x${string}` | undefined;
+      if (!addr) {
+        setIsAnimalNftDeployedOnChain(false);
+        return;
+      }
+      try {
+        const bytecode = await publicClient.getBytecode({ address: addr });
+        setIsAnimalNftDeployedOnChain(!!bytecode && bytecode !== "0x");
+      } catch {
+        setIsAnimalNftDeployedOnChain(false);
+      }
+    };
+    void run();
+  }, [publicClient, animalNftContract?.address]);
 
   const { data: nextTokenId } = useScaffoldReadContract({
     contractName: "AnimalNFT",
@@ -144,8 +166,23 @@ export const AnimalNfts = () => {
           <div className="card-body gap-3">
             <div className="flex items-center justify-between">
               <h2 className="card-title">Mint an Animal NFT</h2>
-              <div className="text-xs opacity-70">{animalNftContract ? "AnimalNFT deployed" : "Not deployed"}</div>
+              <div className="text-xs opacity-70">
+                {isAnimalNftDeployedOnChain === null
+                  ? "Checking deployment…"
+                  : isAnimalNftDeployedOnChain
+                    ? "AnimalNFT deployed"
+                    : "Not deployed"}
+              </div>
             </div>
+
+            {isAnimalNftDeployedOnChain === false ? (
+              <div className="alert alert-warning">
+                <span className="text-sm">
+                  AnimalNFT isn’t deployed on the connected network (or you restarted your local chain). Run `yarn
+                  deploy` and refresh, or switch networks.
+                </span>
+              </div>
+            ) : null}
 
             <label className="form-control w-full">
               <div className="label">
@@ -161,7 +198,12 @@ export const AnimalNfts = () => {
 
             <button
               className="btn btn-primary"
-              disabled={!connectedAddress || !animalNftContract || mintName.trim().length === 0}
+              disabled={
+                !connectedAddress ||
+                !animalNftContract ||
+                isAnimalNftDeployedOnChain !== true ||
+                mintName.trim().length === 0
+              }
               onClick={async () => {
                 const name = mintName.trim();
                 // `mint` is overloaded; cast to avoid TS confusion and let viem pick the correct overload at runtime.

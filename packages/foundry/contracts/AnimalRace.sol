@@ -2,6 +2,8 @@
 pragma solidity ^0.8.19;
 
 import { DeterministicDice } from "./libraries/DeterministicDice.sol";
+import { ReadinessWinProbTable } from "./libraries/ReadinessWinProbTable.sol";
+import { AnimalRaceSimulator } from "./AnimalRaceSimulator.sol";
 import { IERC721 } from "../lib/openzeppelin-contracts/contracts/token/ERC721/IERC721.sol";
 
 interface IAnimalNFT is IERC721 {
@@ -24,6 +26,13 @@ contract AnimalRace {
     using DeterministicDice for DeterministicDice.Dice;
 
     uint8 public constant ANIMAL_COUNT = 4;
+    // Fixed-odds params (v3):
+    // - decimal odds are stored in basis points (1e4). Example: 3.80x => 38000.
+    // - house edge is enforced by requiring an overround >= 1/(1-edge).
+    uint16 internal constant ODDS_SCALE = 10000;
+    uint16 public constant HOUSE_EDGE_BPS = 500; // 5%
+    uint32 internal constant MIN_DECIMAL_ODDS_BPS = 10100; // 1.01x
+    uint32 internal constant MAX_DECIMAL_ODDS_BPS = 500000; // 50.00x
     // Phase schedule (v2):
     // - Submissions close at (bettingCloseBlock - SUBMISSION_CLOSE_OFFSET_BLOCKS)
     // - Betting is only open after submissions close (inclusive) and before bettingCloseBlock (exclusive)
@@ -38,17 +47,22 @@ contract AnimalRace {
 
     address public house;
     IAnimalNFT public animalNft;
+    ReadinessWinProbTable public winProbTable;
+    AnimalRaceSimulator public simulator;
 
     struct Race {
         // Betting close block (formerly "closeBlock" in v1).
         uint64 closeBlock;
         // Lane lineup finalized from entrant pool + house fill.
         bool animalsFinalized;
+        // Fixed odds quoted for lanes (locked once set; required before betting).
+        bool oddsSet;
         bool settled;
         uint8 winner; // 0-3, valid only if settled
         bytes32 seed; // stored on settlement for later verification
         uint256 totalPot;
         uint256[4] totalOnAnimal;
+        uint32[4] decimalOddsBps; // per lane, scaled by ODDS_SCALE
     }
 
     struct RaceAnimals {
@@ -84,6 +98,8 @@ contract AnimalRace {
     }
 
     uint256 public nextRaceId;
+    // Sum of unpaid winning payouts across settled races (fixed odds).
+    uint256 public settledLiability;
     mapping(uint256 => Race) private races;
     mapping(uint256 => mapping(address => Bet)) private bets;
     mapping(uint256 => RaceAnimals) private raceAnimals;
@@ -103,6 +119,7 @@ contract AnimalRace {
     uint256[4] public houseAnimalTokenIds;
 
     event RaceCreated(uint256 indexed raceId, uint64 closeBlock);
+    event RaceOddsSet(uint256 indexed raceId, uint32 odds0Bps, uint32 odds1Bps, uint32 odds2Bps, uint32 odds3Bps);
     event BetPlaced(uint256 indexed raceId, address indexed bettor, uint8 indexed animal, uint256 amount);
     event RaceSettled(uint256 indexed raceId, bytes32 seed, uint8 winner);
     event Claimed(uint256 indexed raceId, address indexed bettor, uint256 payout);
@@ -133,10 +150,30 @@ contract AnimalRace {
     error EntryPoolFull();
     error AnimalsAlreadyFinalized();
     error PreviousRaceNotSettled();
+    error NotHouse();
+    error OddsNotSet();
+    error OddsAlreadySet();
+    error InvalidOdds();
+    error InsufficientBankroll();
 
-    constructor(address _animalNft, address _house, uint256[ANIMAL_COUNT] memory _houseAnimalTokenIds) {
+    modifier onlyHouse() {
+        if (msg.sender != house) revert NotHouse();
+        _;
+    }
+
+    receive() external payable { }
+
+    constructor(
+        address _animalNft,
+        address _house,
+        uint256[ANIMAL_COUNT] memory _houseAnimalTokenIds,
+        address _winProbTable,
+        address _simulator
+    ) {
         animalNft = IAnimalNFT(_animalNft);
         house = _house;
+        winProbTable = ReadinessWinProbTable(_winProbTable);
+        simulator = AnimalRaceSimulator(_simulator);
         houseAnimalTokenIds = _houseAnimalTokenIds;
 
         // Basic sanity: prevent accidental all-zeros configuration.
@@ -168,18 +205,19 @@ contract AnimalRace {
      * @return winner The winning animal index (0-3)
      * @return distances Final distances after all ticks (units are arbitrary)
      */
-    function simulate(bytes32 seed) external pure returns (uint8 winner, uint16[ANIMAL_COUNT] memory distances) {
-        return _simulate(seed);
+    function simulate(bytes32 seed) external view returns (uint8 winner, uint16[ANIMAL_COUNT] memory distances) {
+        // Backwards compatible: default "fresh" readiness.
+        return simulator.simulate(seed);
     }
 
     /// @notice Deterministically simulate a race from a seed + lane readiness snapshot.
     /// @dev Matches settlement behavior after readiness was introduced.
     function simulateWithReadiness(bytes32 seed, uint8[ANIMAL_COUNT] calldata readiness)
         external
-        pure
+        view
         returns (uint8 winner, uint16[ANIMAL_COUNT] memory distances)
     {
-        return _simulateWithReadiness(seed, readiness);
+        return simulator.simulateWithReadiness(seed, readiness);
     }
 
     function latestRaceId() public view returns (uint256 raceId) {
@@ -227,9 +265,22 @@ contract AnimalRace {
 
         // Ensure the lane lineup is finalized before accepting bets (so bettors can see who is racing).
         _ensureAnimalsFinalized(raceId);
+        if (!r.oddsSet) revert OddsNotSet();
 
         Bet storage b = bets[raceId][msg.sender];
         if (b.amount != 0) revert AlreadyBet();
+
+        // Risk control (fixed odds): ensure the contract can cover worst-case payout for this race,
+        // while also reserving funds for already-settled liabilities.
+        uint256[4] memory projectedTotals = r.totalOnAnimal;
+        projectedTotals[animal] += msg.value;
+        uint256 maxPayout;
+        for (uint8 i = 0; i < ANIMAL_COUNT; i++) {
+            uint256 payoutIfWin = (projectedTotals[i] * uint256(r.decimalOddsBps[i])) / ODDS_SCALE;
+            if (payoutIfWin > maxPayout) maxPayout = payoutIfWin;
+        }
+        // `address(this).balance` already includes `msg.value` during execution.
+        if (address(this).balance < settledLiability + maxPayout) revert InsufficientBankroll();
 
         b.amount = uint128(msg.value);
         b.animal = animal;
@@ -239,6 +290,46 @@ contract AnimalRace {
 
         bettorRaceIds[msg.sender].push(raceId);
         emit BetPlaced(raceId, msg.sender, animal, msg.value);
+    }
+
+    /**
+     * @notice Publish the fixed decimal odds for a race (must be done after lineup/readiness are finalized).
+     * @dev Odds must be set before any bets can be placed. House-only to protect bankroll.
+     *
+     * House edge enforcement:
+     * Let decimal odds be O_i. We require sum(1/O_i) >= 1/(1-edge). For edge=5%, that's >= 1.052631...
+     * Using basis points, we enforce:
+     *   sum(ODDS_SCALE^2 / O_i_bps) >= ceil(ODDS_SCALE*ODDS_SCALE / (ODDS_SCALE - HOUSE_EDGE_BPS))
+     */
+    function setRaceOdds(uint256 raceId, uint32[4] calldata decimalOddsBps) external onlyHouse {
+        Race storage r = races[raceId];
+        if (r.closeBlock == 0) revert InvalidRace();
+        if (r.settled) revert AlreadySettled();
+        if (!r.animalsFinalized) revert RaceNotReady();
+        if (r.oddsSet) revert OddsAlreadySet();
+
+        // Must be within the betting window (submissions closed, betting not closed).
+        uint64 submissionCloseBlock = _submissionCloseBlock(r.closeBlock);
+        if (block.number < submissionCloseBlock) revert BettingNotOpen();
+        if (block.number >= r.closeBlock) revert BettingClosed();
+
+        uint256 invSumBps = 0;
+        for (uint8 i = 0; i < ANIMAL_COUNT; i++) {
+            uint32 o = decimalOddsBps[i];
+            if (o < MIN_DECIMAL_ODDS_BPS || o > MAX_DECIMAL_ODDS_BPS) revert InvalidOdds();
+            // inv in bps of 1.0: (ODDS_SCALE / (o/ODDS_SCALE)) = ODDS_SCALE^2 / o
+            // Use ceil division to avoid rejecting valid odds due to integer truncation.
+            uint256 num = uint256(ODDS_SCALE) * uint256(ODDS_SCALE);
+            invSumBps += (num + uint256(o) - 1) / uint256(o);
+        }
+
+        uint256 minOverroundBps = (uint256(ODDS_SCALE) * uint256(ODDS_SCALE) + (ODDS_SCALE - HOUSE_EDGE_BPS) - 1)
+            / (ODDS_SCALE - HOUSE_EDGE_BPS);
+        if (invSumBps < minOverroundBps) revert InvalidOdds();
+
+        r.decimalOddsBps = decimalOddsBps;
+        r.oddsSet = true;
+        emit RaceOddsSet(raceId, decimalOddsBps[0], decimalOddsBps[1], decimalOddsBps[2], decimalOddsBps[3]);
     }
 
     /**
@@ -310,6 +401,8 @@ contract AnimalRace {
         if (r.closeBlock == 0) revert InvalidRace();
         if (r.settled) revert AlreadySettled();
         if (block.number <= r.closeBlock) revert RaceNotReady();
+        // Fixed odds are required only if there were bets for this race.
+        if (r.totalPot != 0 && !r.oddsSet) revert OddsNotSet();
 
         bytes32 bh = blockhash(r.closeBlock);
         if (bh == bytes32(0)) revert BlockhashUnavailable();
@@ -321,12 +414,18 @@ contract AnimalRace {
         // Make sure lineup is finalized (it should have been finalized during betting window,
         // but keep settlement robust).
         _ensureAnimalsFinalized(raceId);
-        (uint8 w,) = _simulateWithReadiness(simSeed, raceReadiness[raceId]);
+        uint8 w = simulator.winnerWithReadiness(simSeed, raceReadiness[raceId]);
 
         r.settled = true;
         r.winner = w;
         // Store the simulation seed so the race can be replayed off-chain.
         r.seed = simSeed;
+
+        // Record the total liability for this race (winners will claim fixed payouts).
+        if (r.totalPot != 0) {
+            uint256 raceLiability = (r.totalOnAnimal[w] * uint256(r.decimalOddsBps[w])) / ODDS_SCALE;
+            settledLiability += raceLiability;
+        }
 
         _decreaseReadinessAfterRace(raceId);
 
@@ -365,8 +464,10 @@ contract AnimalRace {
                 return 0;
             }
 
-            uint256 winnersTotal = r.totalOnAnimal[r.winner];
-            payout = winnersTotal == 0 ? 0 : (r.totalPot * uint256(b.amount)) / winnersTotal;
+            payout = (uint256(b.amount) * uint256(r.decimalOddsBps[b.animal])) / ODDS_SCALE;
+            if (payout != 0) {
+                settledLiability -= payout;
+            }
 
             (bool ok,) = msg.sender.call{value: payout}("");
             if (!ok) revert TransferFailed();
@@ -419,8 +520,10 @@ contract AnimalRace {
             b.claimed = true;
             nextClaimIndex[msg.sender] = idx + 1;
 
-            uint256 winnersTotal = r.totalOnAnimal[r.winner];
-            payout = winnersTotal == 0 ? 0 : (r.totalPot * uint256(b.amount)) / winnersTotal;
+            payout = (uint256(b.amount) * uint256(r.decimalOddsBps[b.animal])) / ODDS_SCALE;
+            if (payout != 0) {
+                settledLiability -= payout;
+            }
 
             (bool ok,) = msg.sender.call{value: payout}("");
             if (!ok) revert TransferFailed();
@@ -469,6 +572,11 @@ contract AnimalRace {
     {
         Race storage r = races[raceId];
         return (r.closeBlock, r.settled, r.winner, r.seed, r.totalPot, r.totalOnAnimal);
+    }
+
+    function getRaceOddsById(uint256 raceId) external view returns (bool oddsSet, uint32[4] memory decimalOddsBps) {
+        Race storage r = races[raceId];
+        return (r.oddsSet, r.decimalOddsBps);
     }
 
     function getBet(address bettor) external view returns (uint128 amount, uint8 animal, bool claimed) {
@@ -565,8 +673,7 @@ contract AnimalRace {
             if (!r.settled) continue;
             if (b.animal != r.winner) continue;
 
-            uint256 winnersTotal = r.totalOnAnimal[r.winner];
-            uint256 p = winnersTotal == 0 ? 0 : (r.totalPot * uint256(b.amount)) / winnersTotal;
+            uint256 p = (uint256(b.amount) * uint256(r.decimalOddsBps[b.animal])) / ODDS_SCALE;
 
             out.hasClaim = true;
             out.raceId = rid;
@@ -640,8 +747,7 @@ contract AnimalRace {
                 return out;
             }
 
-            uint256 winnersTotal = r.totalOnAnimal[w];
-            uint256 p = winnersTotal == 0 ? 0 : (r.totalPot * uint256(b.amount)) / winnersTotal;
+            uint256 p = (uint256(b.amount) * uint256(r.decimalOddsBps[b.animal])) / ODDS_SCALE;
             out.hasClaim = true;
             out.raceId = rid;
             out.status = 3;
@@ -695,12 +801,72 @@ contract AnimalRace {
             if (rr < 1) rr = 1;
             raceReadiness[raceId][lane] = rr;
         }
+
+        // Auto-quote fixed odds from the readiness snapshot (lookup table), so no extra tx is required.
+        _autoSetOddsFromReadiness(raceId);
         r.animalsFinalized = true;
 
         RaceAnimals storage ra = raceAnimals[raceId];
         for (uint8 lane = 0; lane < ANIMAL_COUNT; lane++) {
             emit AnimalAssigned(raceId, ra.tokenIds[lane], ra.originalOwners[lane], lane);
         }
+    }
+
+    function _autoSetOddsFromReadiness(uint256 raceId) internal {
+        Race storage r = races[raceId];
+        if (r.oddsSet) return;
+
+        uint8[4] memory rr = raceReadiness[raceId];
+        uint8[4] memory laneIdx = [uint8(0), 1, 2, 3];
+
+        // Sort readiness ascending (and keep lane indices aligned). Small fixed-size sort.
+        for (uint8 i = 0; i < ANIMAL_COUNT; i++) {
+            for (uint8 j = i + 1; j < ANIMAL_COUNT; j++) {
+                if (rr[j] < rr[i]) {
+                    (rr[i], rr[j]) = (rr[j], rr[i]);
+                    (laneIdx[i], laneIdx[j]) = (laneIdx[j], laneIdx[i]);
+                }
+            }
+        }
+
+        uint16[4] memory probsBps = winProbTable.getSorted(rr[0], rr[1], rr[2], rr[3]);
+
+        // Symmetry fix: if multiple lanes have the same readiness, their true win probability is identical.
+        // The lookup table is Monte Carlo-estimated, so those positions can differ slightly; we set each
+        // equal-readiness group to the same rounded average (guarantees identical odds for identical readiness).
+        uint16[4] memory probsAdj = probsBps;
+        uint8 start = 0;
+        while (start < ANIMAL_COUNT) {
+            uint8 end = start;
+            while (end + 1 < ANIMAL_COUNT && rr[end + 1] == rr[start]) {
+                end++;
+            }
+            uint8 len = end - start + 1;
+            if (len > 1) {
+                uint256 sum = 0;
+                for (uint8 i = start; i <= end; i++) {
+                    sum += probsAdj[i];
+                }
+                // round(sum/len) to nearest
+                uint16 avg = uint16((sum + (len / 2)) / len);
+                for (uint8 i = start; i <= end; i++) {
+                    probsAdj[i] = avg;
+                }
+            }
+            start = end + 1;
+        }
+
+        for (uint8 i = 0; i < ANIMAL_COUNT; i++) {
+            uint16 p = probsAdj[i];
+            if (p == 0) p = 1; // defensive
+            uint256 o = (uint256(ODDS_SCALE) * uint256(ODDS_SCALE - HOUSE_EDGE_BPS)) / uint256(p);
+            if (o < MIN_DECIMAL_ODDS_BPS) o = MIN_DECIMAL_ODDS_BPS;
+            if (o > MAX_DECIMAL_ODDS_BPS) o = MAX_DECIMAL_ODDS_BPS;
+            r.decimalOddsBps[laneIdx[i]] = uint32(o);
+        }
+
+        r.oddsSet = true;
+        emit RaceOddsSet(raceId, r.decimalOddsBps[0], r.decimalOddsBps[1], r.decimalOddsBps[2], r.decimalOddsBps[3]);
     }
 
     function _finalizeAnimalsFromPool(uint256 raceId, bytes32 fillSeed) internal {
@@ -791,89 +957,6 @@ contract AnimalRace {
         }
     }
 
-    function _readinessBps(uint8 readiness) internal pure returns (uint16) {
-        // Map readiness 1..10 -> 0.70x..1.00x (basis points).
-        // readiness 10 => 10000 bps, readiness 1 => 7000 bps
-        if (readiness == 0) readiness = 10;
-        if (readiness > 10) readiness = 10;
-        if (readiness < 1) readiness = 1;
-        // 7000 + (readiness-1) * 3000/9
-        return uint16(7000 + (uint256(readiness - 1) * 3000) / 9);
-    }
-
-    function _scaledSpeed(uint256 baseSpeed, uint16 multiplierBps) internal pure returns (uint16) {
-        // baseSpeed is in [1..SPEED_RANGE]. Apply multiplier and floor, but keep a minimum of 1.
-        uint256 s = (baseSpeed * uint256(multiplierBps)) / 10_000;
-        if (s == 0) return 1;
-        return uint16(s);
-    }
-
-    function _simulate(bytes32 seed) internal pure returns (uint8 winner, uint16[4] memory distances) {
-        // Backwards-compatible default (fresh animals).
-        uint8[4] memory readiness = [uint8(10), 10, 10, 10];
-        return _simulateWithReadiness(seed, readiness);
-    }
-
-    function _simulateWithReadiness(bytes32 seed, uint8[4] memory readiness)
-        internal
-        pure
-        returns (uint8 winner, uint16[4] memory distances)
-    {
-        DeterministicDice.Dice memory dice = DeterministicDice.create(seed);
-
-        bool finished = false;
-
-        uint16[4] memory bps;
-        for (uint8 a = 0; a < ANIMAL_COUNT; a++) {
-            bps[a] = _readinessBps(readiness[a]);
-        }
-
-        for (uint256 t = 0; t < MAX_TICKS; t++) {
-            for (uint256 a = 0; a < ANIMAL_COUNT; a++) {
-                (uint256 r, DeterministicDice.Dice memory updatedDice) = dice.roll(SPEED_RANGE);
-                dice = updatedDice;
-                // base speed in [1..SPEED_RANGE], scaled by readiness multiplier
-                uint256 baseSpeed = r + 1;
-                distances[a] += _scaledSpeed(baseSpeed, bps[uint8(a)]);
-            }
-
-            // Check finish after each tick
-            if (
-                distances[0] >= TRACK_LENGTH || distances[1] >= TRACK_LENGTH || distances[2] >= TRACK_LENGTH
-                    || distances[3] >= TRACK_LENGTH
-            ) {
-                finished = true;
-                break;
-            }
-        }
-
-        require(finished, "AnimalRace: race did not finish");
-
-        // Find leaders
-        uint16 best = distances[0];
-        uint8 leaderCount = 1;
-        uint8[4] memory leaders;
-        leaders[0] = 0;
-
-        for (uint8 i = 1; i < ANIMAL_COUNT; i++) {
-            uint16 d = distances[i];
-            if (d > best) {
-                best = d;
-                leaderCount = 1;
-                leaders[0] = i;
-            } else if (d == best) {
-                leaders[leaderCount] = i;
-                leaderCount++;
-            }
-        }
-
-        if (leaderCount == 1) {
-            return (leaders[0], distances);
-        }
-
-        // Deterministic tie-break
-        (uint256 pick,) = dice.roll(leaderCount);
-        return (leaders[uint8(pick)], distances);
-    }
+    // (Simulation logic moved to `AnimalRaceSimulator` to stay under the 24KB EIP-170 size limit.)
 }
 

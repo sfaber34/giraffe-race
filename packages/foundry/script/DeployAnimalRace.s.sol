@@ -3,7 +3,9 @@ pragma solidity ^0.8.19;
 
 import "./DeployHelpers.s.sol";
 import "../contracts/AnimalRace.sol";
+import "../contracts/AnimalRaceSimulator.sol";
 import "../contracts/AnimalNFT.sol";
+import "../contracts/libraries/ReadinessWinProbTable.sol";
 
 /**
  * @notice Deploy script for AnimalRace contract
@@ -19,6 +21,8 @@ contract DeployAnimalRace is ScaffoldETHDeploy {
         // Deploy the AnimalNFT collection (permissionless mint).
         // We'll mint the initial "house animals" to `houseForGame`.
         AnimalNFT animalNft = new AnimalNFT();
+        ReadinessWinProbTable table = new ReadinessWinProbTable();
+        AnimalRaceSimulator simulator = new AnimalRaceSimulator();
 
         uint256[4] memory houseTokenIds;
         houseTokenIds[0] = animalNft.mint(houseForGame, "house-1");
@@ -27,7 +31,7 @@ contract DeployAnimalRace is ScaffoldETHDeploy {
         houseTokenIds[3] = animalNft.mint(houseForGame, "house-4");
 
         // Deploy the race contract with the NFT + house configuration.
-        AnimalRace race = new AnimalRace(address(animalNft), houseForGame, houseTokenIds);
+        AnimalRace race = new AnimalRace(address(animalNft), houseForGame, houseTokenIds, address(table), address(simulator));
 
         // Allow the race contract to update readiness after races.
         animalNft.setRaceContract(address(race));

@@ -5,7 +5,9 @@ import "forge-std/Test.sol";
 import "forge-std/console2.sol";
 import "forge-std/StdJson.sol";
 import "../contracts/AnimalRace.sol";
+import "../contracts/AnimalRaceSimulator.sol";
 import "../contracts/AnimalNFT.sol";
+import "../contracts/libraries/ReadinessWinProbTable.sol";
 import { DeterministicDice } from "../contracts/libraries/DeterministicDice.sol";
 
 contract AnimalRaceTest is Test {
@@ -35,10 +37,27 @@ contract AnimalRaceTest is Test {
             houseTokenIds[i] = animalNft.mint(owner, string(abi.encodePacked("house-", vm.toString(i))));
         }
 
-        race = new AnimalRace(address(animalNft), owner, houseTokenIds);
+        ReadinessWinProbTable table = new ReadinessWinProbTable();
+        AnimalRaceSimulator simulator = new AnimalRaceSimulator();
+        race = new AnimalRace(address(animalNft), owner, houseTokenIds, address(table), address(simulator));
         animalNft.setRaceContract(address(race));
         vm.deal(alice, 10 ether);
         vm.deal(bob, 10 ether);
+        vm.deal(owner, 200 ether);
+        vm.prank(owner);
+        (bool ok, bytes memory returndata) = address(race).call{value: 150 ether}("");
+        returndata; // silence unused warning
+        require(ok, "fund race bankroll failed");
+    }
+
+    function _finalize(uint256 raceId, uint64 closeBlock, bytes32 forcedLineupBh) internal {
+        uint64 submissionCloseBlock = closeBlock - 10;
+        // Finalization entropy uses blockhash(submissionCloseBlock - 1).
+        vm.roll(uint256(submissionCloseBlock - 1));
+        vm.setBlockhash(uint256(submissionCloseBlock - 1), forcedLineupBh);
+        vm.roll(uint256(submissionCloseBlock));
+        race.finalizeRaceAnimals();
+        raceId; // silence unused warning (odds auto-set during finalization)
     }
 
     function testReadinessStartsAt10AndDecreasesAfterRace() public {
@@ -74,6 +93,21 @@ contract AnimalRaceTest is Test {
         for (uint256 i = 0; i < 4; i++) {
             assertEq(uint256(animalNft.readinessOf(houseTokenIds[i])), 9);
         }
+    }
+
+    function testOddsAreEqualWhenAllReadinessEqual() public {
+        vm.roll(123);
+        uint256 raceId = race.createRace();
+        uint64 closeBlock;
+        (closeBlock,,,,,) = race.getRace();
+        bytes32 forcedLineupBh = keccak256("forced lineup blockhash odds equal");
+        _finalize(raceId, closeBlock, forcedLineupBh);
+
+        (bool oddsSet, uint32[4] memory oddsBps) = race.getRaceOddsById(raceId);
+        assertTrue(oddsSet);
+        assertEq(oddsBps[0], oddsBps[1]);
+        assertEq(oddsBps[1], oddsBps[2]);
+        assertEq(oddsBps[2], oddsBps[3]);
     }
 
     function testReadinessFloorsAt1() public {
@@ -147,15 +181,10 @@ contract AnimalRaceTest is Test {
 
         uint64 closeBlock;
         (closeBlock,,,,,) = race.getRace();
-        uint64 submissionCloseBlock = closeBlock - 10;
 
-        // Set the lineup entropy blockhash so finalize (triggered during placeBet) doesn't revert.
         bytes32 forcedLineupBh = keccak256("forced lineup blockhash");
-        vm.roll(uint256(submissionCloseBlock - 1));
-        vm.setBlockhash(uint256(submissionCloseBlock - 1), forcedLineupBh);
+        _finalize(raceId, closeBlock, forcedLineupBh);
 
-        // Betting only opens after submissions close.
-        vm.roll(uint256(submissionCloseBlock));
         _placeBet(alice, raceId, 0, 1 ether);
         _placeBet(bob, raceId, 1, 2 ether);
 
@@ -181,12 +210,8 @@ contract AnimalRaceTest is Test {
         uint256 raceId = race.createRace();
         uint64 closeBlock;
         (closeBlock,,,,,) = race.getRace();
-        uint64 submissionCloseBlock = closeBlock - 10;
-
         bytes32 forcedLineupBh = keccak256("forced lineup blockhash 2");
-        vm.roll(uint256(submissionCloseBlock - 1));
-        vm.setBlockhash(uint256(submissionCloseBlock - 1), forcedLineupBh);
-        vm.roll(uint256(submissionCloseBlock));
+        _finalize(raceId, closeBlock, forcedLineupBh);
 
         _placeBet(alice, raceId, 2, 1 ether);
 
@@ -194,18 +219,14 @@ contract AnimalRaceTest is Test {
         _placeBet(alice, raceId, 3, 1 ether);
     }
 
-    function testClaimPayoutProRata() public {
+    function testClaimPayout_FixedOdds() public {
         vm.roll(200);
         uint256 raceId = race.createRace();
 
         uint64 closeBlock;
         (closeBlock,,,,,) = race.getRace();
-        uint64 submissionCloseBlock = closeBlock - 10;
-
         bytes32 forcedLineupBh = keccak256("forced lineup blockhash 3");
-        vm.roll(uint256(submissionCloseBlock - 1));
-        vm.setBlockhash(uint256(submissionCloseBlock - 1), forcedLineupBh);
-        vm.roll(uint256(submissionCloseBlock));
+        _finalize(raceId, closeBlock, forcedLineupBh);
 
         // Alice and Bob both bet on animal 0, different amounts
         _placeBet(alice, raceId, 0, 1 ether);
@@ -237,13 +258,15 @@ contract AnimalRaceTest is Test {
         vm.prank(bob);
         uint256 bobPayout = race.claim();
 
-        // Total pot = 4 ETH, winnersTotal = 4 ETH
-        // Alice payout = 4 * 1/4 = 1 ETH
-        // Bob payout   = 4 * 3/4 = 3 ETH
-        assertEq(alicePayout, 1 ether);
-        assertEq(bobPayout, 3 ether);
-        assertEq(alice.balance, aliceBalBefore + 1 ether);
-        assertEq(bob.balance, bobBalBefore + 3 ether);
+        // Fixed odds are auto-quoted from the readiness snapshot using the lookup table.
+        (bool oddsSet, uint32[4] memory oddsBps) = race.getRaceOddsById(raceId);
+        assertTrue(oddsSet);
+        uint256 expectedAlice = (1 ether * uint256(oddsBps[0])) / 10_000;
+        uint256 expectedBob = (3 ether * uint256(oddsBps[0])) / 10_000;
+        assertEq(alicePayout, expectedAlice);
+        assertEq(bobPayout, expectedBob);
+        assertEq(alice.balance, aliceBalBefore + expectedAlice);
+        assertEq(bob.balance, bobBalBefore + expectedBob);
     }
 
     function testSettleRevertsIfBlockhashUnavailable() public {

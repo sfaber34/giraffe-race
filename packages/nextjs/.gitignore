@@ -36,3 +36,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 ipfs-upload.config.json
+
+# generator outputs (keep ReadinessWinProbTable.sol, but ignore resume checkpoints)
+generated/readiness-prob-checkpoint.json
