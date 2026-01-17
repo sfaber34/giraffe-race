@@ -28,6 +28,11 @@ type RaceStatus = "no_race" | "submissions_open" | "betting_open" | "betting_clo
 
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
+// Replay speed baseline multiplier:
+// - "1x" should feel faster than real-time UI defaults
+// - higher speeds scale proportionally (2x/3x still work the same, just faster)
+const BASE_REPLAY_SPEED_MULTIPLIER = 1.5;
+
 const BlockCountdownBar = ({
   label,
   current,
@@ -545,9 +550,10 @@ export const RaceDashboard = () => {
     if (!simulation) return;
     if (!raceStarted) return;
 
+    const effectivePlaybackSpeed = playbackSpeed * BASE_REPLAY_SPEED_MULTIPLIER;
     const id = window.setInterval(
       () => setFrame(prev => (prev >= lastFrameIndex ? lastFrameIndex : prev + 1)),
-      Math.floor(120 / playbackSpeed),
+      Math.floor(120 / effectivePlaybackSpeed),
     );
     return () => window.clearInterval(id);
   }, [isPlaying, simulation, raceStarted, lastFrameIndex, playbackSpeed]);
@@ -694,7 +700,7 @@ export const RaceDashboard = () => {
       const target = cameraTargetXRef.current;
       const maxScroll = Math.max(0, el.scrollWidth - el.clientWidth);
 
-      const smoothTimeSec = Math.max(0.05, 0.55 / playbackSpeedRef.current);
+      const smoothTimeSec = Math.max(0.05, 0.55 / (playbackSpeedRef.current * BASE_REPLAY_SPEED_MULTIPLIER));
       const omega = 2 / smoothTimeSec;
       const x = omega * dtSec;
       const exp = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
@@ -1013,7 +1019,7 @@ export const RaceDashboard = () => {
                               className="absolute left-0 top-0"
                               style={{
                                 transform: `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%)`,
-                                transition: `transform ${Math.floor(120 / playbackSpeed)}ms linear`,
+                                transition: `transform ${Math.floor(120 / (playbackSpeed * BASE_REPLAY_SPEED_MULTIPLIER))}ms linear`,
                                 willChange: "transform",
                                 filter: isWinner ? "drop-shadow(0 6px 10px rgba(0,0,0,0.25))" : undefined,
                               }}
