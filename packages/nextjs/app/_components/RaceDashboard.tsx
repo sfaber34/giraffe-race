@@ -372,6 +372,9 @@ export const RaceDashboard = () => {
     };
   }, [myBetData]);
 
+  const isBetLocked = !!myBet?.hasBet;
+  const selectedBetLane = isBetLocked ? myBet?.animal : betLane;
+
   const estimatedPayoutWei = useMemo(() => {
     if (!parsedOdds?.oddsSet) return null;
     const lane = myBet?.hasBet ? myBet.animal : betLane;
@@ -1410,141 +1413,108 @@ export const RaceDashboard = () => {
                         Betting opens after submissions close and the lineup is finalized.
                       </p>
 
-                      {!canBet ? (
-                        <div className="alert alert-info">
-                          <div className="flex flex-col gap-2 w-full">
-                            <div className="font-medium">
-                              {parsed?.settled ? "Race is settled." : "Betting is closed. Waiting for settlement."}
-                            </div>
-                            {connectedAddress ? (
-                              myBet?.hasBet ? (
-                                <div className="text-sm">
-                                  You bet on{" "}
-                                  <span className="font-semibold">
-                                    {(() => {
-                                      const tokenId = parsedAnimals?.tokenIds?.[myBet.animal] ?? 0n;
-                                      return tokenId !== 0n ? (
-                                        <>
-                                          {LANE_EMOJI} <LaneName tokenId={tokenId} fallback={`Lane ${myBet.animal}`} />
-                                        </>
-                                      ) : (
-                                        `Lane ${myBet.animal}`
-                                      );
-                                    })()}
-                                  </span>{" "}
-                                  for <span className="font-semibold">{formatEther(myBet.amount)} ETH</span>.
-                                </div>
-                              ) : (
-                                <div className="text-sm">You didn’t place a bet for this race.</div>
-                              )
-                            ) : (
-                              <div className="text-sm">Connect your wallet to see what you bet.</div>
-                            )}
-                            <div className="text-xs opacity-70">
-                              {parsed?.settled
-                                ? "Replay is available and you can claim your payout if you won."
-                                : "Once the race is settled, the replay becomes available and you can claim your payout if you won."}
-                            </div>
-                          </div>
+                      <>
+                        {/*
+                          Always render the bet UI. When betting isn't open (or the user already placed a bet),
+                          it naturally appears in a disabled/locked state instead of switching to a separate
+                          "you didn't bet" message block.
+                        */}
+                        <div className="flex flex-col gap-2 w-full">
+                          {Array.from({ length: LANE_COUNT }).map((_, lane) => (
+                            <button
+                              key={lane}
+                              className={`btn w-full justify-between ${
+                                selectedBetLane === lane ? "btn-primary" : "btn-outline"
+                              } ${
+                                isBetLocked && selectedBetLane === lane
+                                  ? "ring-2 ring-primary ring-offset-2 ring-offset-base-100 disabled:opacity-100"
+                                  : ""
+                              }`}
+                              onClick={() => setBetLane(lane as 0 | 1 | 2 | 3)}
+                              disabled={!canBet || isBetLocked}
+                              type="button"
+                            >
+                              <span className="flex items-center gap-2">
+                                <span>{LANE_EMOJI}</span>
+                                {lineupFinalized &&
+                                parsedAnimals?.tokenIds?.[lane] &&
+                                parsedAnimals.tokenIds[lane] !== 0n ? (
+                                  <LaneName tokenId={parsedAnimals.tokenIds[lane]} fallback={`Lane ${lane}`} />
+                                ) : (
+                                  <span>Lane {lane}</span>
+                                )}
+                              </span>
+                              <span className="flex flex-col items-end text-xs opacity-80">
+                                <span>Readiness {laneReadiness[lane]}/10</span>
+                                {lineupFinalized ? (
+                                  <span className="font-mono opacity-90">{oddsLabelForLane(lane)}</span>
+                                ) : null}
+                              </span>
+                            </button>
+                          ))}
                         </div>
-                      ) : (
-                        <>
-                          <div className="flex flex-col gap-2 w-full">
-                            {Array.from({ length: LANE_COUNT }).map((_, lane) => (
-                              <button
-                                key={lane}
-                                className={`btn w-full justify-between ${
-                                  betLane === lane ? "btn-primary" : "btn-outline"
-                                }`}
-                                onClick={() => setBetLane(lane as 0 | 1 | 2 | 3)}
-                                disabled={!canBet || !!myBet?.hasBet}
-                                type="button"
-                              >
-                                <span className="flex items-center gap-2">
-                                  <span>{LANE_EMOJI}</span>
-                                  {lineupFinalized &&
-                                  parsedAnimals?.tokenIds?.[lane] &&
-                                  parsedAnimals.tokenIds[lane] !== 0n ? (
-                                    <LaneName tokenId={parsedAnimals.tokenIds[lane]} fallback={`Lane ${lane}`} />
-                                  ) : (
-                                    <span>Lane {lane}</span>
-                                  )}
-                                </span>
-                                <span className="flex flex-col items-end text-xs opacity-80">
-                                  <span>Readiness {laneReadiness[lane]}/10</span>
-                                  {lineupFinalized ? (
-                                    <span className="font-mono opacity-90">{oddsLabelForLane(lane)}</span>
-                                  ) : null}
-                                </span>
-                              </button>
-                            ))}
+
+                        {lineupFinalized ? (
+                          <div className="text-xs opacity-70">
+                            {"Odds are fixed and enforced on-chain (derived from the locked readiness snapshot)."}
                           </div>
+                        ) : null}
 
-                          {lineupFinalized ? (
-                            <div className="text-xs opacity-70">
-                              {"Odds are fixed and enforced on-chain (derived from the locked readiness snapshot)."}
-                            </div>
-                          ) : null}
-
-                          <div className={!canBet || !!myBet?.hasBet ? "opacity-50 pointer-events-none" : ""}>
+                        {isBetLocked ? (
+                          <EtherInput
+                            placeholder="Bet amount (ETH)"
+                            defaultValue={myBet?.amount ? formatEther(myBet.amount) : ""}
+                            disabled
+                            style={{ width: "100%" }}
+                          />
+                        ) : (
+                          <div className={!canBet ? "opacity-50 pointer-events-none" : ""}>
                             <EtherInput
                               placeholder="Bet amount (ETH)"
                               onValueChange={({ valueInEth }) => {
-                                if (!canBet || !!myBet?.hasBet) return;
+                                if (!canBet) return;
                                 setBetAmountEth(valueInEth);
                               }}
                               style={{ width: "100%" }}
                             />
                           </div>
+                        )}
 
-                          <div className="text-sm">
-                            <div className="flex justify-between">
-                              <span className="opacity-70">Estimated payout</span>
-                              <span className="font-mono">
-                                {estimatedPayoutWei === null ? "—" : `${formatEther(estimatedPayoutWei)} ETH`}
-                              </span>
-                            </div>
-                            <div className="text-xs opacity-60">
-                              Includes your stake. Fixed odds are locked at bet time.
-                            </div>
+                        <div className="text-sm">
+                          <div className="flex justify-between">
+                            <span className="opacity-70">Estimated payout</span>
+                            <span className="font-mono">
+                              {estimatedPayoutWei === null ? "—" : `${formatEther(estimatedPayoutWei)} ETH`}
+                            </span>
                           </div>
+                          <div className="text-xs opacity-60">
+                            Includes your stake. Fixed odds are locked at bet time.
+                          </div>
+                        </div>
 
-                          <button
-                            className="btn btn-primary"
-                            disabled={
-                              !animalRaceContract ||
-                              !connectedAddress ||
-                              !canBet ||
-                              !placeBetValue ||
-                              !!myBet?.hasBet ||
-                              !isViewingLatest
-                            }
-                            onClick={async () => {
-                              if (!placeBetValue) return;
-                              await writeAnimalRaceAsync({
-                                functionName: "placeBet",
-                                args: [betLane],
-                                value: placeBetValue,
-                              } as any);
-                              setBetAmountEth("");
-                            }}
-                          >
-                            Place bet
-                          </button>
-
-                          {!canBet ? (
-                            <div className="text-xs opacity-70">
-                              {status !== "betting_open"
-                                ? "Betting is only available during the betting window."
-                                : !lineupFinalized
-                                  ? "Finalize the lineup to reveal which NFTs are racing."
-                                  : "—"}
-                            </div>
-                          ) : myBet?.hasBet ? (
-                            <div className="text-xs opacity-70">You already placed a bet for this race.</div>
-                          ) : null}
-                        </>
-                      )}
+                        <button
+                          className="btn btn-primary"
+                          disabled={
+                            !animalRaceContract ||
+                            !connectedAddress ||
+                            !canBet ||
+                            !placeBetValue ||
+                            !!myBet?.hasBet ||
+                            !isViewingLatest
+                          }
+                          onClick={async () => {
+                            if (!placeBetValue) return;
+                            await writeAnimalRaceAsync({
+                              functionName: "placeBet",
+                              args: [betLane],
+                              value: placeBetValue,
+                            } as any);
+                            setBetAmountEth("");
+                          }}
+                        >
+                          Place bet
+                        </button>
+                      </>
                     </div>
                   </div>
                 ) : null}
