@@ -32,7 +32,6 @@ contract AnimalRace {
     uint16 internal constant ODDS_SCALE = 10000;
     uint16 public constant HOUSE_EDGE_BPS = 500; // 5%
     uint32 internal constant MIN_DECIMAL_ODDS_BPS = 10100; // 1.01x
-    uint32 internal constant MAX_DECIMAL_ODDS_BPS = 500000; // 50.00x
     // Phase schedule (v2):
     // - Submissions close at (bettingCloseBlock - SUBMISSION_CLOSE_OFFSET_BLOCKS)
     // - Betting is only open after submissions close (inclusive) and before bettingCloseBlock (exclusive)
@@ -316,7 +315,7 @@ contract AnimalRace {
         uint256 invSumBps = 0;
         for (uint8 i = 0; i < ANIMAL_COUNT; i++) {
             uint32 o = decimalOddsBps[i];
-            if (o < MIN_DECIMAL_ODDS_BPS || o > MAX_DECIMAL_ODDS_BPS) revert InvalidOdds();
+            if (o < MIN_DECIMAL_ODDS_BPS) revert InvalidOdds();
             // inv in bps of 1.0: (ODDS_SCALE / (o/ODDS_SCALE)) = ODDS_SCALE^2 / o
             // Use ceil division to avoid rejecting valid odds due to integer truncation.
             uint256 num = uint256(ODDS_SCALE) * uint256(ODDS_SCALE);
@@ -861,7 +860,6 @@ contract AnimalRace {
             if (p == 0) p = 1; // defensive
             uint256 o = (uint256(ODDS_SCALE) * uint256(ODDS_SCALE - HOUSE_EDGE_BPS)) / uint256(p);
             if (o < MIN_DECIMAL_ODDS_BPS) o = MIN_DECIMAL_ODDS_BPS;
-            if (o > MAX_DECIMAL_ODDS_BPS) o = MAX_DECIMAL_ODDS_BPS;
             r.decimalOddsBps[laneIdx[i]] = uint32(o);
         }
 

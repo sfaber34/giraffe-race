@@ -109,10 +109,12 @@ function clampReadiness(r) {
   return x;
 }
 
-// Match Solidity/TS: 7000 + (readiness-1)*3000/9
+// Match Solidity/TS: minBps + (readiness-1) * (10000-minBps) / 9
 function readinessBps(readiness) {
   const r = clampReadiness(readiness);
-  return 7000 + Math.floor(((r - 1) * 3000) / 9);
+  const minBps = 9525;
+  const range = 10_000 - minBps; // 475
+  return minBps + Math.floor(((r - 1) * range) / 9);
 }
 
 /**
@@ -135,8 +137,15 @@ function simulateRaceFromSeed({ seed, readiness }) {
     for (let a = 0; a < 4; a++) {
       const r = dice.roll(SPEED_RANGE); // 0..9
       const baseSpeed = Number(r + 1n); // 1..10
-      const scaled = Math.floor((baseSpeed * bps[a]) / 10_000);
-      distances[a] += Math.max(1, scaled);
+      // Probabilistic rounding (matches Solidity): avoids a chunky handicap from floor().
+      const raw = baseSpeed * bps[a];
+      let q = Math.floor(raw / 10_000);
+      const rem = raw % 10_000;
+      if (rem > 0) {
+        const pick = Number(dice.roll(10_000n)); // 0..9999
+        if (pick < rem) q += 1;
+      }
+      distances[a] += Math.max(1, q);
     }
     if (
       distances[0] >= TRACK_LENGTH ||
@@ -437,7 +446,7 @@ pragma solidity ^0.8.19;
 /// @notice Readiness win probability lookup table (4 lanes).
 /// @dev Index order is all sorted tuples (a<=b<=c<=d) with a,b,c,d in [1..10], in nested-loop order.
 /// Each entry is 8 bytes: 4x uint16 (basis points) in big-endian.
-/// @dev This is a deployable contract (not a library) so `AnimalRace` doesn't exceed the 24KB size limit.
+/// @dev This is a deployable contract (not a library) so \`AnimalRace\` doesn't exceed the 24KB size limit.
 contract ReadinessWinProbTable {
     uint256 internal constant ENTRY_BYTES = 8;
     uint256 internal constant TABLE_LEN = 715;

@@ -16,10 +16,12 @@ const clampReadiness = (r: number) => {
   return x;
 };
 
-// Match Solidity: 7000 + (readiness-1) * 3000 / 9
+// Match Solidity: minBps + (readiness-1) * (10000-minBps) / 9
 const readinessBps = (readiness: number) => {
   const r = clampReadiness(readiness);
-  return 7000 + Math.floor(((r - 1) * 3000) / 9);
+  const minBps = 9525;
+  const range = 10_000 - minBps; // 475
+  return minBps + Math.floor(((r - 1) * range) / 9);
 };
 
 export function simulateRaceFromSeed({
@@ -49,8 +51,15 @@ export function simulateRaceFromSeed({
     for (let a = 0; a < animalCount; a++) {
       const r = dice.roll(BigInt(speedRange)); // 0..speedRange-1
       const baseSpeed = Number(r + 1n); // 1..speedRange
-      const scaled = Math.floor((baseSpeed * bps[a]!) / 10_000);
-      distances[a] += Math.max(1, scaled);
+      // Probabilistic rounding (matches Solidity): avoids a chunky handicap from floor().
+      const raw = baseSpeed * bps[a]!;
+      let q = Math.floor(raw / 10_000);
+      const rem = raw % 10_000;
+      if (rem > 0) {
+        const pick = Number(dice.roll(10_000n)); // 0..9999
+        if (pick < rem) q += 1;
+      }
+      distances[a] += Math.max(1, q);
     }
     frames.push(distances.slice());
     ticks = t + 1;
