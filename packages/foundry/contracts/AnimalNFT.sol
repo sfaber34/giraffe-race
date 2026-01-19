@@ -30,6 +30,12 @@ contract AnimalNFT is ERC721, Ownable {
         _;
     }
 
+    modifier onlyLocalTesting() {
+        // Allow anyone to use testing helpers on anvil/hardhat local chain.
+        require(block.chainid == 31337, "AnimalNFT: local testing only");
+        _;
+    }
+
     function setRaceContract(address _race) external onlyOwner {
         raceContract = _race;
     }
@@ -55,28 +61,53 @@ contract AnimalNFT is ERC721, Ownable {
         _readiness[tokenId] = r;
     }
 
-    function _mintAnimal(address to, string memory animalName) internal returns (uint256 tokenId) {
+    function _mintAnimal(address to, string memory animalName, uint8 readiness) internal returns (uint256 tokenId) {
         tokenId = nextTokenId++;
         if (bytes(animalName).length != 0) {
             _animalNames[tokenId] = animalName;
         }
-        _readiness[tokenId] = 10;
+        // clamp readiness to [1..10]; 0 is treated as 10 for backwards compatibility elsewhere.
+        uint8 r = readiness;
+        if (r == 0) r = 10;
+        if (r > 10) r = 10;
+        if (r < 1) r = 1;
+        _readiness[tokenId] = r;
         _safeMint(to, tokenId);
     }
 
     /// @notice Mint an AnimalNFT to an arbitrary address (permissionless).
     function mint(address to) external returns (uint256 tokenId) {
-        return _mintAnimal(to, "");
+        return _mintAnimal(to, "", 10);
     }
 
     /// @notice Mint an AnimalNFT with a name to an arbitrary address (permissionless).
     function mint(address to, string calldata animalName) external returns (uint256 tokenId) {
-        return _mintAnimal(to, animalName);
+        return _mintAnimal(to, animalName, 10);
     }
 
     /// @notice Convenience: mint to yourself with a name.
     function mint(string calldata animalName) external returns (uint256 tokenId) {
-        return _mintAnimal(msg.sender, animalName);
+        return _mintAnimal(msg.sender, animalName, 10);
+    }
+
+    /// @notice Mint an AnimalNFT with an explicit readiness (testing helper).
+    /// @dev Permissionless on local chain only (chainid 31337).
+    function mintWithReadiness(address to, uint8 readiness, string calldata animalName)
+        external
+        onlyLocalTesting
+        returns (uint256 tokenId)
+    {
+        return _mintAnimal(to, animalName, readiness);
+    }
+
+    /// @notice Permissionless local testing helper to set readiness directly on an existing token.
+    function setReadinessForTesting(uint256 tokenId, uint8 readiness) external onlyLocalTesting {
+        require(_ownerOf(tokenId) != address(0), "AnimalNFT: nonexistent token");
+        uint8 r = readiness;
+        if (r == 0) r = 10;
+        if (r > 10) r = 10;
+        if (r < 1) r = 1;
+        _readiness[tokenId] = r;
     }
 
     function nameOf(uint256 tokenId) external view returns (string memory) {

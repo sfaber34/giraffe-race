@@ -48,6 +48,8 @@ contract AnimalRace {
     IAnimalNFT public animalNft;
     ReadinessWinProbTable public winProbTable;
     AnimalRaceSimulator public simulator;
+    // NOTE (testing): readiness decay after races is currently disabled in code.
+    // When deploying a live version where readiness should always decay, uncomment the call in `_settleRace`.
 
     struct Race {
         // Betting close block (formerly "closeBlock" in v1).
@@ -340,11 +342,9 @@ contract AnimalRace {
      *      If an entrant becomes invalid (transferred away), they're treated as a no-show.
      */
     function submitAnimal(uint256 tokenId) external {
-        // "Presence creates the race": if there is no active race (none yet, or latest is settled),
-        // create a new one with the fixed schedule.
-        if (nextRaceId == 0 || races[nextRaceId - 1].settled) {
-            _createRace();
-        }
+        // Races must be explicitly created by calling `createRace()`.
+        if (nextRaceId == 0) revert InvalidRace();
+        if (races[nextRaceId - 1].settled) revert InvalidRace();
 
         uint256 raceId = _activeRaceId();
         Race storage r = races[raceId];
@@ -426,7 +426,8 @@ contract AnimalRace {
             settledLiability += raceLiability;
         }
 
-        _decreaseReadinessAfterRace(raceId);
+        // Readiness decay disabled for testing:
+        // _decreaseReadinessAfterRace(raceId);
 
         emit RaceSettled(raceId, simSeed, r.winner);
     }

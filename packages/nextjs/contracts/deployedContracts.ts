@@ -315,6 +315,35 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "mintWithReadiness",
+          inputs: [
+            {
+              name: "to",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "readiness",
+              type: "uint8",
+              internalType: "uint8",
+            },
+            {
+              name: "animalName",
+              type: "string",
+              internalType: "string",
+            },
+          ],
+          outputs: [
+            {
+              name: "tokenId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
           name: "name",
           inputs: [],
           outputs: [
@@ -506,6 +535,24 @@ const deployedContracts = {
               name: "_race",
               type: "address",
               internalType: "address",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "setReadinessForTesting",
+          inputs: [
+            {
+              name: "tokenId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "readiness",
+              type: "uint8",
+              internalType: "uint8",
             },
           ],
           outputs: [],
@@ -838,7 +885,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 2,
+      deployedOnBlock: 4,
     },
     ReadinessWinProbTable: {
       address: "0xb19b36b1456e65e3a6d514d3f715f204bd59f431",
@@ -879,7 +926,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 2,
+      deployedOnBlock: 4,
     },
     AnimalRaceSimulator: {
       address: "0x8ce361602b935680e8dec218b820ff5056beb7af",
@@ -963,7 +1010,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 3,
+      deployedOnBlock: 2,
     },
     AnimalRace: {
       address: "0xf7cd8fa9b94db2aa972023b379c7f72c65e4de9d",
@@ -2182,7 +2229,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 5,
+      deployedOnBlock: 4,
     },
   },
 } as const;
