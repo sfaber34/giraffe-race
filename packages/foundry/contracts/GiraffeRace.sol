@@ -35,6 +35,10 @@ contract GiraffeRace {
     uint16 internal constant ODDS_SCALE = 10000;
     uint16 public constant HOUSE_EDGE_BPS = 500; // 5%
     uint32 internal constant MIN_DECIMAL_ODDS_BPS = 10100; // 1.01x
+    // TEMP (6-lane migration): we are temporarily disabling the probability-table-based odds quoting
+    // to avoid needing a much larger on-chain table. Keep the old code (commented) so we can restore it.
+    // Fixed decimal odds in basis points (ODDS_SCALE=1e4): 2.00x => 20000.
+    uint32 internal constant TEMP_FIXED_DECIMAL_ODDS_BPS = 20000;
     // Phase schedule (v2):
     // - Submissions close at (bettingCloseBlock - SUBMISSION_CLOSE_OFFSET_BLOCKS)
     // - Betting is only open after submissions close (inclusive) and before bettingCloseBlock (exclusive)
@@ -835,6 +839,15 @@ contract GiraffeRace {
         uint8[4] memory rr = raceScore[raceId];
         uint8[4] memory laneIdx = [uint8(0), 1, 2, 3];
 
+        // TEMP: fixed odds (disable probability table usage without deleting code).
+        // This keeps the flow "finalize -> odds set -> betting open" working.
+        for (uint8 lane = 0; lane < LANE_COUNT; lane++) {
+            r.decimalOddsBps[lane] = TEMP_FIXED_DECIMAL_ODDS_BPS;
+        }
+        r.oddsSet = true;
+        emit RaceOddsSet(raceId, r.decimalOddsBps[0], r.decimalOddsBps[1], r.decimalOddsBps[2], r.decimalOddsBps[3]);
+        return;
+
         // Sort score ascending (and keep lane indices aligned). Small fixed-size sort.
         for (uint8 i = 0; i < LANE_COUNT; i++) {
             for (uint8 j = i + 1; j < LANE_COUNT; j++) {
@@ -845,12 +858,13 @@ contract GiraffeRace {
             }
         }
 
-        uint16[4] memory probsBps = winProbTable.getSorted(rr[0], rr[1], rr[2], rr[3]);
+        // NOTE: Probability-table-based odds (disabled temporarily).
+        // uint16[4] memory probsBps = winProbTable.getSorted(rr[0], rr[1], rr[2], rr[3]);
 
         // Symmetry fix: if multiple lanes have the same score, their true win probability is identical.
         // The lookup table is Monte Carlo-estimated, so those positions can differ slightly; we set each
         // equal-score group to the same rounded average (guarantees identical odds for identical score).
-        uint16[4] memory probsAdj = probsBps;
+        // uint16[4] memory probsAdj = probsBps;
         uint8 start = 0;
         while (start < LANE_COUNT) {
             uint8 end = start;
@@ -861,23 +875,23 @@ contract GiraffeRace {
             if (len > 1) {
                 uint256 sum = 0;
                 for (uint8 i = start; i <= end; i++) {
-                    sum += probsAdj[i];
+                    // sum += probsAdj[i];
                 }
                 // round(sum/len) to nearest
                 uint16 avg = uint16((sum + (len / 2)) / len);
                 for (uint8 i = start; i <= end; i++) {
-                    probsAdj[i] = avg;
+                    // probsAdj[i] = avg;
                 }
             }
             start = end + 1;
         }
 
         for (uint8 i = 0; i < LANE_COUNT; i++) {
-            uint16 p = probsAdj[i];
-            if (p == 0) p = 1; // defensive
-            uint256 o = (uint256(ODDS_SCALE) * uint256(ODDS_SCALE - HOUSE_EDGE_BPS)) / uint256(p);
-            if (o < MIN_DECIMAL_ODDS_BPS) o = MIN_DECIMAL_ODDS_BPS;
-            r.decimalOddsBps[laneIdx[i]] = uint32(o);
+            // uint16 p = probsAdj[i];
+            // if (p == 0) p = 1; // defensive
+            // uint256 o = (uint256(ODDS_SCALE) * uint256(ODDS_SCALE - HOUSE_EDGE_BPS)) / uint256(p);
+            // if (o < MIN_DECIMAL_ODDS_BPS) o = MIN_DECIMAL_ODDS_BPS;
+            // r.decimalOddsBps[laneIdx[i]] = uint32(o);
         }
 
         r.oddsSet = true;

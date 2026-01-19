@@ -2269,7 +2269,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 4,
+      deployedOnBlock: 2,
     },
   },
 } as const;
