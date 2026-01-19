@@ -15,6 +15,10 @@ contract AnimalNFT is ERC721, Ownable {
     // Readiness is a simple 1-10 attribute that affects race performance.
     // New mints start at 10 and decrease by 1 (floored at 1) after running a race.
     mapping(uint256 => uint8) private _readiness; // 0 = legacy/uninitialized (treated as 10)
+    // Additional 1-10 attributes that affect race performance (equally weighted with readiness).
+    // 0 = legacy/uninitialized (treated as 10)
+    mapping(uint256 => uint8) private _conditioning;
+    mapping(uint256 => uint8) private _speed;
     address public raceContract;
 
     // Owner index (lightweight "enumerable" for UX/testing):
@@ -40,19 +44,41 @@ contract AnimalNFT is ERC721, Ownable {
         raceContract = _race;
     }
 
+    function _clampStat(uint8 stat) internal pure returns (uint8) {
+        uint8 s = stat;
+        if (s == 0) s = 10;
+        if (s > 10) s = 10;
+        if (s < 1) s = 1;
+        return s;
+    }
+
     function readinessOf(uint256 tokenId) external view returns (uint8) {
         require(_ownerOf(tokenId) != address(0), "AnimalNFT: nonexistent token");
-        uint8 r = _readiness[tokenId];
-        if (r == 0) return 10;
-        return r;
+        return _clampStat(_readiness[tokenId]);
+    }
+
+    function conditioningOf(uint256 tokenId) external view returns (uint8) {
+        require(_ownerOf(tokenId) != address(0), "AnimalNFT: nonexistent token");
+        return _clampStat(_conditioning[tokenId]);
+    }
+
+    function speedOf(uint256 tokenId) external view returns (uint8) {
+        require(_ownerOf(tokenId) != address(0), "AnimalNFT: nonexistent token");
+        return _clampStat(_speed[tokenId]);
+    }
+
+    function statsOf(uint256 tokenId) external view returns (uint8 readiness, uint8 conditioning, uint8 speed) {
+        require(_ownerOf(tokenId) != address(0), "AnimalNFT: nonexistent token");
+        readiness = _clampStat(_readiness[tokenId]);
+        conditioning = _clampStat(_conditioning[tokenId]);
+        speed = _clampStat(_speed[tokenId]);
     }
 
     /// @notice Decrease readiness after an NFT runs a race (floored at 1).
     /// @dev Callable only by the configured `raceContract`.
     function decreaseReadiness(uint256 tokenId) external onlyRace {
         require(_ownerOf(tokenId) != address(0), "AnimalNFT: nonexistent token");
-        uint8 r = _readiness[tokenId];
-        if (r == 0) r = 10;
+        uint8 r = _clampStat(_readiness[tokenId]);
         if (r > 1) {
             unchecked {
                 r -= 1;
@@ -66,12 +92,11 @@ contract AnimalNFT is ERC721, Ownable {
         if (bytes(animalName).length != 0) {
             _animalNames[tokenId] = animalName;
         }
-        // clamp readiness to [1..10]; 0 is treated as 10 for backwards compatibility elsewhere.
-        uint8 r = readiness;
-        if (r == 0) r = 10;
-        if (r > 10) r = 10;
-        if (r < 1) r = 1;
-        _readiness[tokenId] = r;
+        // All stats are [1..10] (0 treated as 10 for backwards compatibility).
+        // New mints should be full stats (10), but we keep an explicit readiness parameter for local testing.
+        _readiness[tokenId] = _clampStat(readiness);
+        _conditioning[tokenId] = 10;
+        _speed[tokenId] = 10;
         _safeMint(to, tokenId);
     }
 
@@ -103,11 +128,15 @@ contract AnimalNFT is ERC721, Ownable {
     /// @notice Permissionless local testing helper to set readiness directly on an existing token.
     function setReadinessForTesting(uint256 tokenId, uint8 readiness) external onlyLocalTesting {
         require(_ownerOf(tokenId) != address(0), "AnimalNFT: nonexistent token");
-        uint8 r = readiness;
-        if (r == 0) r = 10;
-        if (r > 10) r = 10;
-        if (r < 1) r = 1;
-        _readiness[tokenId] = r;
+        _readiness[tokenId] = _clampStat(readiness);
+    }
+
+    /// @notice Permissionless local testing helper to set all stats directly on an existing token.
+    function setForTesting(uint256 tokenId, uint8 readiness, uint8 conditioning, uint8 speed) external onlyLocalTesting {
+        require(_ownerOf(tokenId) != address(0), "AnimalNFT: nonexistent token");
+        _readiness[tokenId] = _clampStat(readiness);
+        _conditioning[tokenId] = _clampStat(conditioning);
+        _speed[tokenId] = _clampStat(speed);
     }
 
     function nameOf(uint256 tokenId) external view returns (string memory) {

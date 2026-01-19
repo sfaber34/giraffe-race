@@ -298,6 +298,50 @@ export const RaceDashboard = () => {
     return Array.from({ length: LANE_COUNT }, (_, i) => clamp(Number(arr[i] ?? 10)));
   }, [raceReadinessData]);
 
+  const laneTokenIds = useMemo(() => {
+    if (!parsedAnimals?.tokenIds) return [0n, 0n, 0n, 0n] as const;
+    const arr = parsedAnimals.tokenIds;
+    return [BigInt(arr[0] ?? 0n), BigInt(arr[1] ?? 0n), BigInt(arr[2] ?? 0n), BigInt(arr[3] ?? 0n)] as const;
+  }, [parsedAnimals?.tokenIds]);
+
+  const { data: lane0StatsData } = useScaffoldReadContract({
+    contractName: "AnimalNFT",
+    functionName: "statsOf" as any,
+    args: [laneTokenIds[0]],
+    query: { enabled: !!animalNftContract && laneTokenIds[0] !== 0n },
+  } as any);
+  const { data: lane1StatsData } = useScaffoldReadContract({
+    contractName: "AnimalNFT",
+    functionName: "statsOf" as any,
+    args: [laneTokenIds[1]],
+    query: { enabled: !!animalNftContract && laneTokenIds[1] !== 0n },
+  } as any);
+  const { data: lane2StatsData } = useScaffoldReadContract({
+    contractName: "AnimalNFT",
+    functionName: "statsOf" as any,
+    args: [laneTokenIds[2]],
+    query: { enabled: !!animalNftContract && laneTokenIds[2] !== 0n },
+  } as any);
+  const { data: lane3StatsData } = useScaffoldReadContract({
+    contractName: "AnimalNFT",
+    functionName: "statsOf" as any,
+    args: [laneTokenIds[3]],
+    query: { enabled: !!animalNftContract && laneTokenIds[3] !== 0n },
+  } as any);
+
+  const laneStats = useMemo(() => {
+    const clamp = (n: number) => Math.max(1, Math.min(10, Math.floor(n)));
+    const parse = (raw: unknown) => {
+      const t = (Array.isArray(raw) ? raw : []) as any[];
+      return {
+        readiness: clamp(Number(t[0] ?? 10)),
+        conditioning: clamp(Number(t[1] ?? 10)),
+        speed: clamp(Number(t[2] ?? 10)),
+      };
+    };
+    return [parse(lane0StatsData), parse(lane1StatsData), parse(lane2StatsData), parse(lane3StatsData)];
+  }, [lane0StatsData, lane1StatsData, lane2StatsData, lane3StatsData]);
+
   const submissionCloseBlock = useMemo(() => {
     if (!parsed) return null;
     if (parsed.closeBlock < SUBMISSION_CLOSE_OFFSET_BLOCKS) return null;
@@ -1158,7 +1202,7 @@ export const RaceDashboard = () => {
                       await writeAnimalRaceAsync({ functionName: "createRace" } as any);
                     }}
                   >
-                    Create race (no entries)
+                    Create race
                   </button>
                   <button
                     className="btn btn-sm btn-outline"
@@ -1181,7 +1225,7 @@ export const RaceDashboard = () => {
                 </div>
                 <div className="text-xs opacity-70">
                   Anyone can create/finalize/settle. Odds are auto-quoted on-chain at lineup finalization based on the
-                  locked readiness snapshot.
+                  locked stats snapshot (avg of readiness/conditioning/speed).
                 </div>
               </div>
 
@@ -1429,7 +1473,7 @@ export const RaceDashboard = () => {
                           {Array.from({ length: LANE_COUNT }).map((_, lane) => (
                             <button
                               key={lane}
-                              className={`btn w-full justify-between ${
+                              className={`btn w-full justify-between h-auto py-3 min-h-[4.5rem] ${
                                 selectedBetLane === lane ? "btn-primary" : "btn-outline"
                               } ${
                                 isBetLocked && selectedBetLane === lane
@@ -1451,7 +1495,9 @@ export const RaceDashboard = () => {
                                 )}
                               </span>
                               <span className="flex flex-col items-end text-xs opacity-80">
-                                <span>Readiness {laneReadiness[lane]}/10</span>
+                                <span>Readiness {laneStats[lane]?.readiness ?? 10}/10</span>
+                                <span>Conditioning {laneStats[lane]?.conditioning ?? 10}/10</span>
+                                <span>Speed {laneStats[lane]?.speed ?? 10}/10</span>
                                 {lineupFinalized ? (
                                   <span className="font-mono opacity-90">{oddsLabelForLane(lane)}</span>
                                 ) : null}
@@ -1462,7 +1508,7 @@ export const RaceDashboard = () => {
 
                         {lineupFinalized ? (
                           <div className="text-xs opacity-70">
-                            {"Odds are fixed and enforced on-chain (derived from the locked readiness snapshot)."}
+                            {"Odds are fixed and enforced on-chain (derived from the locked stats snapshot)."}
                           </div>
                         ) : null}
 

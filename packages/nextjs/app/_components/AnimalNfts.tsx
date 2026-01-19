@@ -18,7 +18,9 @@ export const AnimalNfts = () => {
   const publicClient = usePublicClient({ chainId: targetNetwork.id });
 
   const [mintName, setMintName] = useState("");
-  const [ownedNfts, setOwnedNfts] = useState<{ tokenId: bigint; name: string; readiness: number }[]>([]);
+  const [ownedNfts, setOwnedNfts] = useState<
+    { tokenId: bigint; name: string; readiness: number; conditioning: number; speed: number }[]
+  >([]);
   const [isLoadingOwnedNfts, setIsLoadingOwnedNfts] = useState(false);
   const [isAnimalNftDeployedOnChain, setIsAnimalNftDeployedOnChain] = useState<boolean | null>(null);
 
@@ -95,7 +97,7 @@ export const AnimalNfts = () => {
           {
             address: animalNftContract.address as `0x${string}`,
             abi: animalNftContract.abi as any,
-            functionName: "readinessOf",
+            functionName: "statsOf",
             args: [id],
           },
         ]);
@@ -124,7 +126,7 @@ export const AnimalNfts = () => {
               (publicClient as any).readContract({
                 address: animalNftContract.address as `0x${string}`,
                 abi: animalNftContract.abi as any,
-                functionName: "readinessOf",
+                functionName: "statsOf",
                 args: [id],
               }),
             ]),
@@ -134,16 +136,19 @@ export const AnimalNfts = () => {
           );
         }
 
-        const clampReadiness = (n: number) => Math.max(1, Math.min(10, Math.floor(n)));
+        const clampStat = (n: number) => Math.max(1, Math.min(10, Math.floor(n)));
 
         setOwnedNfts(
           ownedTokenIds.map((tokenId, i) => {
             const nameIdx = i * 2;
-            const readinessIdx = i * 2 + 1;
+            const statsIdx = i * 2 + 1;
             const name = (((results[nameIdx] as any)?.result as string | undefined) ?? "").trim();
-            const readinessRaw = (results[readinessIdx] as any)?.result;
-            const readiness = clampReadiness(Number(readinessRaw ?? 10));
-            return { tokenId, name, readiness };
+            const statsRaw = (results[statsIdx] as any)?.result;
+            const tuple = (Array.isArray(statsRaw) ? statsRaw : []) as any[];
+            const readiness = clampStat(Number(tuple[0] ?? 10));
+            const conditioning = clampStat(Number(tuple[1] ?? 10));
+            const speed = clampStat(Number(tuple[2] ?? 10));
+            return { tokenId, name, readiness, conditioning, speed };
           }),
         );
       } finally {
@@ -247,7 +252,9 @@ export const AnimalNfts = () => {
                       <div className="font-medium">
                         {LANE_EMOJI} {nft.name || "(unnamed)"}
                       </div>
-                      <div className="text-xs opacity-70">Readiness: {nft.readiness}/10</div>
+                      <div className="text-xs opacity-70">
+                        Readiness: {nft.readiness}/10 · Conditioning: {nft.conditioning}/10 · Speed: {nft.speed}/10
+                      </div>
                     </div>
                   </div>
                 ))}

@@ -8,6 +8,9 @@ import { IERC721 } from "../lib/openzeppelin-contracts/contracts/token/ERC721/IE
 
 interface IAnimalNFT is IERC721 {
     function readinessOf(uint256 tokenId) external view returns (uint8);
+    function conditioningOf(uint256 tokenId) external view returns (uint8);
+    function speedOf(uint256 tokenId) external view returns (uint8);
+    function statsOf(uint256 tokenId) external view returns (uint8 readiness, uint8 conditioning, uint8 speed);
     function decreaseReadiness(uint256 tokenId) external;
 }
 
@@ -104,7 +107,9 @@ contract AnimalRace {
     mapping(uint256 => Race) private races;
     mapping(uint256 => mapping(address => Bet)) private bets;
     mapping(uint256 => RaceAnimals) private raceAnimals;
-    // Snapshot of readiness (1-10) for each lane at lineup finalization time.
+    // Snapshot of "effective readiness" (1-10) for each lane at lineup finalization time.
+    // Effective readiness is computed as the equally-weighted average of:
+    //   readiness, conditioning, speed (each 1-10).
     mapping(uint256 => uint8[4]) private raceReadiness;
     mapping(uint256 => mapping(address => bool)) private hasSubmittedAnimal;
     mapping(uint256 => RaceEntry[]) private raceEntries;
@@ -426,8 +431,7 @@ contract AnimalRace {
             settledLiability += raceLiability;
         }
 
-        // Readiness decay disabled for testing:
-        // _decreaseReadinessAfterRace(raceId);
+        _decreaseReadinessAfterRace(raceId);
 
         emit RaceSettled(raceId, simSeed, r.winner);
     }
@@ -791,14 +795,26 @@ contract AnimalRace {
 
         _finalizeAnimalsFromPool(raceId, fillSeed);
 
-        // Snapshot readiness for each lane at finalization time.
+        // Snapshot effective readiness for each lane at finalization time.
         RaceAnimals storage raSnapshot = raceAnimals[raceId];
         for (uint8 lane = 0; lane < ANIMAL_COUNT; lane++) {
-            uint8 rr = animalNft.readinessOf(raSnapshot.tokenIds[lane]);
+            (uint8 r0, uint8 c0, uint8 s0) = animalNft.statsOf(raSnapshot.tokenIds[lane]);
             // Defensive clamps (AnimalNFT should already return 1..10).
-            if (rr == 0) rr = 10;
-            if (rr > 10) rr = 10;
+            if (r0 == 0) r0 = 10;
+            if (r0 > 10) r0 = 10;
+            if (r0 < 1) r0 = 1;
+            if (c0 == 0) c0 = 10;
+            if (c0 > 10) c0 = 10;
+            if (c0 < 1) c0 = 1;
+            if (s0 == 0) s0 = 10;
+            if (s0 > 10) s0 = 10;
+            if (s0 < 1) s0 = 1;
+
+            // Equally-weighted average of the 3 stats, rounded to nearest integer.
+            uint16 sum = uint16(r0) + uint16(c0) + uint16(s0); // 3..30
+            uint8 rr = uint8((uint256(sum) + 1) / 3);
             if (rr < 1) rr = 1;
+            if (rr > 10) rr = 10;
             raceReadiness[raceId][lane] = rr;
         }
 
