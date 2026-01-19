@@ -160,14 +160,24 @@ function applyPaletteFromSeed(svg, seed) {
   const body = hslToHex(hue, saturation, lightness);
   const face = hslToHex(hue, clampInt(saturation - 10, 0, 100), clampInt(lightness + 18, 0, 100));
 
-  // Spots: same hue, more saturated, darker (matches TS).
+  // Spots: option B (matches TS)
+  // - 85%: analogous hue shift (±25°)
+  // - 15%: contrasting hue shift (+120..+180°)
+  const modePick = Number(dice.roll(100n)); // 0..99
+  const spotsHue =
+    modePick < 85 ? modHue(hue + (Number(dice.roll(51n)) - 25)) : modHue(hue + 120 + Number(dice.roll(61n)));
+
   const spotsSatBump = 5 + Number(dice.roll(11n)); // +5..+15
   const spotsDarken = 10 + Number(dice.roll(9n)); // -10..-18
-  const spots = hslToHex(hue, clampInt(saturation + spotsSatBump, 0, 100), clampInt(lightness - spotsDarken, 0, 100));
+  const spots = hslToHex(
+    spotsHue,
+    clampInt(saturation + spotsSatBump - (modePick < 85 ? 0 : 12), 0, 100),
+    clampInt(lightness - spotsDarken, 0, 100),
+  );
 
   const accentDark = hslToHex(
-    hue,
-    clampInt(saturation + Math.max(0, spotsSatBump - 5), 0, 100),
+    spotsHue,
+    clampInt(saturation + Math.max(0, spotsSatBump - 5) - (modePick < 85 ? 0 : 12), 0, 100),
     clampInt(lightness - (spotsDarken + 12), 0, 100),
   );
 
@@ -176,6 +186,11 @@ function applyPaletteFromSeed(svg, seed) {
     .replace(/#f5d76e/gi, face) // default highlight
     .replace(/#c4923a/gi, spots) // default spots / accents
     .replace(/#8b6914/gi, accentDark); // neck accent rounded-rects + other dark accents
+}
+
+function modHue(h) {
+  const x = h % 360;
+  return x < 0 ? x + 360 : x;
 }
 
 function clampInt(n, min, max) {

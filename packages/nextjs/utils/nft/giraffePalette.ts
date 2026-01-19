@@ -66,22 +66,34 @@ export function giraffePaletteFromSeed(seed: Hex): GiraffePalette {
   });
 
   // Spots should contrast body but still feel "related":
-  // - same hue
+  // - mostly analogous hue shift (small offset)
+  // - occasionally a stronger contrasting hue shift
   // - a bit more saturated
   // - noticeably darker
+  //
+  // Option B: weighted mode
+  // - 85%: analogous (±25°)
+  // - 15%: contrasting (+120..+180°)
+  const modePick = Number(dice.roll(100n)); // 0..99
+  const spotsHue =
+    modePick < 85
+      ? modHue(hue + (Number(dice.roll(51n)) - 25)) // -25..+25
+      : modHue(hue + 120 + Number(dice.roll(61n))); // +120..+180
+
   const spotsSatBump = 5 + Number(dice.roll(11n)); // +5..+15
   const spotsDarken = 10 + Number(dice.roll(9n)); // -10..-18
   const spots = hslToHex({
-    h: hue,
-    s: clampInt(saturation + spotsSatBump, 0, 100),
+    h: spotsHue,
+    // If we're in the contrasting mode, cap saturation a bit so it doesn't go neon.
+    s: clampInt(saturation + spotsSatBump - (modePick < 85 ? 0 : 12), 0, 100),
     l: clampInt(lightness - spotsDarken, 0, 100),
   });
 
   // Accent-dark is used by the small rounded-rect "neck accents" (and some line accents).
   // Keep it in the same hue family, but push it darker than spots for visual hierarchy.
   const accentDark = hslToHex({
-    h: hue,
-    s: clampInt(saturation + Math.max(0, spotsSatBump - 5), 0, 100),
+    h: spotsHue,
+    s: clampInt(saturation + Math.max(0, spotsSatBump - 5) - (modePick < 85 ? 0 : 12), 0, 100),
     l: clampInt(lightness - (spotsDarken + 12), 0, 100),
   });
 
@@ -98,6 +110,11 @@ type Hsl = { h: number; s: number; l: number };
 
 function clampInt(n: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, Math.round(n)));
+}
+
+function modHue(h: number): number {
+  const x = h % 360;
+  return x < 0 ? x + 360 : x;
 }
 
 function hslToHex({ h, s, l }: Hsl): string {
