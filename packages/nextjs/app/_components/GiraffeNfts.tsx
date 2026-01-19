@@ -3,14 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Address } from "@scaffold-ui/components";
 import { useAccount, usePublicClient } from "wagmi";
+import { GiraffeAnimated } from "~~/components/assets/GiraffeAnimated";
 import {
   useDeployedContractInfo,
   useScaffoldReadContract,
   useScaffoldWriteContract,
   useTargetNetwork,
 } from "~~/hooks/scaffold-eth";
-
-const LANE_EMOJI = "🦒";
 
 export const GiraffeNfts = () => {
   const { address: connectedAddress } = useAccount();
@@ -257,7 +256,15 @@ export const GiraffeNfts = () => {
                   <div key={nft.tokenId.toString()} className="rounded-xl bg-base-100 border border-base-300 px-3 py-2">
                     <div className="flex items-center justify-between gap-3">
                       <div className="font-medium">
-                        {LANE_EMOJI} {nft.name || "(unnamed)"}
+                        <span className="inline-flex items-center gap-2">
+                          <GiraffeAnimated
+                            idPrefix={`nft-${nft.tokenId.toString()}`}
+                            playbackRate={1}
+                            playing={false}
+                            sizePx={96}
+                          />
+                          <span>{nft.name || "(unnamed)"}</span>
+                        </span>
                       </div>
                       <div className="text-xs opacity-70">
                         Readiness: {nft.readiness}/10 · Conditioning: {nft.conditioning}/10 · Speed: {nft.speed}/10

@@ -15,8 +15,6 @@ import {
 import { simulateRaceFromSeed } from "~~/utils/race/simulateRace";
 
 const LANE_COUNT = 4 as const;
-const LANE_EMOJI = "🦒";
-
 // Keep in sync with `GiraffeRace.sol`
 const SUBMISSION_CLOSE_OFFSET_BLOCKS = 10n;
 const BETTING_CLOSE_OFFSET_BLOCKS = 20n;
@@ -932,7 +930,13 @@ export const RaceDashboard = () => {
                           "-"
                         ) : (
                           <>
-                            {LANE_EMOJI}{" "}
+                            <GiraffeAnimated
+                              idPrefix={`winner-${(viewingRaceId ?? 0n).toString()}-${revealedWinner}-${(parsedGiraffes?.tokenIds?.[revealedWinner] ?? 0n).toString()}`}
+                              playbackRate={1}
+                              playing={true}
+                              sizePx={48}
+                              className="inline-block align-middle"
+                            />{" "}
                             {parsedGiraffes ? (
                               <LaneName
                                 tokenId={parsedGiraffes.tokenIds[revealedWinner] ?? 0n}
@@ -1317,7 +1321,13 @@ export const RaceDashboard = () => {
                     <div className="flex justify-between">
                       <span className="opacity-70">Your bet</span>
                       <span className="font-semibold text-right">
-                        {LANE_EMOJI}{" "}
+                        <GiraffeAnimated
+                          idPrefix={`claim-${nextWinningClaim.raceId.toString()}-${nextWinningClaim.betLane}-${nextWinningClaim.betTokenId.toString()}`}
+                          playbackRate={1}
+                          playing={true}
+                          sizePx={48}
+                          className="inline-block align-middle"
+                        />{" "}
                         {nextWinningClaim.betTokenId !== 0n ? (
                           <LaneName
                             tokenId={nextWinningClaim.betTokenId}
@@ -1402,7 +1412,6 @@ export const RaceDashboard = () => {
                             </option>
                             {ownedTokenIds.map(tokenId => (
                               <option key={tokenId.toString()} value={tokenId.toString()}>
-                                {LANE_EMOJI}{" "}
                                 {(ownedTokenNameById[tokenId.toString()] || "").trim()
                                   ? ownedTokenNameById[tokenId.toString()]
                                   : isLoadingOwnedTokenNames
@@ -1440,7 +1449,13 @@ export const RaceDashboard = () => {
                         <div className="text-xs opacity-70">
                           Submitted{" "}
                           <span className="font-semibold">
-                            {LANE_EMOJI}{" "}
+                            <GiraffeAnimated
+                              idPrefix={`submitted-${(viewingRaceId ?? 0n).toString()}-${(submittedTokenId ?? 0n).toString()}`}
+                              playbackRate={1}
+                              playing={true}
+                              sizePx={40}
+                              className="inline-block align-middle"
+                            />{" "}
                             {(ownedTokenNameById[submittedTokenId?.toString() ?? ""] || "").trim()
                               ? ownedTokenNameById[submittedTokenId?.toString() ?? ""]
                               : `Token #${submittedTokenId?.toString()}`}
@@ -1488,7 +1503,12 @@ export const RaceDashboard = () => {
                               type="button"
                             >
                               <span className="flex items-center gap-2">
-                                <span>{LANE_EMOJI}</span>
+                                <GiraffeAnimated
+                                  idPrefix={`bet-${(viewingRaceId ?? 0n).toString()}-${lane}-${laneTokenIds[lane].toString()}`}
+                                  playbackRate={1}
+                                  playing={false}
+                                  sizePx={56}
+                                />
                                 {lineupFinalized &&
                                 parsedGiraffes?.tokenIds?.[lane] &&
                                 parsedGiraffes.tokenIds[lane] !== 0n ? (
