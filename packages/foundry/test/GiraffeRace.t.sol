@@ -15,13 +15,13 @@ contract GiraffeRaceTest is Test {
     using stdJson for string;
 
     GiraffeRace public race;
-    GiraffeNFT public animalNft;
+    GiraffeNFT public giraffeNft;
     address public owner = address(0xBEEF);
     address public alice = address(0xA11CE);
     address public bob = address(0xB0B);
     uint256[4] internal houseTokenIds;
 
-    uint256 internal constant ANIMAL_COUNT = 4;
+    uint256 internal constant LANE_COUNT = 4;
     uint256 internal constant TRACK_LENGTH = 1000;
     uint256 internal constant MAX_TICKS = 500;
     uint256 internal constant SPEED_RANGE = 10;
@@ -32,15 +32,15 @@ contract GiraffeRaceTest is Test {
     string internal constant STATS_DIR = "./tmp/win-stats";
 
     function setUp() public {
-        animalNft = new GiraffeNFT();
+        giraffeNft = new GiraffeNFT();
         for (uint256 i = 0; i < 4; i++) {
-            houseTokenIds[i] = animalNft.mint(owner, string(abi.encodePacked("house-", vm.toString(i))));
+            houseTokenIds[i] = giraffeNft.mint(owner, string(abi.encodePacked("house-", vm.toString(i))));
         }
 
         WinProbTable table = new WinProbTable();
         GiraffeRaceSimulator simulator = new GiraffeRaceSimulator();
-        race = new GiraffeRace(address(animalNft), owner, houseTokenIds, address(table), address(simulator));
-        animalNft.setRaceContract(address(race));
+        race = new GiraffeRace(address(giraffeNft), owner, houseTokenIds, address(table), address(simulator));
+        giraffeNft.setRaceContract(address(race));
         vm.deal(alice, 10 ether);
         vm.deal(bob, 10 ether);
         vm.deal(owner, 200 ether);
@@ -56,7 +56,7 @@ contract GiraffeRaceTest is Test {
         vm.roll(uint256(submissionCloseBlock - 1));
         vm.setBlockhash(uint256(submissionCloseBlock - 1), forcedLineupBh);
         vm.roll(uint256(submissionCloseBlock));
-        race.finalizeRaceAnimals();
+        race.finalizeRaceGiraffes();
         raceId; // silence unused warning (odds auto-set during finalization)
     }
 
@@ -73,13 +73,13 @@ contract GiraffeRaceTest is Test {
         vm.roll(uint256(submissionCloseBlock - 1));
         vm.setBlockhash(uint256(submissionCloseBlock - 1), forcedLineupBh);
         vm.roll(uint256(submissionCloseBlock));
-        race.finalizeRaceAnimals();
+        race.finalizeRaceGiraffes();
 
         // Snapshot should show "fresh" readiness.
         uint8[4] memory snap = race.getRaceReadinessById(raceId);
         for (uint256 i = 0; i < 4; i++) {
             assertEq(uint256(snap[i]), 10);
-            assertEq(uint256(animalNft.readinessOf(houseTokenIds[i])), 10);
+            assertEq(uint256(giraffeNft.readinessOf(houseTokenIds[i])), 10);
         }
 
         // Settlement entropy uses blockhash(closeBlock).
@@ -91,7 +91,7 @@ contract GiraffeRaceTest is Test {
 
         // After settling, every participant's readiness should decrease by 1.
         for (uint256 i = 0; i < 4; i++) {
-            assertEq(uint256(animalNft.readinessOf(houseTokenIds[i])), 9);
+            assertEq(uint256(giraffeNft.readinessOf(houseTokenIds[i])), 9);
         }
     }
 
@@ -114,11 +114,11 @@ contract GiraffeRaceTest is Test {
         // Directly exercise the floor behavior via the authorized race address.
         vm.startPrank(address(race));
         for (uint256 i = 0; i < 20; i++) {
-            animalNft.decreaseReadiness(houseTokenIds[0]);
+            giraffeNft.decreaseReadiness(houseTokenIds[0]);
         }
         vm.stopPrank();
 
-        assertEq(uint256(animalNft.readinessOf(houseTokenIds[0])), 1);
+        assertEq(uint256(giraffeNft.readinessOf(houseTokenIds[0])), 1);
     }
 
     function _expectedWinner(bytes32 seed) internal pure returns (uint8) {
@@ -127,7 +127,7 @@ contract GiraffeRaceTest is Test {
         uint16[4] memory distances;
         bool finished = false;
         for (uint256 t = 0; t < MAX_TICKS; t++) {
-            for (uint256 a = 0; a < ANIMAL_COUNT; a++) {
+            for (uint256 a = 0; a < LANE_COUNT; a++) {
                 uint256 r;
                 DeterministicDice.Dice memory updatedDice1;
                 (r, updatedDice1) = dice.roll(SPEED_RANGE);
@@ -168,11 +168,11 @@ contract GiraffeRaceTest is Test {
         return leaders[uint8(pick)];
     }
 
-    function _placeBet(address bettor, uint256 raceId, uint8 animal, uint256 value) internal {
+    function _placeBet(address bettor, uint256 raceId, uint8 giraffe, uint256 value) internal {
         // raceId arg kept only for call sites; contract uses the current race internally.
         raceId; // silence unused warning
         vm.prank(bettor);
-        race.placeBet{value: value}(animal);
+        race.placeBet{value: value}(giraffe);
     }
 
     function testSettleIsDeterministicFromSeed() public {
@@ -228,7 +228,7 @@ contract GiraffeRaceTest is Test {
         bytes32 forcedLineupBh = keccak256("forced lineup blockhash 3");
         _finalize(raceId, closeBlock, forcedLineupBh);
 
-        // Alice and Bob both bet on animal 0, different amounts
+        // Alice and Bob both bet on giraffe 0, different amounts
         _placeBet(alice, raceId, 0, 1 ether);
         _placeBet(bob, raceId, 0, 3 ether);
 
@@ -292,12 +292,12 @@ contract GiraffeRaceTest is Test {
         uint64 submissionCloseBlock = closeBlock - 10;
 
         vm.prank(alice);
-        uint256 aliceTokenId = animalNft.mint(alice, "alice");
+        uint256 aliceTokenId = giraffeNft.mint(alice, "alice");
 
         vm.roll(uint256(submissionCloseBlock));
         vm.prank(alice);
         vm.expectRevert(GiraffeRace.SubmissionsClosed.selector);
-        race.submitAnimal(aliceTokenId);
+        race.submitGiraffe(aliceTokenId);
     }
 
     function testCannotBetBeforeSubmissionsClose() public {
@@ -339,15 +339,15 @@ contract GiraffeRaceTest is Test {
         for (uint256 i = 0; i < 50; i++) {
             address entrant = address(uint160(0x1000 + i));
             vm.prank(entrant);
-            uint256 tokenId = animalNft.mint(entrant, string(abi.encodePacked("entrant-", vm.toString(i))));
+            uint256 tokenId = giraffeNft.mint(entrant, string(abi.encodePacked("entrant-", vm.toString(i))));
 
             vm.prank(entrant);
-            race.submitAnimal(tokenId);
+            race.submitGiraffe(tokenId);
         }
 
         // Betting opens after submissions close, so finalize at submissionCloseBlock.
         vm.roll(uint256(submissionCloseBlock));
-        race.finalizeRaceAnimals();
+        race.finalizeRaceGiraffes();
 
         // Settlement entropy uses blockhash(closeBlock).
         bytes32 forcedBh = keccak256("forced settle blockhash 50 entrants");
@@ -392,9 +392,9 @@ contract GiraffeRaceTest is Test {
             vm.roll(uint256(submissionCloseBlock - 1));
             vm.setBlockhash(uint256(submissionCloseBlock - 1), forcedLineupBh);
             vm.roll(uint256(submissionCloseBlock));
-            race.finalizeRaceAnimals();
+            race.finalizeRaceGiraffes();
 
-            (, uint256[4] memory tokenIds,) = race.getRaceAnimals();
+            (, uint256[4] memory tokenIds,) = race.getRaceGiraffes();
 
             // Settlement entropy uses blockhash(closeBlock).
             bytes32 forcedBh = keccak256(abi.encodePacked("settle", globalI));
@@ -513,7 +513,7 @@ contract GiraffeRaceTest is Test {
 
         for (uint256 t = 0; t < 4; t++) {
             uint256 tokenId = houseTokenIds[t];
-            string memory name = animalNft.nameOf(tokenId);
+            string memory name = giraffeNft.nameOf(tokenId);
             uint256 wins = tokenWinsAgg[t];
             console2.log("House tokenId", tokenId, "wins", wins);
             console2.log("  bps", _bps(wins, totalRaces));

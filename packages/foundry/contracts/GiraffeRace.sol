@@ -16,7 +16,7 @@ interface IGiraffeNFT is IERC721 {
 
 /**
  * @title GiraffeRace
- * @notice Simple on-chain betting game: 4 identical animals, winner picked deterministically from a seed.
+ * @notice Simple on-chain betting game: 4 identical giraffes, winner picked deterministically from a seed.
  * @dev v1: single bet per address per race, parimutuel payout (winners split the pot pro-rata).
  *
  * Seed (v1) is derived from a future blockhash:
@@ -28,7 +28,7 @@ interface IGiraffeNFT is IERC721 {
 contract GiraffeRace {
     using DeterministicDice for DeterministicDice.Dice;
 
-    uint8 public constant ANIMAL_COUNT = 4;
+    uint8 public constant LANE_COUNT = 4;
     // Fixed-odds params (v3):
     // - decimal odds are stored in basis points (1e4). Example: 3.80x => 38000.
     // - house edge is enforced by requiring an overround >= 1/(1-edge).
@@ -58,18 +58,18 @@ contract GiraffeRace {
         // Betting close block (formerly "closeBlock" in v1).
         uint64 closeBlock;
         // Lane lineup finalized from entrant pool + house fill.
-        bool animalsFinalized;
+        bool giraffesFinalized;
         // Fixed odds quoted for lanes (locked once set; required before betting).
         bool oddsSet;
         bool settled;
         uint8 winner; // 0-3, valid only if settled
         bytes32 seed; // stored on settlement for later verification
         uint256 totalPot;
-        uint256[4] totalOnAnimal;
+        uint256[4] totalOnLane;
         uint32[4] decimalOddsBps; // per lane, scaled by ODDS_SCALE
     }
 
-    struct RaceAnimals {
+    struct RaceGiraffes {
         // Number of lanes that have been assigned tokenIds (selected entrants + house fill).
         uint8 assignedCount;
         // Token ID for each lane (0..3). 0 means unassigned (valid tokenIds start at 1 in our GiraffeNFT).
@@ -85,7 +85,7 @@ contract GiraffeRace {
 
     struct Bet {
         uint128 amount;
-        uint8 animal; // 0-3
+        uint8 lane; // 0-3
         bool claimed;
     }
 
@@ -93,7 +93,7 @@ contract GiraffeRace {
         bool hasClaim;
         uint256 raceId;
         uint8 status;
-        uint8 betAnimal;
+        uint8 betLane;
         uint256 betTokenId;
         uint128 betAmount;
         uint8 winner;
@@ -106,12 +106,12 @@ contract GiraffeRace {
     uint256 public settledLiability;
     mapping(uint256 => Race) private races;
     mapping(uint256 => mapping(address => Bet)) private bets;
-    mapping(uint256 => RaceAnimals) private raceAnimals;
+    mapping(uint256 => RaceGiraffes) private raceGiraffes;
     // Snapshot of "effective readiness" (1-10) for each lane at lineup finalization time.
     // Effective readiness is computed as the equally-weighted average of:
     //   readiness, conditioning, speed (each 1-10).
     mapping(uint256 => uint8[4]) private raceReadiness;
-    mapping(uint256 => mapping(address => bool)) private hasSubmittedAnimal;
+    mapping(uint256 => mapping(address => bool)) private hasSubmittedGiraffe;
     mapping(uint256 => RaceEntry[]) private raceEntries;
     mapping(uint256 => mapping(uint256 => bool)) private tokenEntered;
 
@@ -120,18 +120,18 @@ contract GiraffeRace {
     // Next index in `bettorRaceIds[msg.sender]` to resolve/claim.
     mapping(address => uint256) private nextClaimIndex;
 
-    // Fixed pool of house animals used to auto-fill empty lanes.
+    // Fixed pool of house giraffes used to auto-fill empty lanes.
     // These are NOT escrowed by default (no approvals required); we just reference them as house-owned racers.
-    uint256[4] public houseAnimalTokenIds;
+    uint256[4] public houseGiraffeTokenIds;
 
     event RaceCreated(uint256 indexed raceId, uint64 closeBlock);
     event RaceOddsSet(uint256 indexed raceId, uint32 odds0Bps, uint32 odds1Bps, uint32 odds2Bps, uint32 odds3Bps);
-    event BetPlaced(uint256 indexed raceId, address indexed bettor, uint8 indexed animal, uint256 amount);
+    event BetPlaced(uint256 indexed raceId, address indexed bettor, uint8 indexed lane, uint256 amount);
     event RaceSettled(uint256 indexed raceId, bytes32 seed, uint8 winner);
     event Claimed(uint256 indexed raceId, address indexed bettor, uint256 payout);
-    event AnimalSubmitted(uint256 indexed raceId, address indexed owner, uint256 indexed tokenId, uint8 lane);
-    event AnimalAssigned(uint256 indexed raceId, uint256 indexed tokenId, address indexed originalOwner, uint8 lane);
-    event HouseAnimalAssigned(uint256 indexed raceId, uint256 indexed tokenId, uint8 lane);
+    event GiraffeSubmitted(uint256 indexed raceId, address indexed owner, uint256 indexed tokenId, uint8 lane);
+    event GiraffeAssigned(uint256 indexed raceId, uint256 indexed tokenId, address indexed originalOwner, uint8 lane);
+    event HouseGiraffeAssigned(uint256 indexed raceId, uint256 indexed tokenId, uint8 lane);
 
     error InvalidRace();
     error NoClaimableBets();
@@ -139,7 +139,7 @@ contract GiraffeRace {
     error BettingNotOpen();
     error SubmissionsClosed();
     error AlreadyBet();
-    error InvalidAnimal();
+    error InvalidLane();
     error ZeroBet();
     error AlreadySettled();
     error NotSettled();
@@ -149,12 +149,12 @@ contract GiraffeRace {
     error AlreadyClaimed();
     error TransferFailed();
     error AlreadySubmitted();
-    error InvalidHouseAnimal();
-    error AnimalNotAssigned();
+    error InvalidHouseGiraffe();
+    error GiraffeNotAssigned();
     error NotTokenOwner();
     error TokenAlreadyEntered();
     error EntryPoolFull();
-    error AnimalsAlreadyFinalized();
+    error GiraffesAlreadyFinalized();
     error PreviousRaceNotSettled();
     error NotHouse();
     error OddsNotSet();
@@ -172,7 +172,7 @@ contract GiraffeRace {
     constructor(
         address _giraffeNft,
         address _house,
-        uint256[ANIMAL_COUNT] memory _houseAnimalTokenIds,
+        uint256[LANE_COUNT] memory _houseGiraffeTokenIds,
         address _winProbTable,
         address _simulator
     ) {
@@ -180,16 +180,16 @@ contract GiraffeRace {
         house = _house;
         winProbTable = WinProbTable(_winProbTable);
         simulator = GiraffeRaceSimulator(_simulator);
-        houseAnimalTokenIds = _houseAnimalTokenIds;
+        houseGiraffeTokenIds = _houseGiraffeTokenIds;
 
         // Basic sanity: prevent accidental all-zeros configuration.
-        for (uint256 i = 0; i < ANIMAL_COUNT; i++) {
-            if (_houseAnimalTokenIds[i] == 0) revert InvalidHouseAnimal();
+        for (uint256 i = 0; i < LANE_COUNT; i++) {
+            if (_houseGiraffeTokenIds[i] == 0) revert InvalidHouseGiraffe();
         }
     }
 
-    function animalCount() external pure returns (uint8) {
-        return ANIMAL_COUNT;
+    function laneCount() external pure returns (uint8) {
+        return LANE_COUNT;
     }
 
     function tickCount() external pure returns (uint16) {
@@ -208,20 +208,20 @@ contract GiraffeRace {
     /**
      * @notice Deterministically simulate a race from a seed.
      * @dev Pure function so it can be re-run off-chain for verification / animation.
-     * @return winner The winning animal index (0-3)
+     * @return winner The winning lane index (0-3)
      * @return distances Final distances after all ticks (units are arbitrary)
      */
-    function simulate(bytes32 seed) external view returns (uint8 winner, uint16[ANIMAL_COUNT] memory distances) {
+    function simulate(bytes32 seed) external view returns (uint8 winner, uint16[LANE_COUNT] memory distances) {
         // Backwards compatible: default "fresh" readiness.
         return simulator.simulate(seed);
     }
 
     /// @notice Deterministically simulate a race from a seed + lane readiness snapshot.
     /// @dev Matches settlement behavior after readiness was introduced.
-    function simulateWithReadiness(bytes32 seed, uint8[ANIMAL_COUNT] calldata readiness)
+    function simulateWithReadiness(bytes32 seed, uint8[LANE_COUNT] calldata readiness)
         external
         view
-        returns (uint8 winner, uint16[ANIMAL_COUNT] memory distances)
+        returns (uint8 winner, uint16[LANE_COUNT] memory distances)
     {
         return simulator.simulateWithReadiness(seed, readiness);
     }
@@ -259,8 +259,8 @@ contract GiraffeRace {
         emit RaceCreated(raceId, closeBlock);
     }
 
-    function placeBet(uint8 animal) external payable {
-        if (animal >= ANIMAL_COUNT) revert InvalidAnimal();
+    function placeBet(uint8 lane) external payable {
+        if (lane >= LANE_COUNT) revert InvalidLane();
 
         uint256 raceId = _activeRaceId();
         Race storage r = races[raceId];
@@ -270,7 +270,7 @@ contract GiraffeRace {
         if (msg.value == 0) revert ZeroBet();
 
         // Ensure the lane lineup is finalized before accepting bets (so bettors can see who is racing).
-        _ensureAnimalsFinalized(raceId);
+        _ensureGiraffesFinalized(raceId);
         if (!r.oddsSet) revert OddsNotSet();
 
         Bet storage b = bets[raceId][msg.sender];
@@ -278,10 +278,10 @@ contract GiraffeRace {
 
         // Risk control (fixed odds): ensure the contract can cover worst-case payout for this race,
         // while also reserving funds for already-settled liabilities.
-        uint256[4] memory projectedTotals = r.totalOnAnimal;
-        projectedTotals[animal] += msg.value;
+        uint256[4] memory projectedTotals = r.totalOnLane;
+        projectedTotals[lane] += msg.value;
         uint256 maxPayout;
-        for (uint8 i = 0; i < ANIMAL_COUNT; i++) {
+        for (uint8 i = 0; i < LANE_COUNT; i++) {
             uint256 payoutIfWin = (projectedTotals[i] * uint256(r.decimalOddsBps[i])) / ODDS_SCALE;
             if (payoutIfWin > maxPayout) maxPayout = payoutIfWin;
         }
@@ -289,13 +289,13 @@ contract GiraffeRace {
         if (address(this).balance < settledLiability + maxPayout) revert InsufficientBankroll();
 
         b.amount = uint128(msg.value);
-        b.animal = animal;
+        b.lane = lane;
 
         r.totalPot += msg.value;
-        r.totalOnAnimal[animal] += msg.value;
+        r.totalOnLane[lane] += msg.value;
 
         bettorRaceIds[msg.sender].push(raceId);
-        emit BetPlaced(raceId, msg.sender, animal, msg.value);
+        emit BetPlaced(raceId, msg.sender, lane, msg.value);
     }
 
     /**
@@ -311,7 +311,7 @@ contract GiraffeRace {
         Race storage r = races[raceId];
         if (r.closeBlock == 0) revert InvalidRace();
         if (r.settled) revert AlreadySettled();
-        if (!r.animalsFinalized) revert RaceNotReady();
+        if (!r.giraffesFinalized) revert RaceNotReady();
         if (r.oddsSet) revert OddsAlreadySet();
 
         // Must be within the betting window (submissions closed, betting not closed).
@@ -320,7 +320,7 @@ contract GiraffeRace {
         if (block.number >= r.closeBlock) revert BettingClosed();
 
         uint256 invSumBps = 0;
-        for (uint8 i = 0; i < ANIMAL_COUNT; i++) {
+        for (uint8 i = 0; i < LANE_COUNT; i++) {
             uint32 o = decimalOddsBps[i];
             if (o < MIN_DECIMAL_ODDS_BPS) revert InvalidOdds();
             // inv in bps of 1.0: (ODDS_SCALE / (o/ODDS_SCALE)) = ODDS_SCALE^2 / o
@@ -339,14 +339,14 @@ contract GiraffeRace {
     }
 
     /**
-     * @notice Submit one of your AnimalNFTs into the race's entrant pool (non-custodial).
+     * @notice Submit one of your GiraffeNFTs into the race's entrant pool (non-custodial).
      * @dev If <= 4 total entrants submit, all valid entrants race.
      *      If > 4 submit, we deterministically draw 4 valid entrants at settlement.
      *
      *      "Valid" at settlement time means the current owner still matches the original submitter.
      *      If an entrant becomes invalid (transferred away), they're treated as a no-show.
      */
-    function submitAnimal(uint256 tokenId) external {
+    function submitGiraffe(uint256 tokenId) external {
         // Races must be explicitly created by calling `createRace()`.
         if (nextRaceId == 0) revert InvalidRace();
         if (races[nextRaceId - 1].settled) revert InvalidRace();
@@ -357,22 +357,22 @@ contract GiraffeRace {
         if (block.number >= _submissionCloseBlock(r.closeBlock)) revert SubmissionsClosed();
         if (r.settled) revert AlreadySettled();
 
-        if (hasSubmittedAnimal[raceId][msg.sender]) revert AlreadySubmitted();
+        if (hasSubmittedGiraffe[raceId][msg.sender]) revert AlreadySubmitted();
         if (giraffeNft.ownerOf(tokenId) != msg.sender) revert NotTokenOwner();
-        // Prevent users from submitting one of the reserved house animals.
-        for (uint256 i = 0; i < ANIMAL_COUNT; i++) {
-            if (houseAnimalTokenIds[i] == tokenId) revert InvalidHouseAnimal();
+        // Prevent users from submitting one of the reserved house giraffes.
+        for (uint256 i = 0; i < LANE_COUNT; i++) {
+            if (houseGiraffeTokenIds[i] == tokenId) revert InvalidHouseGiraffe();
         }
         if (tokenEntered[raceId][tokenId]) revert TokenAlreadyEntered();
         if (raceEntries[raceId].length >= MAX_ENTRIES_PER_RACE) revert EntryPoolFull();
 
         // Mark submission before external call; tx reverts if transfer fails.
-        hasSubmittedAnimal[raceId][msg.sender] = true;
+        hasSubmittedGiraffe[raceId][msg.sender] = true;
         tokenEntered[raceId][tokenId] = true;
         raceEntries[raceId].push(RaceEntry({ tokenId: tokenId, submitter: msg.sender }));
 
         // Lane isn't determined until settlement; emit 255 to mean "pool entry".
-        emit AnimalSubmitted(raceId, msg.sender, tokenId, type(uint8).max);
+        emit GiraffeSubmitted(raceId, msg.sender, tokenId, type(uint8).max);
     }
 
     /**
@@ -383,16 +383,16 @@ contract GiraffeRace {
      *      Entropy uses `blockhash(submissionCloseBlock - 1)` so it's available starting at
      *      `submissionCloseBlock` (the first block where submissions are closed).
      */
-    function finalizeRaceAnimals() external {
+    function finalizeRaceGiraffes() external {
         uint256 raceId = _activeRaceId();
         Race storage r = races[raceId];
         if (r.settled) revert AlreadySettled();
-        if (r.animalsFinalized) revert AnimalsAlreadyFinalized();
+        if (r.giraffesFinalized) revert GiraffesAlreadyFinalized();
 
         uint64 submissionCloseBlock = _submissionCloseBlock(r.closeBlock);
         if (block.number < submissionCloseBlock) revert BettingNotOpen();
 
-        _finalizeAnimals(raceId);
+        _finalizeGiraffes(raceId);
     }
 
     function settleRace() external {
@@ -417,7 +417,7 @@ contract GiraffeRace {
 
         // Make sure lineup is finalized (it should have been finalized during betting window,
         // but keep settlement robust).
-        _ensureAnimalsFinalized(raceId);
+        _ensureGiraffesFinalized(raceId);
         uint8 w = simulator.winnerWithReadiness(simSeed, raceReadiness[raceId]);
 
         r.settled = true;
@@ -427,7 +427,7 @@ contract GiraffeRace {
 
         // Record the total liability for this race (winners will claim fixed payouts).
         if (r.totalPot != 0) {
-            uint256 raceLiability = (r.totalOnAnimal[w] * uint256(r.decimalOddsBps[w])) / ODDS_SCALE;
+            uint256 raceLiability = (r.totalOnLane[w] * uint256(r.decimalOddsBps[w])) / ODDS_SCALE;
             settledLiability += raceLiability;
         }
 
@@ -463,12 +463,12 @@ contract GiraffeRace {
             nextClaimIndex[msg.sender] = idx + 1;
 
             // Losers resolve to 0 to allow advancing through history.
-            if (b.animal != r.winner) {
+            if (b.lane != r.winner) {
                 emit Claimed(raceId, msg.sender, 0);
                 return 0;
             }
 
-            payout = (uint256(b.amount) * uint256(r.decimalOddsBps[b.animal])) / ODDS_SCALE;
+            payout = (uint256(b.amount) * uint256(r.decimalOddsBps[b.lane])) / ODDS_SCALE;
             if (payout != 0) {
                 settledLiability -= payout;
             }
@@ -513,7 +513,7 @@ contract GiraffeRace {
             }
 
             // Resolve losses silently (advance the queue without "claiming" money).
-            if (b.animal != r.winner) {
+            if (b.lane != r.winner) {
                 b.claimed = true;
                 idx++;
                 nextClaimIndex[msg.sender] = idx;
@@ -524,7 +524,7 @@ contract GiraffeRace {
             b.claimed = true;
             nextClaimIndex[msg.sender] = idx + 1;
 
-            payout = (uint256(b.amount) * uint256(r.decimalOddsBps[b.animal])) / ODDS_SCALE;
+            payout = (uint256(b.amount) * uint256(r.decimalOddsBps[b.lane])) / ODDS_SCALE;
             if (payout != 0) {
                 settledLiability -= payout;
             }
@@ -553,12 +553,12 @@ contract GiraffeRace {
             uint8 winner,
             bytes32 seed,
             uint256 totalPot,
-            uint256[4] memory totalOnAnimal
+            uint256[4] memory totalOnLane
         )
     {
         uint256 raceId = latestRaceId();
         Race storage r = races[raceId];
-        return (r.closeBlock, r.settled, r.winner, r.seed, r.totalPot, r.totalOnAnimal);
+        return (r.closeBlock, r.settled, r.winner, r.seed, r.totalPot, r.totalOnLane);
     }
 
     /// @notice Read a specific race by id (UI helper for browsing history / replay).
@@ -571,11 +571,11 @@ contract GiraffeRace {
             uint8 winner,
             bytes32 seed,
             uint256 totalPot,
-            uint256[4] memory totalOnAnimal
+            uint256[4] memory totalOnLane
         )
     {
         Race storage r = races[raceId];
-        return (r.closeBlock, r.settled, r.winner, r.seed, r.totalPot, r.totalOnAnimal);
+        return (r.closeBlock, r.settled, r.winner, r.seed, r.totalPot, r.totalOnLane);
     }
 
     function getRaceOddsById(uint256 raceId) external view returns (bool oddsSet, uint32[4] memory decimalOddsBps) {
@@ -583,19 +583,19 @@ contract GiraffeRace {
         return (r.oddsSet, r.decimalOddsBps);
     }
 
-    function getBet(address bettor) external view returns (uint128 amount, uint8 animal, bool claimed) {
+    function getBet(address bettor) external view returns (uint128 amount, uint8 lane, bool claimed) {
         uint256 raceId = latestRaceId();
         Bet storage b = bets[raceId][bettor];
-        return (b.amount, b.animal, b.claimed);
+        return (b.amount, b.lane, b.claimed);
     }
 
     /// @notice Read the bet for a specific race id (UI helper for browsing history).
-    function getBetById(uint256 raceId, address bettor) external view returns (uint128 amount, uint8 animal, bool claimed) {
+    function getBetById(uint256 raceId, address bettor) external view returns (uint128 amount, uint8 lane, bool claimed) {
         Bet storage b = bets[raceId][bettor];
-        return (b.amount, b.animal, b.claimed);
+        return (b.amount, b.lane, b.claimed);
     }
 
-    function getRaceAnimals()
+    function getRaceGiraffes()
         external
         view
         returns (
@@ -606,12 +606,12 @@ contract GiraffeRace {
     {
         uint256 raceId = latestRaceId();
 
-        RaceAnimals storage ra = raceAnimals[raceId];
+        RaceGiraffes storage ra = raceGiraffes[raceId];
         return (ra.assignedCount, ra.tokenIds, ra.originalOwners);
     }
 
     /// @notice Read lane assignments for a specific race id (UI helper for browsing history / replay).
-    function getRaceAnimalsById(uint256 raceId)
+    function getRaceGiraffesById(uint256 raceId)
         external
         view
         returns (
@@ -620,7 +620,7 @@ contract GiraffeRace {
             address[4] memory originalOwners
         )
     {
-        RaceAnimals storage ra = raceAnimals[raceId];
+        RaceGiraffes storage ra = raceGiraffes[raceId];
         return (ra.assignedCount, ra.tokenIds, ra.originalOwners);
     }
 
@@ -656,7 +656,7 @@ contract GiraffeRace {
 
             Race storage r = races[rid];
             if (!r.settled) continue;
-            if (b.animal != r.winner) continue;
+            if (b.lane != r.winner) continue;
 
             remaining++;
         }
@@ -675,15 +675,15 @@ contract GiraffeRace {
 
             Race storage r = races[rid];
             if (!r.settled) continue;
-            if (b.animal != r.winner) continue;
+            if (b.lane != r.winner) continue;
 
-            uint256 p = (uint256(b.amount) * uint256(r.decimalOddsBps[b.animal])) / ODDS_SCALE;
+            uint256 p = (uint256(b.amount) * uint256(r.decimalOddsBps[b.lane])) / ODDS_SCALE;
 
             out.hasClaim = true;
             out.raceId = rid;
             out.status = 3;
-            out.betAnimal = b.animal;
-            out.betTokenId = raceAnimals[rid].tokenIds[b.animal];
+            out.betLane = b.lane;
+            out.betTokenId = raceGiraffes[rid].tokenIds[b.lane];
             out.betAmount = b.amount;
             out.winner = r.winner;
             out.payout = p;
@@ -728,8 +728,8 @@ contract GiraffeRace {
                 out.hasClaim = true;
                 out.raceId = rid;
                 out.status = s;
-                out.betAnimal = b.animal;
-                out.betTokenId = raceAnimals[rid].tokenIds[b.animal];
+                out.betLane = b.lane;
+                out.betTokenId = raceGiraffes[rid].tokenIds[b.lane];
                 out.betAmount = b.amount;
                 out.winner = 0;
                 out.payout = 0;
@@ -738,12 +738,12 @@ contract GiraffeRace {
             }
 
             uint8 w = r.winner;
-            if (b.animal != w) {
+            if (b.lane != w) {
                 out.hasClaim = true;
                 out.raceId = rid;
                 out.status = 2;
-                out.betAnimal = b.animal;
-                out.betTokenId = raceAnimals[rid].tokenIds[b.animal];
+                out.betLane = b.lane;
+                out.betTokenId = raceGiraffes[rid].tokenIds[b.lane];
                 out.betAmount = b.amount;
                 out.winner = w;
                 out.payout = 0;
@@ -751,12 +751,12 @@ contract GiraffeRace {
                 return out;
             }
 
-            uint256 p = (uint256(b.amount) * uint256(r.decimalOddsBps[b.animal])) / ODDS_SCALE;
+            uint256 p = (uint256(b.amount) * uint256(r.decimalOddsBps[b.lane])) / ODDS_SCALE;
             out.hasClaim = true;
             out.raceId = rid;
             out.status = 3;
-            out.betAnimal = b.animal;
-            out.betTokenId = raceAnimals[rid].tokenIds[b.animal];
+            out.betLane = b.lane;
+            out.betTokenId = raceGiraffes[rid].tokenIds[b.lane];
             out.betAmount = b.amount;
             out.winner = w;
             out.payout = p;
@@ -772,17 +772,17 @@ contract GiraffeRace {
         return bettingCloseBlock - SUBMISSION_CLOSE_OFFSET_BLOCKS;
     }
 
-    function _ensureAnimalsFinalized(uint256 raceId) internal {
+    function _ensureGiraffesFinalized(uint256 raceId) internal {
         Race storage r = races[raceId];
-        if (r.animalsFinalized) return;
+        if (r.giraffesFinalized) return;
 
         uint64 submissionCloseBlock = _submissionCloseBlock(r.closeBlock);
         if (block.number < submissionCloseBlock) revert BettingNotOpen();
 
-        _finalizeAnimals(raceId);
+        _finalizeGiraffes(raceId);
     }
 
-    function _finalizeAnimals(uint256 raceId) internal {
+    function _finalizeGiraffes(uint256 raceId) internal {
         Race storage r = races[raceId];
         uint64 submissionCloseBlock = _submissionCloseBlock(r.closeBlock);
 
@@ -793,11 +793,11 @@ contract GiraffeRace {
         bytes32 baseSeed = keccak256(abi.encodePacked(bh, raceId, address(this)));
         bytes32 fillSeed = keccak256(abi.encodePacked(baseSeed, "HOUSE_FILL"));
 
-        _finalizeAnimalsFromPool(raceId, fillSeed);
+        _finalizeGiraffesFromPool(raceId, fillSeed);
 
         // Snapshot effective readiness for each lane at finalization time.
-        RaceAnimals storage raSnapshot = raceAnimals[raceId];
-        for (uint8 lane = 0; lane < ANIMAL_COUNT; lane++) {
+        RaceGiraffes storage raSnapshot = raceGiraffes[raceId];
+        for (uint8 lane = 0; lane < LANE_COUNT; lane++) {
             (uint8 r0, uint8 c0, uint8 s0) = giraffeNft.statsOf(raSnapshot.tokenIds[lane]);
             // Defensive clamps (GiraffeNFT should already return 1..10).
             if (r0 == 0) r0 = 10;
@@ -820,11 +820,11 @@ contract GiraffeRace {
 
         // Auto-quote fixed odds from the readiness snapshot (lookup table), so no extra tx is required.
         _autoSetOddsFromReadiness(raceId);
-        r.animalsFinalized = true;
+        r.giraffesFinalized = true;
 
-        RaceAnimals storage ra = raceAnimals[raceId];
-        for (uint8 lane = 0; lane < ANIMAL_COUNT; lane++) {
-            emit AnimalAssigned(raceId, ra.tokenIds[lane], ra.originalOwners[lane], lane);
+        RaceGiraffes storage ra = raceGiraffes[raceId];
+        for (uint8 lane = 0; lane < LANE_COUNT; lane++) {
+            emit GiraffeAssigned(raceId, ra.tokenIds[lane], ra.originalOwners[lane], lane);
         }
     }
 
@@ -836,8 +836,8 @@ contract GiraffeRace {
         uint8[4] memory laneIdx = [uint8(0), 1, 2, 3];
 
         // Sort readiness ascending (and keep lane indices aligned). Small fixed-size sort.
-        for (uint8 i = 0; i < ANIMAL_COUNT; i++) {
-            for (uint8 j = i + 1; j < ANIMAL_COUNT; j++) {
+        for (uint8 i = 0; i < LANE_COUNT; i++) {
+            for (uint8 j = i + 1; j < LANE_COUNT; j++) {
                 if (rr[j] < rr[i]) {
                     (rr[i], rr[j]) = (rr[j], rr[i]);
                     (laneIdx[i], laneIdx[j]) = (laneIdx[j], laneIdx[i]);
@@ -852,9 +852,9 @@ contract GiraffeRace {
         // equal-readiness group to the same rounded average (guarantees identical odds for identical readiness).
         uint16[4] memory probsAdj = probsBps;
         uint8 start = 0;
-        while (start < ANIMAL_COUNT) {
+        while (start < LANE_COUNT) {
             uint8 end = start;
-            while (end + 1 < ANIMAL_COUNT && rr[end + 1] == rr[start]) {
+            while (end + 1 < LANE_COUNT && rr[end + 1] == rr[start]) {
                 end++;
             }
             uint8 len = end - start + 1;
@@ -872,7 +872,7 @@ contract GiraffeRace {
             start = end + 1;
         }
 
-        for (uint8 i = 0; i < ANIMAL_COUNT; i++) {
+        for (uint8 i = 0; i < LANE_COUNT; i++) {
             uint16 p = probsAdj[i];
             if (p == 0) p = 1; // defensive
             uint256 o = (uint256(ODDS_SCALE) * uint256(ODDS_SCALE - HOUSE_EDGE_BPS)) / uint256(p);
@@ -884,12 +884,12 @@ contract GiraffeRace {
         emit RaceOddsSet(raceId, r.decimalOddsBps[0], r.decimalOddsBps[1], r.decimalOddsBps[2], r.decimalOddsBps[3]);
     }
 
-    function _finalizeAnimalsFromPool(uint256 raceId, bytes32 fillSeed) internal {
+    function _finalizeGiraffesFromPool(uint256 raceId, bytes32 fillSeed) internal {
         // Reset any previous lane data (should be empty before settle, but be safe).
-        delete raceAnimals[raceId];
-        RaceAnimals storage ra = raceAnimals[raceId];
+        delete raceGiraffes[raceId];
+        RaceGiraffes storage ra = raceGiraffes[raceId];
 
-        // Deterministically shuffle/select pool entrants + house animals per race using independent entropy.
+        // Deterministically shuffle/select pool entrants + house giraffes per race using independent entropy.
         DeterministicDice.Dice memory dice = DeterministicDice.create(fillSeed);
 
         uint8[4] memory availableIdx = [0, 1, 2, 3];
@@ -911,9 +911,9 @@ contract GiraffeRace {
         // Select racers:
         // - If <= 4 valid entrants, take them all (in submission order).
         // - If > 4 valid entrants, draw 4 without replacement using dice.
-        if (validCount <= ANIMAL_COUNT) {
+        if (validCount <= LANE_COUNT) {
             uint8 lane = 0;
-            for (uint256 i = 0; i < n && lane < ANIMAL_COUNT; i++) {
+            for (uint256 i = 0; i < n && lane < LANE_COUNT; i++) {
                 RaceEntry storage e = entries[i];
                 if (giraffeNft.ownerOf(e.tokenId) == e.submitter) {
                     ra.tokenIds[lane] = e.tokenId;
@@ -923,7 +923,7 @@ contract GiraffeRace {
             }
             ra.assignedCount = lane;
         } else {
-            for (uint8 lane = 0; lane < ANIMAL_COUNT; lane++) {
+            for (uint8 lane = 0; lane < LANE_COUNT; lane++) {
                 uint256 remaining = validCount - uint256(lane);
                 (uint256 pick, DeterministicDice.Dice memory updatedDice) = dice.roll(remaining);
                 dice = updatedDice;
@@ -938,12 +938,12 @@ contract GiraffeRace {
                 ra.tokenIds[lane] = e.tokenId;
                 ra.originalOwners[lane] = e.submitter;
             }
-            ra.assignedCount = ANIMAL_COUNT;
+            ra.assignedCount = LANE_COUNT;
         }
 
-        // Fill remaining lanes with house animals (deterministically randomized, no repeats).
-        for (uint8 lane = ra.assignedCount; lane < ANIMAL_COUNT; lane++) {
-            if (availableCount == 0) revert InvalidHouseAnimal();
+        // Fill remaining lanes with house giraffes (deterministically randomized, no repeats).
+        for (uint8 lane = ra.assignedCount; lane < LANE_COUNT; lane++) {
+            if (availableCount == 0) revert InvalidHouseGiraffe();
             (uint256 pick, DeterministicDice.Dice memory updatedDice) = dice.roll(availableCount);
             dice = updatedDice;
 
@@ -951,20 +951,20 @@ contract GiraffeRace {
             availableCount--;
             availableIdx[uint8(pick)] = availableIdx[availableCount];
 
-            uint256 houseTokenId = houseAnimalTokenIds[idx];
-            if (giraffeNft.ownerOf(houseTokenId) != house) revert InvalidHouseAnimal();
+            uint256 houseTokenId = houseGiraffeTokenIds[idx];
+            if (giraffeNft.ownerOf(houseTokenId) != house) revert InvalidHouseGiraffe();
 
             ra.tokenIds[lane] = houseTokenId;
             ra.originalOwners[lane] = house;
-            emit HouseAnimalAssigned(raceId, houseTokenId, lane);
+            emit HouseGiraffeAssigned(raceId, houseTokenId, lane);
         }
 
-        ra.assignedCount = ANIMAL_COUNT;
+        ra.assignedCount = LANE_COUNT;
     }
 
     function _decreaseReadinessAfterRace(uint256 raceId) internal {
-        RaceAnimals storage ra = raceAnimals[raceId];
-        for (uint8 lane = 0; lane < ANIMAL_COUNT; lane++) {
+        RaceGiraffes storage ra = raceGiraffes[raceId];
+        for (uint8 lane = 0; lane < LANE_COUNT; lane++) {
             uint256 tokenId = ra.tokenIds[lane];
             if (tokenId != 0) {
                 giraffeNft.decreaseReadiness(tokenId);

@@ -12,7 +12,7 @@ import {
 
 const LANE_EMOJI = "🦒";
 
-export const GiraffeNfts = () => {
+export const AnimalNfts = () => {
   const { address: connectedAddress } = useAccount();
   const { targetNetwork } = useTargetNetwork();
   const publicClient = usePublicClient({ chainId: targetNetwork.id });
@@ -22,44 +22,44 @@ export const GiraffeNfts = () => {
     { tokenId: bigint; name: string; readiness: number; conditioning: number; speed: number }[]
   >([]);
   const [isLoadingOwnedNfts, setIsLoadingOwnedNfts] = useState(false);
-  const [isGiraffeNftDeployedOnChain, setIsGiraffeNftDeployedOnChain] = useState<boolean | null>(null);
+  const [isAnimalNftDeployedOnChain, setIsAnimalNftDeployedOnChain] = useState<boolean | null>(null);
 
-  const { data: giraffeNftContract } = useDeployedContractInfo({
+  const { data: animalNftContract } = useDeployedContractInfo({
     contractName: "GiraffeNFT",
   });
 
   useEffect(() => {
     const run = async () => {
       if (!publicClient) {
-        setIsGiraffeNftDeployedOnChain(null);
+        setIsAnimalNftDeployedOnChain(null);
         return;
       }
-      const addr = giraffeNftContract?.address as `0x${string}` | undefined;
+      const addr = animalNftContract?.address as `0x${string}` | undefined;
       if (!addr) {
-        setIsGiraffeNftDeployedOnChain(false);
+        setIsAnimalNftDeployedOnChain(false);
         return;
       }
       try {
         const bytecode = await publicClient.getBytecode({ address: addr });
-        setIsGiraffeNftDeployedOnChain(!!bytecode && bytecode !== "0x");
+        setIsAnimalNftDeployedOnChain(!!bytecode && bytecode !== "0x");
       } catch {
-        setIsGiraffeNftDeployedOnChain(false);
+        setIsAnimalNftDeployedOnChain(false);
       }
     };
     void run();
-  }, [publicClient, giraffeNftContract?.address]);
+  }, [publicClient, animalNftContract?.address]);
 
   const { data: nextTokenId } = useScaffoldReadContract({
     contractName: "GiraffeNFT",
     functionName: "nextTokenId",
-    query: { enabled: !!giraffeNftContract },
+    query: { enabled: !!animalNftContract },
   });
 
   const { data: ownedTokenIdsData } = useScaffoldReadContract({
     contractName: "GiraffeNFT",
     functionName: "tokensOfOwner",
     args: [connectedAddress],
-    query: { enabled: !!connectedAddress && !!giraffeNftContract },
+    query: { enabled: !!connectedAddress && !!animalNftContract },
   });
 
   const ownedTokenIds = useMemo(() => {
@@ -67,7 +67,7 @@ export const GiraffeNfts = () => {
     return raw.map(x => BigInt(x)).filter(x => x !== 0n);
   }, [ownedTokenIdsData]);
 
-  const { writeContractAsync: writeGiraffeNftAsync } = useScaffoldWriteContract({
+  const { writeContractAsync: writeAnimalNftAsync } = useScaffoldWriteContract({
     contractName: "GiraffeNFT",
   });
 
@@ -78,7 +78,7 @@ export const GiraffeNfts = () => {
         return;
       }
       if (!publicClient) return;
-      if (!giraffeNftContract?.address) return;
+      if (!animalNftContract?.address) return;
 
       setIsLoadingOwnedNfts(true);
       try {
@@ -89,14 +89,14 @@ export const GiraffeNfts = () => {
 
         const calls = ownedTokenIds.flatMap(id => [
           {
-            address: giraffeNftContract.address as `0x${string}`,
-            abi: giraffeNftContract.abi as any,
+            address: animalNftContract.address as `0x${string}`,
+            abi: animalNftContract.abi as any,
             functionName: "nameOf",
             args: [id],
           },
           {
-            address: giraffeNftContract.address as `0x${string}`,
-            abi: giraffeNftContract.abi as any,
+            address: animalNftContract.address as `0x${string}`,
+            abi: animalNftContract.abi as any,
             functionName: "statsOf",
             args: [id],
           },
@@ -118,14 +118,14 @@ export const GiraffeNfts = () => {
           const settled = await Promise.allSettled(
             ownedTokenIds.flatMap(id => [
               (publicClient as any).readContract({
-                address: giraffeNftContract.address as `0x${string}`,
-                abi: giraffeNftContract.abi as any,
+                address: animalNftContract.address as `0x${string}`,
+                abi: animalNftContract.abi as any,
                 functionName: "nameOf",
                 args: [id],
               }),
               (publicClient as any).readContract({
-                address: giraffeNftContract.address as `0x${string}`,
-                abi: giraffeNftContract.abi as any,
+                address: animalNftContract.address as `0x${string}`,
+                abi: animalNftContract.abi as any,
                 functionName: "statsOf",
                 args: [id],
               }),
@@ -157,14 +157,7 @@ export const GiraffeNfts = () => {
     };
 
     void run();
-  }, [
-    connectedAddress,
-    publicClient,
-    giraffeNftContract?.address,
-    giraffeNftContract?.abi,
-    ownedTokenIds,
-    nextTokenId,
-  ]);
+  }, [connectedAddress, publicClient, animalNftContract?.address, animalNftContract?.abi, ownedTokenIds, nextTokenId]);
 
   return (
     <div className="flex flex-col gap-8 w-full max-w-4xl px-6 py-10">
@@ -179,15 +172,15 @@ export const GiraffeNfts = () => {
             <div className="flex items-center justify-between">
               <h2 className="card-title">Mint a Giraffe NFT</h2>
               <div className="text-xs opacity-70">
-                {isGiraffeNftDeployedOnChain === null
+                {isAnimalNftDeployedOnChain === null
                   ? "Checking deployment…"
-                  : isGiraffeNftDeployedOnChain
+                  : isAnimalNftDeployedOnChain
                     ? "GiraffeNFT deployed"
                     : "Not deployed"}
               </div>
             </div>
 
-            {isGiraffeNftDeployedOnChain === false ? (
+            {isAnimalNftDeployedOnChain === false ? (
               <div className="alert alert-warning">
                 <span className="text-sm">
                   GiraffeNFT isn’t deployed on the connected network (or you restarted your local chain). Run `yarn
@@ -212,14 +205,14 @@ export const GiraffeNfts = () => {
               className="btn btn-primary"
               disabled={
                 !connectedAddress ||
-                !giraffeNftContract ||
-                isGiraffeNftDeployedOnChain !== true ||
+                !animalNftContract ||
+                isAnimalNftDeployedOnChain !== true ||
                 mintName.trim().length === 0
               }
               onClick={async () => {
                 const name = mintName.trim();
                 // `mint` is overloaded; cast to avoid TS confusion and let viem pick the correct overload at runtime.
-                await (writeGiraffeNftAsync as any)({ functionName: "mint", args: [name] });
+                await (writeAnimalNftAsync as any)({ functionName: "mint", args: [name] });
                 setMintName("");
               }}
             >

@@ -155,7 +155,7 @@ const deployedContracts = {
               internalType: "address",
             },
             {
-              name: "animalName",
+              name: "giraffeName",
               type: "string",
               internalType: "string",
             },
@@ -174,7 +174,7 @@ const deployedContracts = {
           name: "mint",
           inputs: [
             {
-              name: "animalName",
+              name: "giraffeName",
               type: "string",
               internalType: "string",
             },
@@ -203,7 +203,7 @@ const deployedContracts = {
               internalType: "uint8",
             },
             {
-              name: "animalName",
+              name: "giraffeName",
               type: "string",
               internalType: "string",
             },
@@ -961,7 +961,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 3,
+      deployedOnBlock: 2,
     },
     GiraffeRace: {
       address: "0xed1db453c3156ff3155a97ad217b3087d5dc5f6e",
@@ -980,7 +980,7 @@ const deployedContracts = {
               internalType: "address",
             },
             {
-              name: "_houseAnimalTokenIds",
+              name: "_houseGiraffeTokenIds",
               type: "uint256[4]",
               internalType: "uint256[4]",
             },
@@ -1003,19 +1003,6 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "ANIMAL_COUNT",
-          inputs: [],
-          outputs: [
-            {
-              name: "",
-              type: "uint8",
-              internalType: "uint8",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
           name: "HOUSE_EDGE_BPS",
           inputs: [],
           outputs: [
@@ -1023,6 +1010,19 @@ const deployedContracts = {
               name: "",
               type: "uint16",
               internalType: "uint16",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "LANE_COUNT",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint8",
+              internalType: "uint8",
             },
           ],
           stateMutability: "view",
@@ -1081,19 +1081,6 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "animalCount",
-          inputs: [],
-          outputs: [
-            {
-              name: "",
-              type: "uint8",
-              internalType: "uint8",
-            },
-          ],
-          stateMutability: "pure",
-        },
-        {
-          type: "function",
           name: "claim",
           inputs: [],
           outputs: [
@@ -1133,7 +1120,7 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "finalizeRaceAnimals",
+          name: "finalizeRaceGiraffes",
           inputs: [],
           outputs: [],
           stateMutability: "nonpayable",
@@ -1155,7 +1142,7 @@ const deployedContracts = {
               internalType: "uint128",
             },
             {
-              name: "animal",
+              name: "lane",
               type: "uint8",
               internalType: "uint8",
             },
@@ -1189,7 +1176,7 @@ const deployedContracts = {
               internalType: "uint128",
             },
             {
-              name: "animal",
+              name: "lane",
               type: "uint8",
               internalType: "uint8",
             },
@@ -1252,7 +1239,7 @@ const deployedContracts = {
                   internalType: "uint8",
                 },
                 {
-                  name: "betAnimal",
+                  name: "betLane",
                   type: "uint8",
                   internalType: "uint8",
                 },
@@ -1318,7 +1305,7 @@ const deployedContracts = {
                   internalType: "uint8",
                 },
                 {
-                  name: "betAnimal",
+                  name: "betLane",
                   type: "uint8",
                   internalType: "uint8",
                 },
@@ -1383,61 +1370,9 @@ const deployedContracts = {
               internalType: "uint256",
             },
             {
-              name: "totalOnAnimal",
+              name: "totalOnLane",
               type: "uint256[4]",
               internalType: "uint256[4]",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "getRaceAnimals",
-          inputs: [],
-          outputs: [
-            {
-              name: "assignedCount",
-              type: "uint8",
-              internalType: "uint8",
-            },
-            {
-              name: "tokenIds",
-              type: "uint256[4]",
-              internalType: "uint256[4]",
-            },
-            {
-              name: "originalOwners",
-              type: "address[4]",
-              internalType: "address[4]",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "getRaceAnimalsById",
-          inputs: [
-            {
-              name: "raceId",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          outputs: [
-            {
-              name: "assignedCount",
-              type: "uint8",
-              internalType: "uint8",
-            },
-            {
-              name: "tokenIds",
-              type: "uint256[4]",
-              internalType: "uint256[4]",
-            },
-            {
-              name: "originalOwners",
-              type: "address[4]",
-              internalType: "address[4]",
             },
           ],
           stateMutability: "view",
@@ -1479,9 +1414,61 @@ const deployedContracts = {
               internalType: "uint256",
             },
             {
-              name: "totalOnAnimal",
+              name: "totalOnLane",
               type: "uint256[4]",
               internalType: "uint256[4]",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getRaceGiraffes",
+          inputs: [],
+          outputs: [
+            {
+              name: "assignedCount",
+              type: "uint8",
+              internalType: "uint8",
+            },
+            {
+              name: "tokenIds",
+              type: "uint256[4]",
+              internalType: "uint256[4]",
+            },
+            {
+              name: "originalOwners",
+              type: "address[4]",
+              internalType: "address[4]",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getRaceGiraffesById",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "assignedCount",
+              type: "uint8",
+              internalType: "uint8",
+            },
+            {
+              name: "tokenIds",
+              type: "uint256[4]",
+              internalType: "uint256[4]",
+            },
+            {
+              name: "originalOwners",
+              type: "address[4]",
+              internalType: "address[4]",
             },
           ],
           stateMutability: "view",
@@ -1589,7 +1576,7 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "houseAnimalTokenIds",
+          name: "houseGiraffeTokenIds",
           inputs: [
             {
               name: "",
@@ -1605,6 +1592,19 @@ const deployedContracts = {
             },
           ],
           stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "laneCount",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint8",
+              internalType: "uint8",
+            },
+          ],
+          stateMutability: "pure",
         },
         {
           type: "function",
@@ -1637,7 +1637,7 @@ const deployedContracts = {
           name: "placeBet",
           inputs: [
             {
-              name: "animal",
+              name: "lane",
               type: "uint8",
               internalType: "uint8",
             },
@@ -1764,7 +1764,7 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "submitAnimal",
+          name: "submitGiraffe",
           inputs: [
             {
               name: "tokenId",
@@ -1816,68 +1816,6 @@ const deployedContracts = {
         },
         {
           type: "event",
-          name: "AnimalAssigned",
-          inputs: [
-            {
-              name: "raceId",
-              type: "uint256",
-              indexed: true,
-              internalType: "uint256",
-            },
-            {
-              name: "tokenId",
-              type: "uint256",
-              indexed: true,
-              internalType: "uint256",
-            },
-            {
-              name: "originalOwner",
-              type: "address",
-              indexed: true,
-              internalType: "address",
-            },
-            {
-              name: "lane",
-              type: "uint8",
-              indexed: false,
-              internalType: "uint8",
-            },
-          ],
-          anonymous: false,
-        },
-        {
-          type: "event",
-          name: "AnimalSubmitted",
-          inputs: [
-            {
-              name: "raceId",
-              type: "uint256",
-              indexed: true,
-              internalType: "uint256",
-            },
-            {
-              name: "owner",
-              type: "address",
-              indexed: true,
-              internalType: "address",
-            },
-            {
-              name: "tokenId",
-              type: "uint256",
-              indexed: true,
-              internalType: "uint256",
-            },
-            {
-              name: "lane",
-              type: "uint8",
-              indexed: false,
-              internalType: "uint8",
-            },
-          ],
-          anonymous: false,
-        },
-        {
-          type: "event",
           name: "BetPlaced",
           inputs: [
             {
@@ -1893,7 +1831,7 @@ const deployedContracts = {
               internalType: "address",
             },
             {
-              name: "animal",
+              name: "lane",
               type: "uint8",
               indexed: true,
               internalType: "uint8",
@@ -1934,7 +1872,69 @@ const deployedContracts = {
         },
         {
           type: "event",
-          name: "HouseAnimalAssigned",
+          name: "GiraffeAssigned",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "tokenId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "originalOwner",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "lane",
+              type: "uint8",
+              indexed: false,
+              internalType: "uint8",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "GiraffeSubmitted",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "owner",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "tokenId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "lane",
+              type: "uint8",
+              indexed: false,
+              internalType: "uint8",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "HouseGiraffeAssigned",
           inputs: [
             {
               name: "raceId",
@@ -2060,16 +2060,6 @@ const deployedContracts = {
         },
         {
           type: "error",
-          name: "AnimalNotAssigned",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "AnimalsAlreadyFinalized",
-          inputs: [],
-        },
-        {
-          type: "error",
           name: "BettingClosed",
           inputs: [],
         },
@@ -2090,17 +2080,27 @@ const deployedContracts = {
         },
         {
           type: "error",
+          name: "GiraffeNotAssigned",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "GiraffesAlreadyFinalized",
+          inputs: [],
+        },
+        {
+          type: "error",
           name: "InsufficientBankroll",
           inputs: [],
         },
         {
           type: "error",
-          name: "InvalidAnimal",
+          name: "InvalidHouseGiraffe",
           inputs: [],
         },
         {
           type: "error",
-          name: "InvalidHouseAnimal",
+          name: "InvalidLane",
           inputs: [],
         },
         {
@@ -2180,7 +2180,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 3,
+      deployedOnBlock: 4,
     },
   },
 } as const;

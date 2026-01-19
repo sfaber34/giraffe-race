@@ -6,12 +6,12 @@ import { Ownable } from "../lib/openzeppelin-contracts/contracts/access/Ownable.
 
 /**
  * @title GiraffeNFT
- * @notice Minimal ERC-721 for race animals.
+ * @notice Minimal ERC-721 for race giraffes.
  * @dev Token IDs are sequential starting at 1.
  */
 contract GiraffeNFT is ERC721, Ownable {
     uint256 public nextTokenId = 1;
-    mapping(uint256 => string) private _animalNames;
+    mapping(uint256 => string) private _giraffeNames;
     // Readiness is a simple 1-10 attribute that affects race performance.
     // New mints start at 10 and decrease by 1 (floored at 1) after running a race.
     mapping(uint256 => uint8) private _readiness; // 0 = legacy/uninitialized (treated as 10)
@@ -87,10 +87,10 @@ contract GiraffeNFT is ERC721, Ownable {
         _readiness[tokenId] = r;
     }
 
-    function _mintAnimal(address to, string memory animalName, uint8 readiness) internal returns (uint256 tokenId) {
+    function _mintGiraffe(address to, string memory giraffeName, uint8 readiness) internal returns (uint256 tokenId) {
         tokenId = nextTokenId++;
-        if (bytes(animalName).length != 0) {
-            _animalNames[tokenId] = animalName;
+        if (bytes(giraffeName).length != 0) {
+            _giraffeNames[tokenId] = giraffeName;
         }
         // All stats are [1..10] (0 treated as 10 for backwards compatibility).
         // New mints should be full stats (10), but we keep an explicit readiness parameter for local testing.
@@ -102,27 +102,27 @@ contract GiraffeNFT is ERC721, Ownable {
 
     /// @notice Mint an GiraffeNFT to an arbitrary address (permissionless).
     function mint(address to) external returns (uint256 tokenId) {
-        return _mintAnimal(to, "", 10);
+        return _mintGiraffe(to, "", 10);
     }
 
     /// @notice Mint an GiraffeNFT with a name to an arbitrary address (permissionless).
-    function mint(address to, string calldata animalName) external returns (uint256 tokenId) {
-        return _mintAnimal(to, animalName, 10);
+    function mint(address to, string calldata giraffeName) external returns (uint256 tokenId) {
+        return _mintGiraffe(to, giraffeName, 10);
     }
 
     /// @notice Convenience: mint to yourself with a name.
-    function mint(string calldata animalName) external returns (uint256 tokenId) {
-        return _mintAnimal(msg.sender, animalName, 10);
+    function mint(string calldata giraffeName) external returns (uint256 tokenId) {
+        return _mintGiraffe(msg.sender, giraffeName, 10);
     }
 
     /// @notice Mint an GiraffeNFT with an explicit readiness (testing helper).
     /// @dev Permissionless on local chain only (chainid 31337).
-    function mintWithReadiness(address to, uint8 readiness, string calldata animalName)
+    function mintWithReadiness(address to, uint8 readiness, string calldata giraffeName)
         external
         onlyLocalTesting
         returns (uint256 tokenId)
     {
-        return _mintAnimal(to, animalName, readiness);
+        return _mintGiraffe(to, giraffeName, readiness);
     }
 
     /// @notice Permissionless local testing helper to set readiness directly on an existing token.
@@ -140,7 +140,7 @@ contract GiraffeNFT is ERC721, Ownable {
     }
 
     function nameOf(uint256 tokenId) external view returns (string memory) {
-        return _animalNames[tokenId];
+        return _giraffeNames[tokenId];
     }
 
     function tokensOfOwner(address owner) external view returns (uint256[] memory) {

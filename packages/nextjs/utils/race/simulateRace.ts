@@ -26,29 +26,29 @@ const readinessBps = (readiness: number) => {
 
 export function simulateRaceFromSeed({
   seed,
-  animalCount = 4,
+  laneCount = 4,
   maxTicks = 500,
   speedRange = 10,
   trackLength = 1000,
   readiness,
 }: {
   seed: Hex;
-  animalCount?: number;
+  laneCount?: number;
   maxTicks?: number;
   speedRange?: number;
   trackLength?: number;
-  readiness?: number[]; // length should match animalCount; defaults to all 10 (fresh)
+  readiness?: number[]; // length should match laneCount; defaults to all 10 (fresh)
 }): RaceSimulation {
   const dice = new DeterministicDice(seed);
-  const distances = Array.from({ length: animalCount }, () => 0);
+  const distances = Array.from({ length: laneCount }, () => 0);
   const frames: number[][] = [distances.slice()];
-  const bps = Array.from({ length: animalCount }, (_, i) => readinessBps(readiness?.[i] ?? 10));
+  const bps = Array.from({ length: laneCount }, (_, i) => readinessBps(readiness?.[i] ?? 10));
 
   let finished = false;
   let ticks = 0;
 
   for (let t = 0; t < maxTicks; t++) {
-    for (let a = 0; a < animalCount; a++) {
+    for (let a = 0; a < laneCount; a++) {
       const r = dice.roll(BigInt(speedRange)); // 0..speedRange-1
       const baseSpeed = Number(r + 1n); // 1..speedRange
       // Probabilistic rounding (matches Solidity): avoids a chunky handicap from floor().

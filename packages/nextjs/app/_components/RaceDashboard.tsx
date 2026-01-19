@@ -107,10 +107,10 @@ export const RaceDashboard = () => {
   const startDelayTimeoutRef = useRef<number | null>(null);
   const [svgResetNonce, setSvgResetNonce] = useState(0);
 
-  const { data: animalRaceContract, isLoading: isAnimalRaceLoading } = useDeployedContractInfo({
+  const { data: giraffeRaceContract, isLoading: isGiraffeRaceLoading } = useDeployedContractInfo({
     contractName: "GiraffeRace",
   });
-  const { data: animalNftContract } = useDeployedContractInfo({ contractName: "GiraffeNFT" });
+  const { data: giraffeNftContract } = useDeployedContractInfo({ contractName: "GiraffeNFT" });
 
   const tx = useTransactor();
 
@@ -129,7 +129,7 @@ export const RaceDashboard = () => {
   useEffect(() => {
     const run = async () => {
       if (!publicClient) return;
-      if (!animalNftContract?.address || !animalNftContract?.abi) return;
+      if (!giraffeNftContract?.address || !giraffeNftContract?.abi) return;
       if (ownedTokenIds.length === 0) {
         setOwnedTokenNameById({});
         return;
@@ -138,8 +138,8 @@ export const RaceDashboard = () => {
       setIsLoadingOwnedTokenNames(true);
       try {
         const calls = ownedTokenIds.map(tokenId => ({
-          address: animalNftContract.address as `0x${string}`,
-          abi: animalNftContract.abi as any,
+          address: giraffeNftContract.address as `0x${string}`,
+          abi: giraffeNftContract.abi as any,
           functionName: "nameOf",
           args: [tokenId],
         }));
@@ -158,8 +158,8 @@ export const RaceDashboard = () => {
           const results = await Promise.allSettled(
             ownedTokenIds.map(tokenId =>
               (publicClient as any).readContract({
-                address: animalNftContract.address as `0x${string}`,
-                abi: animalNftContract.abi as any,
+                address: giraffeNftContract.address as `0x${string}`,
+                abi: giraffeNftContract.abi as any,
                 functionName: "nameOf",
                 args: [tokenId],
               }),
@@ -185,21 +185,21 @@ export const RaceDashboard = () => {
     };
 
     void run();
-  }, [publicClient, animalNftContract?.address, animalNftContract?.abi, ownedTokenIds]);
+  }, [publicClient, giraffeNftContract?.address, giraffeNftContract?.abi, ownedTokenIds]);
 
   const { data: nextRaceIdData } = useScaffoldReadContract({
     contractName: "GiraffeRace",
     functionName: "nextRaceId",
-    query: { enabled: !!animalRaceContract },
+    query: { enabled: !!giraffeRaceContract },
   });
   const nextRaceId = (nextRaceIdData as bigint | undefined) ?? 0n;
-  const hasAnyRace = !!animalRaceContract && nextRaceId > 0n;
+  const hasAnyRace = !!giraffeRaceContract && nextRaceId > 0n;
   const latestRaceId = hasAnyRace ? nextRaceId - 1n : null;
 
   const { data: settledLiabilityData } = useScaffoldReadContract({
     contractName: "GiraffeRace",
     functionName: "settledLiability",
-    query: { enabled: !!animalRaceContract },
+    query: { enabled: !!giraffeRaceContract },
   });
   const settledLiability = useMemo(() => {
     try {
@@ -235,9 +235,9 @@ export const RaceDashboard = () => {
     query: { enabled: hasAnyRace && viewingRaceId !== null },
   });
 
-  const { data: raceAnimalsData } = useScaffoldReadContract({
+  const { data: raceGiraffesData } = useScaffoldReadContract({
     contractName: "GiraffeRace",
-    functionName: "getRaceAnimalsById",
+    functionName: "getRaceGiraffesById",
     args: [viewingRaceId ?? 0n],
     query: { enabled: hasAnyRace && viewingRaceId !== null },
   });
@@ -259,26 +259,26 @@ export const RaceDashboard = () => {
 
   const parsed = useMemo(() => {
     if (!raceData) return null;
-    const [closeBlock, settled, winner, seed, totalPot, totalOnAnimal] = raceData;
+    const [closeBlock, settled, winner, seed, totalPot, totalOnLane] = raceData;
     return {
       closeBlock: closeBlock as bigint,
       settled: settled as boolean,
       winner: Number(winner as any) as 0 | 1 | 2 | 3,
       seed: seed as Hex,
       totalPot: totalPot as bigint,
-      totalOnAnimal: (totalOnAnimal as readonly bigint[]).map(x => BigInt(x)),
+      totalOnLane: (totalOnLane as readonly bigint[]).map(x => BigInt(x)),
     };
   }, [raceData]);
 
-  const parsedAnimals = useMemo(() => {
-    if (!raceAnimalsData) return null;
-    const [assignedCount, tokenIds, originalOwners] = raceAnimalsData;
+  const parsedGiraffes = useMemo(() => {
+    if (!raceGiraffesData) return null;
+    const [assignedCount, tokenIds, originalOwners] = raceGiraffesData;
     return {
       assignedCount: Number(assignedCount as any),
       tokenIds: (tokenIds as readonly bigint[]).map(x => BigInt(x)),
       originalOwners: originalOwners as readonly `0x${string}`[],
     };
-  }, [raceAnimalsData]);
+  }, [raceGiraffesData]);
 
   const parsedOdds = useMemo(() => {
     if (!raceOddsData) return null;
@@ -299,34 +299,34 @@ export const RaceDashboard = () => {
   }, [raceReadinessData]);
 
   const laneTokenIds = useMemo(() => {
-    if (!parsedAnimals?.tokenIds) return [0n, 0n, 0n, 0n] as const;
-    const arr = parsedAnimals.tokenIds;
+    if (!parsedGiraffes?.tokenIds) return [0n, 0n, 0n, 0n] as const;
+    const arr = parsedGiraffes.tokenIds;
     return [BigInt(arr[0] ?? 0n), BigInt(arr[1] ?? 0n), BigInt(arr[2] ?? 0n), BigInt(arr[3] ?? 0n)] as const;
-  }, [parsedAnimals?.tokenIds]);
+  }, [parsedGiraffes?.tokenIds]);
 
   const { data: lane0StatsData } = useScaffoldReadContract({
     contractName: "GiraffeNFT",
     functionName: "statsOf" as any,
     args: [laneTokenIds[0]],
-    query: { enabled: !!animalNftContract && laneTokenIds[0] !== 0n },
+    query: { enabled: !!giraffeNftContract && laneTokenIds[0] !== 0n },
   } as any);
   const { data: lane1StatsData } = useScaffoldReadContract({
     contractName: "GiraffeNFT",
     functionName: "statsOf" as any,
     args: [laneTokenIds[1]],
-    query: { enabled: !!animalNftContract && laneTokenIds[1] !== 0n },
+    query: { enabled: !!giraffeNftContract && laneTokenIds[1] !== 0n },
   } as any);
   const { data: lane2StatsData } = useScaffoldReadContract({
     contractName: "GiraffeNFT",
     functionName: "statsOf" as any,
     args: [laneTokenIds[2]],
-    query: { enabled: !!animalNftContract && laneTokenIds[2] !== 0n },
+    query: { enabled: !!giraffeNftContract && laneTokenIds[2] !== 0n },
   } as any);
   const { data: lane3StatsData } = useScaffoldReadContract({
     contractName: "GiraffeNFT",
     functionName: "statsOf" as any,
     args: [laneTokenIds[3]],
-    query: { enabled: !!animalNftContract && laneTokenIds[3] !== 0n },
+    query: { enabled: !!giraffeNftContract && laneTokenIds[3] !== 0n },
   } as any);
 
   const laneStats = useMemo(() => {
@@ -355,21 +355,21 @@ export const RaceDashboard = () => {
   }, [parsed]);
 
   const status: RaceStatus = useMemo(() => {
-    if (!animalRaceContract) return "no_race";
+    if (!giraffeRaceContract) return "no_race";
     if (!hasAnyRace || !parsed) return "no_race";
     if (parsed.settled) return "settled";
     if (blockNumber === undefined) return "betting_closed";
     if (submissionCloseBlock !== null && blockNumber < submissionCloseBlock) return "submissions_open";
     if (blockNumber < parsed.closeBlock) return "betting_open";
     return "betting_closed";
-  }, [animalRaceContract, hasAnyRace, parsed, blockNumber, submissionCloseBlock]);
+  }, [giraffeRaceContract, hasAnyRace, parsed, blockNumber, submissionCloseBlock]);
 
   // Reset the local "submitted token" lock when we change race or wallet.
   useEffect(() => {
     setSubmittedTokenId(null);
   }, [connectedAddress, viewingRaceId]);
 
-  const lineupFinalized = (parsedAnimals?.assignedCount ?? 0) === 4;
+  const lineupFinalized = (parsedGiraffes?.assignedCount ?? 0) === 4;
   const canFinalize = status === "betting_open" && !lineupFinalized;
   // Contract requires oddsSet (auto-derived at finalization), so avoid enabling bets until odds are loaded+set.
   const canBet = status === "betting_open" && lineupFinalized && parsedOdds?.oddsSet === true;
@@ -406,52 +406,52 @@ export const RaceDashboard = () => {
     contractName: "GiraffeRace",
     functionName: "getBetById",
     args: [viewingRaceId ?? 0n, connectedAddress],
-    query: { enabled: !!animalRaceContract && !!connectedAddress && hasAnyRace && viewingRaceId !== null },
+    query: { enabled: !!giraffeRaceContract && !!connectedAddress && hasAnyRace && viewingRaceId !== null },
   });
 
   const myBet = useMemo(() => {
     if (!myBetData) return null;
-    const [amount, animal, claimed] = myBetData;
+    const [amount, lane, claimed] = myBetData;
     const amt = BigInt(amount as any);
     return {
       amount: amt,
-      animal: Number(animal as any) as 0 | 1 | 2 | 3,
+      lane: Number(lane as any) as 0 | 1 | 2 | 3,
       claimed: claimed as boolean,
       hasBet: amt !== 0n,
     };
   }, [myBetData]);
 
   const isBetLocked = !!myBet?.hasBet;
-  const selectedBetLane = isBetLocked ? myBet?.animal : betLane;
+  const selectedBetLane = isBetLocked ? myBet?.lane : betLane;
 
   const estimatedPayoutWei = useMemo(() => {
     if (!parsedOdds?.oddsSet) return null;
-    const lane = myBet?.hasBet ? myBet.animal : betLane;
+    const lane = myBet?.hasBet ? myBet.lane : betLane;
     const amountWei = myBet?.hasBet ? myBet.amount : placeBetValue;
     if (!amountWei) return null;
     const oddsBps = parsedOdds.oddsBps?.[lane] ?? 0n;
     if (oddsBps <= 0n) return null;
     return (amountWei * oddsBps) / 10_000n;
-  }, [parsedOdds?.oddsSet, parsedOdds?.oddsBps, placeBetValue, betLane, myBet?.hasBet, myBet?.animal, myBet?.amount]);
+  }, [parsedOdds?.oddsSet, parsedOdds?.oddsBps, placeBetValue, betLane, myBet?.hasBet, myBet?.lane, myBet?.amount]);
 
   // If the user has already bet, lock the lane highlight to their bet.
   useEffect(() => {
     if (!myBet?.hasBet) return;
-    setBetLane(myBet.animal);
-  }, [myBet?.hasBet, myBet?.animal]);
+    setBetLane(myBet.lane);
+  }, [myBet?.hasBet, myBet?.lane]);
 
   const { data: nextWinningClaimData } = useScaffoldReadContract({
     contractName: "GiraffeRace",
     functionName: "getNextWinningClaim",
     args: [connectedAddress],
-    query: { enabled: !!animalRaceContract && !!connectedAddress },
+    query: { enabled: !!giraffeRaceContract && !!connectedAddress },
   });
 
   const { data: winningClaimRemainingData } = useScaffoldReadContract({
     contractName: "GiraffeRace",
     functionName: "getWinningClaimRemaining",
     args: [connectedAddress],
-    query: { enabled: !!animalRaceContract && !!connectedAddress },
+    query: { enabled: !!giraffeRaceContract && !!connectedAddress },
   });
 
   const winningClaimRemaining = useMemo(() => {
@@ -472,7 +472,7 @@ export const RaceDashboard = () => {
       raceId: BigInt(out?.raceId ?? 0),
       // Always 3 for a settled win; included for compatibility with the shared struct.
       status: Number(out?.status ?? 0) as 0 | 1 | 2 | 3,
-      betAnimal: Number(out?.betAnimal ?? 0) as 0 | 1 | 2 | 3,
+      betLane: Number(out?.betLane ?? 0) as 0 | 1 | 2 | 3,
       betTokenId: BigInt(out?.betTokenId ?? 0),
       betAmount: BigInt(out?.betAmount ?? 0),
       winner: Number(out?.winner ?? 0) as 0 | 1 | 2 | 3,
@@ -492,7 +492,7 @@ export const RaceDashboard = () => {
     setJumpToNextWinningClaimAfterClaim(false);
   }, [jumpToNextWinningClaimAfterClaim, nextWinningClaim?.hasClaim, nextWinningClaim?.raceId]);
 
-  const { writeContractAsync: writeAnimalRaceAsync } = useScaffoldWriteContract({ contractName: "GiraffeRace" });
+  const { writeContractAsync: writeGiraffeRaceAsync } = useScaffoldWriteContract({ contractName: "GiraffeRace" });
 
   const mineBlocks = async (count: number) => {
     if (!publicClient) return;
@@ -528,7 +528,7 @@ export const RaceDashboard = () => {
     if (!parsed || !canSimulate) return null;
     return simulateRaceFromSeed({
       seed: parsed.seed,
-      animalCount: LANE_COUNT,
+      laneCount: LANE_COUNT,
       maxTicks: MAX_TICKS,
       speedRange: SPEED_RANGE,
       trackLength: TRACK_LENGTH,
@@ -933,9 +933,9 @@ export const RaceDashboard = () => {
                         ) : (
                           <>
                             {LANE_EMOJI}{" "}
-                            {parsedAnimals ? (
+                            {parsedGiraffes ? (
                               <LaneName
-                                tokenId={parsedAnimals.tokenIds[revealedWinner] ?? 0n}
+                                tokenId={parsedGiraffes.tokenIds[revealedWinner] ?? 0n}
                                 fallback={`Lane ${revealedWinner}`}
                               />
                             ) : (
@@ -982,8 +982,8 @@ export const RaceDashboard = () => {
                           </span>
                           <span className="opacity-60 tabular-nums">· {d}</span>
                           <span className="opacity-60">
-                            {parsedAnimals ? (
-                              <LaneName tokenId={parsedAnimals.tokenIds[i] ?? 0n} fallback={`Lane ${i}`} />
+                            {parsedGiraffes ? (
+                              <LaneName tokenId={parsedGiraffes.tokenIds[i] ?? 0n} fallback={`Lane ${i}`} />
                             ) : null}
                           </span>
                         </div>
@@ -1100,15 +1100,15 @@ export const RaceDashboard = () => {
               <div className="flex items-center justify-between">
                 <h2 className="card-title">Race status</h2>
                 <div className="text-xs opacity-70">
-                  {isAnimalRaceLoading
+                  {isGiraffeRaceLoading
                     ? "Checking contract…"
-                    : animalRaceContract
+                    : giraffeRaceContract
                       ? "GiraffeRace deployed"
                       : "Not deployed"}
                 </div>
               </div>
 
-              {!animalRaceContract ? (
+              {!giraffeRaceContract ? (
                 <div className="alert alert-info">
                   <span className="text-sm">Deploy the contracts first (`yarn chain` + `yarn deploy`).</span>
                 </div>
@@ -1197,27 +1197,27 @@ export const RaceDashboard = () => {
                 <div className="flex flex-wrap gap-2">
                   <button
                     className="btn btn-sm btn-primary"
-                    disabled={!animalRaceContract || activeRaceExists || !isViewingLatest}
+                    disabled={!giraffeRaceContract || activeRaceExists || !isViewingLatest}
                     onClick={async () => {
-                      await writeAnimalRaceAsync({ functionName: "createRace" } as any);
+                      await writeGiraffeRaceAsync({ functionName: "createRace" } as any);
                     }}
                   >
                     Create race
                   </button>
                   <button
                     className="btn btn-sm btn-outline"
-                    disabled={!animalRaceContract || !canFinalize || !isViewingLatest}
+                    disabled={!giraffeRaceContract || !canFinalize || !isViewingLatest}
                     onClick={async () => {
-                      await writeAnimalRaceAsync({ functionName: "finalizeRaceAnimals" } as any);
+                      await writeGiraffeRaceAsync({ functionName: "finalizeRaceGiraffes" } as any);
                     }}
                   >
                     Finalize lineup
                   </button>
                   <button
                     className="btn btn-sm btn-outline"
-                    disabled={!animalRaceContract || !canSettle || !isViewingLatest}
+                    disabled={!giraffeRaceContract || !canSettle || !isViewingLatest}
                     onClick={async () => {
-                      await writeAnimalRaceAsync({ functionName: "settleRace" } as any);
+                      await writeGiraffeRaceAsync({ functionName: "settleRace" } as any);
                     }}
                   >
                     Settle race
@@ -1233,7 +1233,7 @@ export const RaceDashboard = () => {
 
               <div className="flex flex-col gap-2">
                 <div className="text-sm font-medium">Fund bankroll</div>
-                {!animalRaceContract ? (
+                {!giraffeRaceContract ? (
                   <div className="text-xs opacity-70">Deploy the contracts first to get the GiraffeRace address.</div>
                 ) : (
                   <>
@@ -1241,7 +1241,7 @@ export const RaceDashboard = () => {
                       <div className="flex justify-between">
                         <span className="opacity-70">GiraffeRace balance</span>
                         <span className="font-mono">
-                          <Balance address={animalRaceContract.address as `0x${string}`} />
+                          <Balance address={giraffeRaceContract.address as `0x${string}`} />
                         </span>
                       </div>
                       <div className="flex justify-between">
@@ -1259,10 +1259,10 @@ export const RaceDashboard = () => {
                     <button
                       className="btn btn-sm btn-outline"
                       disabled={
-                        !connectedAddress || !animalRaceContract?.address || isFundingRace || !fundAmountEth.trim()
+                        !connectedAddress || !giraffeRaceContract?.address || isFundingRace || !fundAmountEth.trim()
                       }
                       onClick={async () => {
-                        if (!animalRaceContract?.address) return;
+                        if (!giraffeRaceContract?.address) return;
                         const v = fundAmountEth.trim();
                         if (!v) return;
                         let value: bigint;
@@ -1274,7 +1274,7 @@ export const RaceDashboard = () => {
                         if (value <= 0n) return;
                         try {
                           setIsFundingRace(true);
-                          await tx({ to: animalRaceContract.address as `0x${string}`, value });
+                          await tx({ to: giraffeRaceContract.address as `0x${string}`, value });
                         } finally {
                           setIsFundingRace(false);
                         }
@@ -1321,10 +1321,10 @@ export const RaceDashboard = () => {
                         {nextWinningClaim.betTokenId !== 0n ? (
                           <LaneName
                             tokenId={nextWinningClaim.betTokenId}
-                            fallback={`Lane ${nextWinningClaim.betAnimal}`}
+                            fallback={`Lane ${nextWinningClaim.betLane}`}
                           />
                         ) : (
-                          `Lane ${nextWinningClaim.betAnimal}`
+                          `Lane ${nextWinningClaim.betLane}`
                         )}{" "}
                         · {formatEther(nextWinningClaim.betAmount)} ETH
                       </span>
@@ -1341,9 +1341,9 @@ export const RaceDashboard = () => {
                 )}
                 <button
                   className="btn btn-sm btn-primary"
-                  disabled={!animalRaceContract || !connectedAddress || !nextWinningClaim?.hasClaim}
+                  disabled={!giraffeRaceContract || !connectedAddress || !nextWinningClaim?.hasClaim}
                   onClick={async () => {
-                    await writeAnimalRaceAsync({ functionName: "claimNextWinningPayout" } as any);
+                    await writeGiraffeRaceAsync({ functionName: "claimNextWinningPayout" } as any);
                     setJumpToNextWinningClaimAfterClaim(true);
                   }}
                 >
@@ -1386,7 +1386,7 @@ export const RaceDashboard = () => {
                         ) : isOwnedTokensLoading ? (
                           <div className="text-sm opacity-70">Loading your NFTs…</div>
                         ) : ownedTokenIds.length === 0 ? (
-                          <div className="text-sm opacity-70">You don’t own any AnimalNFTs yet.</div>
+                          <div className="text-sm opacity-70">You don’t own any GiraffeNFTs yet.</div>
                         ) : (
                           <select
                             className="select select-bordered w-full"
@@ -1417,7 +1417,7 @@ export const RaceDashboard = () => {
                       <button
                         className="btn btn-primary"
                         disabled={
-                          !animalRaceContract ||
+                          !giraffeRaceContract ||
                           !connectedAddress ||
                           selectedTokenId === null ||
                           isEnterLocked ||
@@ -1426,7 +1426,10 @@ export const RaceDashboard = () => {
                         }
                         onClick={async () => {
                           if (selectedTokenId === null) return;
-                          await writeAnimalRaceAsync({ functionName: "submitAnimal", args: [selectedTokenId] } as any);
+                          await writeGiraffeRaceAsync({
+                            functionName: "submitGiraffe",
+                            args: [selectedTokenId],
+                          } as any);
                           setSubmittedTokenId(selectedTokenId);
                         }}
                       >
@@ -1487,9 +1490,9 @@ export const RaceDashboard = () => {
                               <span className="flex items-center gap-2">
                                 <span>{LANE_EMOJI}</span>
                                 {lineupFinalized &&
-                                parsedAnimals?.tokenIds?.[lane] &&
-                                parsedAnimals.tokenIds[lane] !== 0n ? (
-                                  <LaneName tokenId={parsedAnimals.tokenIds[lane]} fallback={`Lane ${lane}`} />
+                                parsedGiraffes?.tokenIds?.[lane] &&
+                                parsedGiraffes.tokenIds[lane] !== 0n ? (
+                                  <LaneName tokenId={parsedGiraffes.tokenIds[lane]} fallback={`Lane ${lane}`} />
                                 ) : (
                                   <span>Lane {lane}</span>
                                 )}
@@ -1547,7 +1550,7 @@ export const RaceDashboard = () => {
                         <button
                           className="btn btn-primary"
                           disabled={
-                            !animalRaceContract ||
+                            !giraffeRaceContract ||
                             !connectedAddress ||
                             !canBet ||
                             !placeBetValue ||
@@ -1556,7 +1559,7 @@ export const RaceDashboard = () => {
                           }
                           onClick={async () => {
                             if (!placeBetValue) return;
-                            await writeAnimalRaceAsync({
+                            await writeGiraffeRaceAsync({
                               functionName: "placeBet",
                               args: [betLane],
                               value: placeBetValue,

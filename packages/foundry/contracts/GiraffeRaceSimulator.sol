@@ -8,7 +8,7 @@ import { DeterministicDice } from "./libraries/DeterministicDice.sol";
 contract GiraffeRaceSimulator {
     using DeterministicDice for DeterministicDice.Dice;
 
-    uint8 internal constant ANIMAL_COUNT = 4;
+    uint8 internal constant LANE_COUNT = 4;
     uint16 internal constant TRACK_LENGTH = 1000;
     uint16 internal constant MAX_TICKS = 500;
     uint8 internal constant SPEED_RANGE = 10;
@@ -57,12 +57,12 @@ contract GiraffeRaceSimulator {
         bool finished = false;
 
         uint16[4] memory bps;
-        for (uint8 a = 0; a < ANIMAL_COUNT; a++) {
+        for (uint8 a = 0; a < LANE_COUNT; a++) {
             bps[a] = _readinessBps(readiness[a]);
         }
 
         for (uint256 t = 0; t < MAX_TICKS; t++) {
-            for (uint256 a = 0; a < ANIMAL_COUNT; a++) {
+            for (uint256 a = 0; a < LANE_COUNT; a++) {
                 (uint256 r, DeterministicDice.Dice memory updatedDice) = dice.roll(SPEED_RANGE);
                 dice = updatedDice;
                 uint256 baseSpeed = r + 1;
@@ -95,7 +95,7 @@ contract GiraffeRaceSimulator {
         uint8[4] memory leaders;
         leaders[0] = 0;
 
-        for (uint8 i = 1; i < ANIMAL_COUNT; i++) {
+        for (uint8 i = 1; i < LANE_COUNT; i++) {
             uint16 d = distances[i];
             if (d > best) {
                 best = d;
