@@ -879,7 +879,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 3,
+      deployedOnBlock: 2,
     },
     AnimalRaceSimulator: {
       address: "0x8ce361602b935680e8dec218b820ff5056beb7af",
