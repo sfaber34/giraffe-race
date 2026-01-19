@@ -2,6 +2,7 @@ import { readFile } from "fs/promises";
 import path from "path";
 import type { Hex } from "viem";
 import { encodePacked, keccak256 } from "viem";
+import { DEFAULT_GIRAFFE_PALETTE, giraffePaletteFromSeed } from "~~/utils/nft/giraffePalette";
 import { DeterministicDice } from "~~/utils/race/deterministicDice";
 
 let templatePromise: Promise<string> | null = null;
@@ -41,5 +42,38 @@ export async function renderGiraffeSvg({ tokenId, seed }: RenderGiraffeSvgParams
     encodePacked(["bytes32", "uint256", "uint256", "string"], [seed, tokenId, _debugRoll, "GIRAFFE_PALETTE_V1"]),
   );
 
-  return await loadTemplate();
+  const svg = await loadTemplate();
+
+  // Palette rules live here. For now, `giraffePaletteFromSeed()` returns defaults, so output is unchanged.
+  const palette = giraffePaletteFromSeed(seed);
+
+  // Map "old" (template) colors -> "new" (palette) colors.
+  // This keeps the first iteration extremely simple (direct fill/stroke replacement).
+  const replacements: Record<string, string> = {
+    [DEFAULT_GIRAFFE_PALETTE.body]: palette.body,
+    [DEFAULT_GIRAFFE_PALETTE.faceHighlight]: palette.faceHighlight,
+    [DEFAULT_GIRAFFE_PALETTE.legs]: palette.legs,
+    [DEFAULT_GIRAFFE_PALETTE.spots]: palette.spots,
+    [DEFAULT_GIRAFFE_PALETTE.accentDark]: palette.accentDark,
+    [DEFAULT_GIRAFFE_PALETTE.feet]: palette.feet,
+    [DEFAULT_GIRAFFE_PALETTE.hornCircles]: palette.hornCircles,
+    [DEFAULT_GIRAFFE_PALETTE.eyePupil]: palette.eyePupil,
+    [DEFAULT_GIRAFFE_PALETTE.eyeWhite]: palette.eyeWhite,
+  };
+
+  return applyHexReplacements(svg, replacements);
+}
+
+function applyHexReplacements(svg: string, replacements: Record<string, string>): string {
+  let out = svg;
+  for (const [from, to] of Object.entries(replacements)) {
+    if (!from || !to) continue;
+    if (from.toLowerCase() === to.toLowerCase()) continue;
+    out = out.replace(new RegExp(escapeRegExp(from), "gi"), to);
+  }
+  return out;
+}
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

@@ -39,3 +39,6 @@ ipfs-upload.config.json
 
 # generator outputs (keep ReadinessWinProbTable.sol, but ignore resume checkpoints)
 generated/readiness-prob-checkpoint.json
+
+# Large grids of different svg color schemes
+packages/nextjs/generated/giraffe-grid.html
