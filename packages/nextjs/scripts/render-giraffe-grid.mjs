@@ -198,6 +198,8 @@ function applyPaletteFromSeed(svg, seed) {
     clampInt(lightness - (feetDarken - 6), 0, 100),
   );
 
+  const eyePupil = pickEyePupilColor(dice);
+
   return svg
     .replace(/#e8b84a/gi, body) // default body
     .replace(/#f5d76e/gi, face) // default highlight
@@ -205,7 +207,29 @@ function applyPaletteFromSeed(svg, seed) {
     .replace(/#8b6914/gi, accentDark) // neck accent rounded-rects + other dark accents
     .replace(/#b8862f/gi, legs) // legs
     .replace(/#4e342e/gi, feet) // feet
-    .replace(/#5d4037/gi, hornCircles); // horn circles / extra dark accents
+    .replace(/#5d4037/gi, hornCircles) // horn circles / extra dark accents
+    .replace(/#223\b/gi, eyePupil); // pupil circle placeholder (only this one element)
+}
+
+function pickEyePupilColor(dice) {
+  // Weighted family pick to keep the distribution reasonable.
+  // - 35% brown
+  // - 25% blue
+  // - 25% green
+  // - 15% grey
+  const pick = Number(dice.roll(100n)); // 0..99
+  const family = pick < 35 ? "brown" : pick < 60 ? "blue" : pick < 85 ? "green" : "grey";
+
+  const shades = {
+    brown: ["#2b1b0e", "#3a240f", "#4b2d14", "#5c3b1a", "#6d4a22"],
+    blue: ["#0b1d3a", "#0f2a52", "#173b73", "#1f4f96", "#2a63b8"],
+    green: ["#0d2b1f", "#113a2a", "#174b36", "#1f5f45", "#2a7556"],
+    grey: ["#1f2328", "#2b3036", "#3a414a", "#4b5560", "#5f6b78"],
+  };
+
+  const arr = shades[family] ?? shades.brown;
+  const idx = Number(dice.roll(BigInt(arr.length)));
+  return arr[idx] ?? arr[0];
 }
 
 function modHue(h) {

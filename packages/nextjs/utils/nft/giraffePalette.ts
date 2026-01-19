@@ -38,7 +38,8 @@ export const DEFAULT_GIRAFFE_PALETTE: GiraffePalette = {
   accentDark: "#8b6914",
   feet: "#4e342e",
   hornCircles: "#5d4037",
-  eyePupil: "#222",
+  // NOTE: We retagged the pupil circle in the SVG to #223 so only that single element is ever recolored.
+  eyePupil: "#223",
   eyeWhite: "#fff",
 };
 
@@ -124,6 +125,9 @@ export function giraffePaletteFromSeed(seed: Hex): GiraffePalette {
     l: clampInt(lightness - (feetDarken - 6), 0, 100),
   });
 
+  // Eye color (pupil circle): pick from curated families (not fully random).
+  const eyePupil = pickEyePupilColor(dice);
+
   return {
     ...DEFAULT_GIRAFFE_PALETTE,
     body,
@@ -133,6 +137,7 @@ export function giraffePaletteFromSeed(seed: Hex): GiraffePalette {
     legs,
     feet,
     hornCircles,
+    eyePupil,
   };
 }
 
@@ -205,4 +210,26 @@ function rgbToHex({ r, g, b }: Rgb): string {
   const gg = clampInt(g, 0, 255).toString(16).padStart(2, "0");
   const bb = clampInt(b, 0, 255).toString(16).padStart(2, "0");
   return `#${rr}${gg}${bb}`;
+}
+
+function pickEyePupilColor(dice: DeterministicDice): string {
+  // Weighted family pick to keep the distribution reasonable.
+  // - 35% brown
+  // - 25% blue
+  // - 25% green
+  // - 15% grey
+  const pick = Number(dice.roll(100n)); // 0..99
+  const family: "brown" | "blue" | "green" | "grey" =
+    pick < 35 ? "brown" : pick < 60 ? "blue" : pick < 85 ? "green" : "grey";
+
+  const shades: Record<typeof family, string[]> = {
+    brown: ["#2b1b0e", "#3a240f", "#4b2d14", "#5c3b1a", "#6d4a22"],
+    blue: ["#0b1d3a", "#0f2a52", "#173b73", "#1f4f96", "#2a63b8"],
+    green: ["#0d2b1f", "#113a2a", "#174b36", "#1f5f45", "#2a7556"],
+    grey: ["#1f2328", "#2b3036", "#3a414a", "#4b5560", "#5f6b78"],
+  };
+
+  const arr = shades[family];
+  const idx = Number(dice.roll(BigInt(arr.length)));
+  return arr[idx] ?? arr[0];
 }
