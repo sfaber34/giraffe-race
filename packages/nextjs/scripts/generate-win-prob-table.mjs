@@ -5,7 +5,7 @@ import { Worker, isMainThread, parentPort, workerData } from "node:worker_thread
 import { keccak256, toHex } from "viem";
 
 /**
- * Precompute win probabilities by readiness for 4-lane races.
+ * Precompute win probabilities by effective score (1-10) for 4-lane races.
  *
  * We compute only sorted readiness tuples (a<=b<=c<=d), count = 715.
  * The resulting table stores per-position win probabilities (basis points, 0..10000) for the sorted order.
@@ -15,13 +15,13 @@ import { keccak256, toHex } from "viem";
  * - Solidity library file containing a packed hex table (uint16 bps x 4 lanes per entry)
  *
  * Usage:
- *   node packages/nextjs/scripts/generate-readiness-prob-table.mjs --samples 50000
+ *   node packages/nextjs/scripts/generate-win-prob-table.mjs --samples 50000
  *
  * Flags:
  *   --samples N          (default 50000) Monte Carlo samples per sorted tuple
  *   --workers W          (default cpuCount-1, capped at 12) number of worker threads
- *   --out-sol PATH       (default packages/foundry/contracts/libraries/ReadinessWinProbTable.sol)
- *   --checkpoint PATH    (default packages/nextjs/tmp/readiness-prob-checkpoint.json)
+ *   --out-sol PATH       (default packages/foundry/contracts/libraries/WinProbTable.sol)
+ *   --checkpoint PATH    (default packages/nextjs/generated/win-prob-checkpoint.json)
  *   --resume             resume from checkpoint if present
  *   --progress-every M   print progress every M tuples (default 5)
  */
@@ -101,7 +101,7 @@ function ceilLog2(n) {
   return result;
 }
 
-function clampReadiness(r) {
+function clampScore(r) {
   const x = Math.floor(Number(r));
   if (!Number.isFinite(x)) return 10;
   if (x < 1) return 1;
@@ -110,8 +110,8 @@ function clampReadiness(r) {
 }
 
 // Match Solidity/TS: minBps + (readiness-1) * (10000-minBps) / 9
-function readinessBps(readiness) {
-  const r = clampReadiness(readiness);
+function scoreBps(readiness) {
+  const r = clampScore(readiness);
   const minBps = 9525;
   const range = 10_000 - minBps; // 475
   return minBps + Math.floor(((r - 1) * range) / 9);
@@ -125,7 +125,7 @@ function readinessBps(readiness) {
 function simulateRaceFromSeed({ seed, readiness }) {
   const dice = new DeterministicDice(seed);
   const distances = [0, 0, 0, 0];
-  const bps = [0, 0, 0, 0].map((_, i) => readinessBps(readiness[i] ?? 10));
+  const bps = [0, 0, 0, 0].map((_, i) => scoreBps(readiness[i] ?? 10));
 
   // constants (must match Solidity)
   const SPEED_RANGE = 10n;
@@ -198,8 +198,8 @@ function parseArgs(argv) {
   const out = {
     samples: 50_000,
     workers: Math.max(1, Math.min(12, (os.cpus().length || 1) - 1)),
-    outSol: "packages/foundry/contracts/libraries/ReadinessWinProbTable.sol",
-    checkpoint: "packages/nextjs/generated/readiness-prob-checkpoint.json",
+    outSol: "packages/foundry/contracts/libraries/WinProbTable.sol",
+    checkpoint: "packages/nextjs/generated/win-prob-checkpoint.json",
     resume: false,
     progressEvery: 5,
   };
@@ -215,7 +215,7 @@ function parseArgs(argv) {
   return out;
 }
 
-function* sortedReadinessTuples() {
+function* sortedScoreTuples() {
   for (let a = 1; a <= 10; a++) {
     for (let b = a; b <= 10; b++) {
       for (let c = b; c <= 10; c++) {
@@ -315,7 +315,7 @@ async function main() {
     for (let i = 0; i < 4; i++) tableBytes.push(...encodeU16BE(probs[i]));
   }
 
-  const tuples = Array.from(sortedReadinessTuples());
+  const tuples = Array.from(sortedScoreTuples());
   const startIndex = checkpoint.rows.length;
   if (startIndex >= totalTuples) {
     console.log("Checkpoint already complete; emitting Solidity table...");
@@ -446,8 +446,8 @@ pragma solidity ^0.8.19;
 /// @notice Readiness win probability lookup table (4 lanes).
 /// @dev Index order is all sorted tuples (a<=b<=c<=d) with a,b,c,d in [1..10], in nested-loop order.
 /// Each entry is 8 bytes: 4x uint16 (basis points) in big-endian.
-/// @dev This is a deployable contract (not a library) so \`AnimalRace\` doesn't exceed the 24KB size limit.
-contract ReadinessWinProbTable {
+/// @dev This is a deployable contract (not a library) so \`GiraffeRace\` doesn't exceed the 24KB size limit.
+contract WinProbTable {
     uint256 internal constant ENTRY_BYTES = 8;
     uint256 internal constant TABLE_LEN = 715;
 
@@ -456,8 +456,8 @@ contract ReadinessWinProbTable {
     function _indexSorted(uint8 a, uint8 b, uint8 c, uint8 d) internal pure returns (uint256 idx) {
         // Rank in nested-loop order without brute-forcing all 715 entries.
         // Count of nondecreasing length-r sequences from [s..10] is C((10-s+1)+r-1, r).
-        if (a < 1 || d > 10) revert("ReadinessWinProbTable: bad tuple");
-        if (a > b || b > c || c > d) revert("ReadinessWinProbTable: bad tuple");
+        if (a < 1 || d > 10) revert("WinProbTable: bad tuple");
+        if (a > b || b > c || c > d) revert("WinProbTable: bad tuple");
 
         for (uint8 i = 1; i < a; i++) {
             idx += _c3(uint8(13 - i)); // C((10-i)+3,3) = C(13-i,3)

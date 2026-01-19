@@ -5,11 +5,11 @@ import { ERC721 } from "../lib/openzeppelin-contracts/contracts/token/ERC721/ERC
 import { Ownable } from "../lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 
 /**
- * @title AnimalNFT
+ * @title GiraffeNFT
  * @notice Minimal ERC-721 for race animals.
  * @dev Token IDs are sequential starting at 1.
  */
-contract AnimalNFT is ERC721, Ownable {
+contract GiraffeNFT is ERC721, Ownable {
     uint256 public nextTokenId = 1;
     mapping(uint256 => string) private _animalNames;
     // Readiness is a simple 1-10 attribute that affects race performance.
@@ -27,16 +27,16 @@ contract AnimalNFT is ERC721, Ownable {
     mapping(address => uint256[]) private _ownedTokens;
     mapping(uint256 => uint256) private _ownedTokensIndex; // tokenId => index in _ownedTokens[owner]
 
-    constructor() ERC721("Animal", "ANML") Ownable(msg.sender) {}
+    constructor() ERC721("Giraffe", "GRF") Ownable(msg.sender) {}
 
     modifier onlyRace() {
-        require(msg.sender == raceContract, "AnimalNFT: not race");
+        require(msg.sender == raceContract, "GiraffeNFT: not race");
         _;
     }
 
     modifier onlyLocalTesting() {
         // Allow anyone to use testing helpers on anvil/hardhat local chain.
-        require(block.chainid == 31337, "AnimalNFT: local testing only");
+        require(block.chainid == 31337, "GiraffeNFT: local testing only");
         _;
     }
 
@@ -53,22 +53,22 @@ contract AnimalNFT is ERC721, Ownable {
     }
 
     function readinessOf(uint256 tokenId) external view returns (uint8) {
-        require(_ownerOf(tokenId) != address(0), "AnimalNFT: nonexistent token");
+        require(_ownerOf(tokenId) != address(0), "GiraffeNFT: nonexistent token");
         return _clampStat(_readiness[tokenId]);
     }
 
     function conditioningOf(uint256 tokenId) external view returns (uint8) {
-        require(_ownerOf(tokenId) != address(0), "AnimalNFT: nonexistent token");
+        require(_ownerOf(tokenId) != address(0), "GiraffeNFT: nonexistent token");
         return _clampStat(_conditioning[tokenId]);
     }
 
     function speedOf(uint256 tokenId) external view returns (uint8) {
-        require(_ownerOf(tokenId) != address(0), "AnimalNFT: nonexistent token");
+        require(_ownerOf(tokenId) != address(0), "GiraffeNFT: nonexistent token");
         return _clampStat(_speed[tokenId]);
     }
 
     function statsOf(uint256 tokenId) external view returns (uint8 readiness, uint8 conditioning, uint8 speed) {
-        require(_ownerOf(tokenId) != address(0), "AnimalNFT: nonexistent token");
+        require(_ownerOf(tokenId) != address(0), "GiraffeNFT: nonexistent token");
         readiness = _clampStat(_readiness[tokenId]);
         conditioning = _clampStat(_conditioning[tokenId]);
         speed = _clampStat(_speed[tokenId]);
@@ -77,7 +77,7 @@ contract AnimalNFT is ERC721, Ownable {
     /// @notice Decrease readiness after an NFT runs a race (floored at 1).
     /// @dev Callable only by the configured `raceContract`.
     function decreaseReadiness(uint256 tokenId) external onlyRace {
-        require(_ownerOf(tokenId) != address(0), "AnimalNFT: nonexistent token");
+        require(_ownerOf(tokenId) != address(0), "GiraffeNFT: nonexistent token");
         uint8 r = _clampStat(_readiness[tokenId]);
         if (r > 1) {
             unchecked {
@@ -100,12 +100,12 @@ contract AnimalNFT is ERC721, Ownable {
         _safeMint(to, tokenId);
     }
 
-    /// @notice Mint an AnimalNFT to an arbitrary address (permissionless).
+    /// @notice Mint an GiraffeNFT to an arbitrary address (permissionless).
     function mint(address to) external returns (uint256 tokenId) {
         return _mintAnimal(to, "", 10);
     }
 
-    /// @notice Mint an AnimalNFT with a name to an arbitrary address (permissionless).
+    /// @notice Mint an GiraffeNFT with a name to an arbitrary address (permissionless).
     function mint(address to, string calldata animalName) external returns (uint256 tokenId) {
         return _mintAnimal(to, animalName, 10);
     }
@@ -115,7 +115,7 @@ contract AnimalNFT is ERC721, Ownable {
         return _mintAnimal(msg.sender, animalName, 10);
     }
 
-    /// @notice Mint an AnimalNFT with an explicit readiness (testing helper).
+    /// @notice Mint an GiraffeNFT with an explicit readiness (testing helper).
     /// @dev Permissionless on local chain only (chainid 31337).
     function mintWithReadiness(address to, uint8 readiness, string calldata animalName)
         external
@@ -127,13 +127,13 @@ contract AnimalNFT is ERC721, Ownable {
 
     /// @notice Permissionless local testing helper to set readiness directly on an existing token.
     function setReadinessForTesting(uint256 tokenId, uint8 readiness) external onlyLocalTesting {
-        require(_ownerOf(tokenId) != address(0), "AnimalNFT: nonexistent token");
+        require(_ownerOf(tokenId) != address(0), "GiraffeNFT: nonexistent token");
         _readiness[tokenId] = _clampStat(readiness);
     }
 
     /// @notice Permissionless local testing helper to set all stats directly on an existing token.
     function setForTesting(uint256 tokenId, uint8 readiness, uint8 conditioning, uint8 speed) external onlyLocalTesting {
-        require(_ownerOf(tokenId) != address(0), "AnimalNFT: nonexistent token");
+        require(_ownerOf(tokenId) != address(0), "GiraffeNFT: nonexistent token");
         _readiness[tokenId] = _clampStat(readiness);
         _conditioning[tokenId] = _clampStat(conditioning);
         _speed[tokenId] = _clampStat(speed);

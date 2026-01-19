@@ -3,9 +3,9 @@ pragma solidity ^0.8.19;
 
 import { DeterministicDice } from "./libraries/DeterministicDice.sol";
 
-/// @notice Stateless simulator contract to keep `AnimalRace` deployed bytecode under the 24KB limit.
-/// @dev Must stay in sync with the on-chain race rules used by AnimalRace.
-contract AnimalRaceSimulator {
+/// @notice Stateless simulator contract to keep `GiraffeRace` deployed bytecode under the 24KB limit.
+/// @dev Must stay in sync with the on-chain race rules used by GiraffeRace.
+contract GiraffeRaceSimulator {
     using DeterministicDice for DeterministicDice.Dice;
 
     uint8 internal constant ANIMAL_COUNT = 4;
@@ -88,7 +88,7 @@ contract AnimalRaceSimulator {
             }
         }
 
-        require(finished, "AnimalRace: race did not finish");
+        require(finished, "GiraffeRace: race did not finish");
 
         uint16 best = distances[0];
         uint8 leaderCount = 1;

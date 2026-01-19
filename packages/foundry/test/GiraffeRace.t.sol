@@ -4,18 +4,18 @@ pragma solidity ^0.8.19;
 import "forge-std/Test.sol";
 import "forge-std/console2.sol";
 import "forge-std/StdJson.sol";
-import "../contracts/AnimalRace.sol";
-import "../contracts/AnimalRaceSimulator.sol";
-import "../contracts/AnimalNFT.sol";
-import "../contracts/libraries/ReadinessWinProbTable.sol";
+import "../contracts/GiraffeRace.sol";
+import "../contracts/GiraffeRaceSimulator.sol";
+import "../contracts/GiraffeNFT.sol";
+import "../contracts/libraries/WinProbTable.sol";
 import { DeterministicDice } from "../contracts/libraries/DeterministicDice.sol";
 
-contract AnimalRaceTest is Test {
+contract GiraffeRaceTest is Test {
     using DeterministicDice for DeterministicDice.Dice;
     using stdJson for string;
 
-    AnimalRace public race;
-    AnimalNFT public animalNft;
+    GiraffeRace public race;
+    GiraffeNFT public animalNft;
     address public owner = address(0xBEEF);
     address public alice = address(0xA11CE);
     address public bob = address(0xB0B);
@@ -32,14 +32,14 @@ contract AnimalRaceTest is Test {
     string internal constant STATS_DIR = "./tmp/win-stats";
 
     function setUp() public {
-        animalNft = new AnimalNFT();
+        animalNft = new GiraffeNFT();
         for (uint256 i = 0; i < 4; i++) {
             houseTokenIds[i] = animalNft.mint(owner, string(abi.encodePacked("house-", vm.toString(i))));
         }
 
-        ReadinessWinProbTable table = new ReadinessWinProbTable();
-        AnimalRaceSimulator simulator = new AnimalRaceSimulator();
-        race = new AnimalRace(address(animalNft), owner, houseTokenIds, address(table), address(simulator));
+        WinProbTable table = new WinProbTable();
+        GiraffeRaceSimulator simulator = new GiraffeRaceSimulator();
+        race = new GiraffeRace(address(animalNft), owner, houseTokenIds, address(table), address(simulator));
         animalNft.setRaceContract(address(race));
         vm.deal(alice, 10 ether);
         vm.deal(bob, 10 ether);
@@ -215,7 +215,7 @@ contract AnimalRaceTest is Test {
 
         _placeBet(alice, raceId, 2, 1 ether);
 
-        vm.expectRevert(AnimalRace.AlreadyBet.selector);
+        vm.expectRevert(GiraffeRace.AlreadyBet.selector);
         _placeBet(alice, raceId, 3, 1 ether);
     }
 
@@ -279,7 +279,7 @@ contract AnimalRaceTest is Test {
         // Move far ahead so blockhash is unavailable (returns 0)
         vm.roll(uint256(closeBlock) + 300);
 
-        vm.expectRevert(AnimalRace.BlockhashUnavailable.selector);
+        vm.expectRevert(GiraffeRace.BlockhashUnavailable.selector);
         race.settleRace();
     }
 
@@ -296,7 +296,7 @@ contract AnimalRaceTest is Test {
 
         vm.roll(uint256(submissionCloseBlock));
         vm.prank(alice);
-        vm.expectRevert(AnimalRace.SubmissionsClosed.selector);
+        vm.expectRevert(GiraffeRace.SubmissionsClosed.selector);
         race.submitAnimal(aliceTokenId);
     }
 
@@ -309,7 +309,7 @@ contract AnimalRaceTest is Test {
         uint64 submissionCloseBlock = closeBlock - 10;
 
         vm.roll(uint256(submissionCloseBlock - 1));
-        vm.expectRevert(AnimalRace.BettingNotOpen.selector);
+        vm.expectRevert(GiraffeRace.BettingNotOpen.selector);
         vm.prank(alice);
         race.placeBet{value: 1 ether}(0);
     }
@@ -318,7 +318,7 @@ contract AnimalRaceTest is Test {
         vm.roll(700);
         race.createRace();
 
-        vm.expectRevert(AnimalRace.PreviousRaceNotSettled.selector);
+        vm.expectRevert(GiraffeRace.PreviousRaceNotSettled.selector);
         race.createRace();
     }
 

@@ -2,11 +2,11 @@
 pragma solidity ^0.8.19;
 
 import { DeterministicDice } from "./libraries/DeterministicDice.sol";
-import { ReadinessWinProbTable } from "./libraries/ReadinessWinProbTable.sol";
-import { AnimalRaceSimulator } from "./AnimalRaceSimulator.sol";
+import { WinProbTable } from "./libraries/WinProbTable.sol";
+import { GiraffeRaceSimulator } from "./GiraffeRaceSimulator.sol";
 import { IERC721 } from "../lib/openzeppelin-contracts/contracts/token/ERC721/IERC721.sol";
 
-interface IAnimalNFT is IERC721 {
+interface IGiraffeNFT is IERC721 {
     function readinessOf(uint256 tokenId) external view returns (uint8);
     function conditioningOf(uint256 tokenId) external view returns (uint8);
     function speedOf(uint256 tokenId) external view returns (uint8);
@@ -15,7 +15,7 @@ interface IAnimalNFT is IERC721 {
 }
 
 /**
- * @title AnimalRace
+ * @title GiraffeRace
  * @notice Simple on-chain betting game: 4 identical animals, winner picked deterministically from a seed.
  * @dev v1: single bet per address per race, parimutuel payout (winners split the pot pro-rata).
  *
@@ -25,7 +25,7 @@ interface IAnimalNFT is IERC721 {
  * NOTE: `blockhash(closeBlock)` is only available for the most recent ~256 blocks,
  * so `settleRace` must be called soon after `closeBlock`.
  */
-contract AnimalRace {
+contract GiraffeRace {
     using DeterministicDice for DeterministicDice.Dice;
 
     uint8 public constant ANIMAL_COUNT = 4;
@@ -48,9 +48,9 @@ contract AnimalRace {
     uint8 public constant SPEED_RANGE = 10; // speeds per tick: 1-10
 
     address public house;
-    IAnimalNFT public animalNft;
-    ReadinessWinProbTable public winProbTable;
-    AnimalRaceSimulator public simulator;
+    IGiraffeNFT public giraffeNft;
+    WinProbTable public winProbTable;
+    GiraffeRaceSimulator public simulator;
     // NOTE (testing): readiness decay after races is currently disabled in code.
     // When deploying a live version where readiness should always decay, uncomment the call in `_settleRace`.
 
@@ -72,7 +72,7 @@ contract AnimalRace {
     struct RaceAnimals {
         // Number of lanes that have been assigned tokenIds (selected entrants + house fill).
         uint8 assignedCount;
-        // Token ID for each lane (0..3). 0 means unassigned (valid tokenIds start at 1 in our AnimalNFT).
+        // Token ID for each lane (0..3). 0 means unassigned (valid tokenIds start at 1 in our GiraffeNFT).
         uint256[4] tokenIds;
         // The owner snapshot for each lane at the time the entrant was selected (or `house` for house fill).
         address[4] originalOwners;
@@ -170,16 +170,16 @@ contract AnimalRace {
     receive() external payable { }
 
     constructor(
-        address _animalNft,
+        address _giraffeNft,
         address _house,
         uint256[ANIMAL_COUNT] memory _houseAnimalTokenIds,
         address _winProbTable,
         address _simulator
     ) {
-        animalNft = IAnimalNFT(_animalNft);
+        giraffeNft = IGiraffeNFT(_giraffeNft);
         house = _house;
-        winProbTable = ReadinessWinProbTable(_winProbTable);
-        simulator = AnimalRaceSimulator(_simulator);
+        winProbTable = WinProbTable(_winProbTable);
+        simulator = GiraffeRaceSimulator(_simulator);
         houseAnimalTokenIds = _houseAnimalTokenIds;
 
         // Basic sanity: prevent accidental all-zeros configuration.
@@ -358,7 +358,7 @@ contract AnimalRace {
         if (r.settled) revert AlreadySettled();
 
         if (hasSubmittedAnimal[raceId][msg.sender]) revert AlreadySubmitted();
-        if (animalNft.ownerOf(tokenId) != msg.sender) revert NotTokenOwner();
+        if (giraffeNft.ownerOf(tokenId) != msg.sender) revert NotTokenOwner();
         // Prevent users from submitting one of the reserved house animals.
         for (uint256 i = 0; i < ANIMAL_COUNT; i++) {
             if (houseAnimalTokenIds[i] == tokenId) revert InvalidHouseAnimal();
@@ -798,8 +798,8 @@ contract AnimalRace {
         // Snapshot effective readiness for each lane at finalization time.
         RaceAnimals storage raSnapshot = raceAnimals[raceId];
         for (uint8 lane = 0; lane < ANIMAL_COUNT; lane++) {
-            (uint8 r0, uint8 c0, uint8 s0) = animalNft.statsOf(raSnapshot.tokenIds[lane]);
-            // Defensive clamps (AnimalNFT should already return 1..10).
+            (uint8 r0, uint8 c0, uint8 s0) = giraffeNft.statsOf(raSnapshot.tokenIds[lane]);
+            // Defensive clamps (GiraffeNFT should already return 1..10).
             if (r0 == 0) r0 = 10;
             if (r0 > 10) r0 = 10;
             if (r0 < 1) r0 = 1;
@@ -903,7 +903,7 @@ contract AnimalRace {
         uint256 validCount = 0;
         for (uint256 i = 0; i < n; i++) {
             RaceEntry storage e = entries[i];
-            if (animalNft.ownerOf(e.tokenId) == e.submitter) {
+            if (giraffeNft.ownerOf(e.tokenId) == e.submitter) {
                 validIdx[validCount++] = i;
             }
         }
@@ -915,7 +915,7 @@ contract AnimalRace {
             uint8 lane = 0;
             for (uint256 i = 0; i < n && lane < ANIMAL_COUNT; i++) {
                 RaceEntry storage e = entries[i];
-                if (animalNft.ownerOf(e.tokenId) == e.submitter) {
+                if (giraffeNft.ownerOf(e.tokenId) == e.submitter) {
                     ra.tokenIds[lane] = e.tokenId;
                     ra.originalOwners[lane] = e.submitter;
                     lane++;
@@ -952,7 +952,7 @@ contract AnimalRace {
             availableIdx[uint8(pick)] = availableIdx[availableCount];
 
             uint256 houseTokenId = houseAnimalTokenIds[idx];
-            if (animalNft.ownerOf(houseTokenId) != house) revert InvalidHouseAnimal();
+            if (giraffeNft.ownerOf(houseTokenId) != house) revert InvalidHouseAnimal();
 
             ra.tokenIds[lane] = houseTokenId;
             ra.originalOwners[lane] = house;
@@ -967,11 +967,11 @@ contract AnimalRace {
         for (uint8 lane = 0; lane < ANIMAL_COUNT; lane++) {
             uint256 tokenId = ra.tokenIds[lane];
             if (tokenId != 0) {
-                animalNft.decreaseReadiness(tokenId);
+                giraffeNft.decreaseReadiness(tokenId);
             }
         }
     }
 
-    // (Simulation logic moved to `AnimalRaceSimulator` to stay under the 24KB EIP-170 size limit.)
+    // (Simulation logic moved to `GiraffeRaceSimulator` to stay under the 24KB EIP-170 size limit.)
 }
 

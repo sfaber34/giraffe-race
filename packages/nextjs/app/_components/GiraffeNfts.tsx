@@ -12,7 +12,7 @@ import {
 
 const LANE_EMOJI = "🦒";
 
-export const AnimalNfts = () => {
+export const GiraffeNfts = () => {
   const { address: connectedAddress } = useAccount();
   const { targetNetwork } = useTargetNetwork();
   const publicClient = usePublicClient({ chainId: targetNetwork.id });
@@ -25,7 +25,7 @@ export const AnimalNfts = () => {
   const [isAnimalNftDeployedOnChain, setIsAnimalNftDeployedOnChain] = useState<boolean | null>(null);
 
   const { data: animalNftContract } = useDeployedContractInfo({
-    contractName: "AnimalNFT",
+    contractName: "GiraffeNFT",
   });
 
   useEffect(() => {
@@ -50,13 +50,13 @@ export const AnimalNfts = () => {
   }, [publicClient, animalNftContract?.address]);
 
   const { data: nextTokenId } = useScaffoldReadContract({
-    contractName: "AnimalNFT",
+    contractName: "GiraffeNFT",
     functionName: "nextTokenId",
     query: { enabled: !!animalNftContract },
   });
 
   const { data: ownedTokenIdsData } = useScaffoldReadContract({
-    contractName: "AnimalNFT",
+    contractName: "GiraffeNFT",
     functionName: "tokensOfOwner",
     args: [connectedAddress],
     query: { enabled: !!connectedAddress && !!animalNftContract },
@@ -68,7 +68,7 @@ export const AnimalNfts = () => {
   }, [ownedTokenIdsData]);
 
   const { writeContractAsync: writeAnimalNftAsync } = useScaffoldWriteContract({
-    contractName: "AnimalNFT",
+    contractName: "GiraffeNFT",
   });
 
   useEffect(() => {
@@ -163,19 +163,19 @@ export const AnimalNfts = () => {
     <div className="flex flex-col gap-8 w-full max-w-4xl px-6 py-10">
       <div className="flex flex-col gap-2">
         <h1 className="text-4xl font-bold">NFTs</h1>
-        <p className="text-base-content/70">Mint and view your Animal NFTs.</p>
+        <p className="text-base-content/70">Mint and view your Giraffe NFTs.</p>
       </div>
 
       <div className="grid grid-cols-1 gap-4">
         <div className="card bg-base-200 shadow">
           <div className="card-body gap-3">
             <div className="flex items-center justify-between">
-              <h2 className="card-title">Mint an Animal NFT</h2>
+              <h2 className="card-title">Mint a Giraffe NFT</h2>
               <div className="text-xs opacity-70">
                 {isAnimalNftDeployedOnChain === null
                   ? "Checking deployment…"
                   : isAnimalNftDeployedOnChain
-                    ? "AnimalNFT deployed"
+                    ? "GiraffeNFT deployed"
                     : "Not deployed"}
               </div>
             </div>
@@ -183,7 +183,7 @@ export const AnimalNfts = () => {
             {isAnimalNftDeployedOnChain === false ? (
               <div className="alert alert-warning">
                 <span className="text-sm">
-                  AnimalNFT isn’t deployed on the connected network (or you restarted your local chain). Run `yarn
+                  GiraffeNFT isn’t deployed on the connected network (or you restarted your local chain). Run `yarn
                   deploy` and refresh, or switch networks.
                 </span>
               </div>

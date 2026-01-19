@@ -1,7 +1,7 @@
 # 🏗 Scaffold-ETH 2
 
 ## What it is
-Basic test of how to do a deterministic animal race game using deterministic dice. The seed for a race is keccak256(abi.encodePacked(bh, raceId, address(this))). It has many limitations (betting payout scheme, using eth for bets, a draw picks a winner at random between the draw animals, All animals have same (no) stats, I'm sure other stuff) but a basic test so far.
+Basic test of how to do a deterministic giraffe race game using deterministic dice. The seed for a race is keccak256(abi.encodePacked(bh, raceId, address(this))). It has many limitations (betting payout scheme, using eth for bets, a draw picks a winner at random between the draw giraffes, All giraffes have same (no) stats, I'm sure other stuff) but a basic test so far.
 
 ## How to test it
 - Send a transaction to createRace. Either use the one with closeBlock input to set a closeBlock in the future or use the one without an input to automatically set closeBlock to +10 blocks in the future
@@ -11,7 +11,7 @@ Basic test of how to do a deterministic animal race game using deterministic dic
 - Enter your settled race ID on the homepage to see if the TS emoji replay matches the solidity result
 - Hit claim function to get paid if you bet correctly.
 
-Note: The default owner of AnimalRace.sol is 0x668887c62AF23E42aB10105CB4124CF2C656F331. Might have to change that in DeployAnimalRace.s.sol.
+Note: The default owner of GiraffeRace.sol is 0x668887c62AF23E42aB10105CB4124CF2C656F331. Might have to change that in DeployGiraffeRace.s.sol.
 
 <h4 align="center">
   <a href="https://docs.scaffoldeth.io">Documentation</a> |

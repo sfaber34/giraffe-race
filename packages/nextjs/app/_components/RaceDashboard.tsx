@@ -17,7 +17,7 @@ import { simulateRaceFromSeed } from "~~/utils/race/simulateRace";
 const LANE_COUNT = 4 as const;
 const LANE_EMOJI = "🦒";
 
-// Keep in sync with `AnimalRace.sol`
+// Keep in sync with `GiraffeRace.sol`
 const SUBMISSION_CLOSE_OFFSET_BLOCKS = 10n;
 const BETTING_CLOSE_OFFSET_BLOCKS = 20n;
 const SPEED_RANGE = 10;
@@ -71,7 +71,7 @@ const BlockCountdownBar = ({
 const LaneName = ({ tokenId, fallback }: { tokenId: bigint; fallback: string }) => {
   const enabled = tokenId !== 0n;
   const { data: nameData } = useScaffoldReadContract({
-    contractName: "AnimalNFT",
+    contractName: "GiraffeNFT",
     functionName: "nameOf",
     args: [enabled ? tokenId : undefined],
     query: { enabled },
@@ -108,14 +108,14 @@ export const RaceDashboard = () => {
   const [svgResetNonce, setSvgResetNonce] = useState(0);
 
   const { data: animalRaceContract, isLoading: isAnimalRaceLoading } = useDeployedContractInfo({
-    contractName: "AnimalRace",
+    contractName: "GiraffeRace",
   });
-  const { data: animalNftContract } = useDeployedContractInfo({ contractName: "AnimalNFT" });
+  const { data: animalNftContract } = useDeployedContractInfo({ contractName: "GiraffeNFT" });
 
   const tx = useTransactor();
 
   const { data: ownedTokenIdsData, isLoading: isOwnedTokensLoading } = useScaffoldReadContract({
-    contractName: "AnimalNFT",
+    contractName: "GiraffeNFT",
     functionName: "tokensOfOwner",
     args: [connectedAddress],
     query: { enabled: !!connectedAddress },
@@ -188,7 +188,7 @@ export const RaceDashboard = () => {
   }, [publicClient, animalNftContract?.address, animalNftContract?.abi, ownedTokenIds]);
 
   const { data: nextRaceIdData } = useScaffoldReadContract({
-    contractName: "AnimalRace",
+    contractName: "GiraffeRace",
     functionName: "nextRaceId",
     query: { enabled: !!animalRaceContract },
   });
@@ -197,7 +197,7 @@ export const RaceDashboard = () => {
   const latestRaceId = hasAnyRace ? nextRaceId - 1n : null;
 
   const { data: settledLiabilityData } = useScaffoldReadContract({
-    contractName: "AnimalRace",
+    contractName: "GiraffeRace",
     functionName: "settledLiability",
     query: { enabled: !!animalRaceContract },
   });
@@ -229,21 +229,21 @@ export const RaceDashboard = () => {
     !hasAnyRace || viewingRaceId === null || latestRaceId === null || viewingRaceId === latestRaceId;
 
   const { data: raceData } = useScaffoldReadContract({
-    contractName: "AnimalRace",
+    contractName: "GiraffeRace",
     functionName: "getRaceById",
     args: [viewingRaceId ?? 0n],
     query: { enabled: hasAnyRace && viewingRaceId !== null },
   });
 
   const { data: raceAnimalsData } = useScaffoldReadContract({
-    contractName: "AnimalRace",
+    contractName: "GiraffeRace",
     functionName: "getRaceAnimalsById",
     args: [viewingRaceId ?? 0n],
     query: { enabled: hasAnyRace && viewingRaceId !== null },
   });
 
   const { data: raceReadinessData } = useScaffoldReadContract({
-    contractName: "AnimalRace",
+    contractName: "GiraffeRace",
     // Added in readiness upgrade; cast to avoid ABI typing mismatch until contracts are regenerated.
     functionName: "getRaceReadinessById" as any,
     args: [viewingRaceId ?? 0n],
@@ -251,7 +251,7 @@ export const RaceDashboard = () => {
   } as any);
 
   const { data: raceOddsData } = useScaffoldReadContract({
-    contractName: "AnimalRace",
+    contractName: "GiraffeRace",
     functionName: "getRaceOddsById" as any,
     args: [viewingRaceId ?? 0n],
     query: { enabled: hasAnyRace && viewingRaceId !== null },
@@ -305,25 +305,25 @@ export const RaceDashboard = () => {
   }, [parsedAnimals?.tokenIds]);
 
   const { data: lane0StatsData } = useScaffoldReadContract({
-    contractName: "AnimalNFT",
+    contractName: "GiraffeNFT",
     functionName: "statsOf" as any,
     args: [laneTokenIds[0]],
     query: { enabled: !!animalNftContract && laneTokenIds[0] !== 0n },
   } as any);
   const { data: lane1StatsData } = useScaffoldReadContract({
-    contractName: "AnimalNFT",
+    contractName: "GiraffeNFT",
     functionName: "statsOf" as any,
     args: [laneTokenIds[1]],
     query: { enabled: !!animalNftContract && laneTokenIds[1] !== 0n },
   } as any);
   const { data: lane2StatsData } = useScaffoldReadContract({
-    contractName: "AnimalNFT",
+    contractName: "GiraffeNFT",
     functionName: "statsOf" as any,
     args: [laneTokenIds[2]],
     query: { enabled: !!animalNftContract && laneTokenIds[2] !== 0n },
   } as any);
   const { data: lane3StatsData } = useScaffoldReadContract({
-    contractName: "AnimalNFT",
+    contractName: "GiraffeNFT",
     functionName: "statsOf" as any,
     args: [laneTokenIds[3]],
     query: { enabled: !!animalNftContract && laneTokenIds[3] !== 0n },
@@ -403,7 +403,7 @@ export const RaceDashboard = () => {
   }, [betAmountEth]);
 
   const { data: myBetData } = useScaffoldReadContract({
-    contractName: "AnimalRace",
+    contractName: "GiraffeRace",
     functionName: "getBetById",
     args: [viewingRaceId ?? 0n, connectedAddress],
     query: { enabled: !!animalRaceContract && !!connectedAddress && hasAnyRace && viewingRaceId !== null },
@@ -441,14 +441,14 @@ export const RaceDashboard = () => {
   }, [myBet?.hasBet, myBet?.animal]);
 
   const { data: nextWinningClaimData } = useScaffoldReadContract({
-    contractName: "AnimalRace",
+    contractName: "GiraffeRace",
     functionName: "getNextWinningClaim",
     args: [connectedAddress],
     query: { enabled: !!animalRaceContract && !!connectedAddress },
   });
 
   const { data: winningClaimRemainingData } = useScaffoldReadContract({
-    contractName: "AnimalRace",
+    contractName: "GiraffeRace",
     functionName: "getWinningClaimRemaining",
     args: [connectedAddress],
     query: { enabled: !!animalRaceContract && !!connectedAddress },
@@ -492,7 +492,7 @@ export const RaceDashboard = () => {
     setJumpToNextWinningClaimAfterClaim(false);
   }, [jumpToNextWinningClaimAfterClaim, nextWinningClaim?.hasClaim, nextWinningClaim?.raceId]);
 
-  const { writeContractAsync: writeAnimalRaceAsync } = useScaffoldWriteContract({ contractName: "AnimalRace" });
+  const { writeContractAsync: writeAnimalRaceAsync } = useScaffoldWriteContract({ contractName: "GiraffeRace" });
 
   const mineBlocks = async (count: number) => {
     if (!publicClient) return;
@@ -1103,7 +1103,7 @@ export const RaceDashboard = () => {
                   {isAnimalRaceLoading
                     ? "Checking contract…"
                     : animalRaceContract
-                      ? "AnimalRace deployed"
+                      ? "GiraffeRace deployed"
                       : "Not deployed"}
                 </div>
               </div>
@@ -1234,12 +1234,12 @@ export const RaceDashboard = () => {
               <div className="flex flex-col gap-2">
                 <div className="text-sm font-medium">Fund bankroll</div>
                 {!animalRaceContract ? (
-                  <div className="text-xs opacity-70">Deploy the contracts first to get the AnimalRace address.</div>
+                  <div className="text-xs opacity-70">Deploy the contracts first to get the GiraffeRace address.</div>
                 ) : (
                   <>
                     <div className="text-xs">
                       <div className="flex justify-between">
-                        <span className="opacity-70">AnimalRace balance</span>
+                        <span className="opacity-70">GiraffeRace balance</span>
                         <span className="font-mono">
                           <Balance address={animalRaceContract.address as `0x${string}`} />
                         </span>
@@ -1281,7 +1281,7 @@ export const RaceDashboard = () => {
                       }}
                     >
                       {isFundingRace ? <span className="loading loading-spinner loading-xs" /> : null}
-                      <span>{isFundingRace ? "Funding…" : "Send ETH to AnimalRace"}</span>
+                      <span>{isFundingRace ? "Funding…" : "Send ETH to GiraffeRace"}</span>
                     </button>
                     <div className="text-xs opacity-70">
                       This is just a plain ETH transfer to the contract (used to cover fixed-odds payouts).

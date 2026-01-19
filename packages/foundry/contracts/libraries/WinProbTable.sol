@@ -4,8 +4,8 @@ pragma solidity ^0.8.19;
 /// @notice Readiness win probability lookup table (4 lanes).
 /// @dev Index order is all sorted tuples (a<=b<=c<=d) with a,b,c,d in [1..10], in nested-loop order.
 /// Each entry is 8 bytes: 4x uint16 (basis points) in big-endian.
-/// @dev This is a deployable contract (not a library) so `AnimalRace` doesn't exceed the 24KB size limit.
-contract ReadinessWinProbTable {
+/// @dev This is a deployable contract (not a library) so `GiraffeRace` doesn't exceed the 24KB size limit.
+contract WinProbTable {
     uint256 internal constant ENTRY_BYTES = 8;
     uint256 internal constant TABLE_LEN = 715;
 
@@ -14,8 +14,8 @@ contract ReadinessWinProbTable {
     function _indexSorted(uint8 a, uint8 b, uint8 c, uint8 d) internal pure returns (uint256 idx) {
         // Rank in nested-loop order without brute-forcing all 715 entries.
         // Count of nondecreasing length-r sequences from [s..10] is C((10-s+1)+r-1, r).
-        if (a < 1 || d > 10) revert("ReadinessWinProbTable: bad tuple");
-        if (a > b || b > c || c > d) revert("ReadinessWinProbTable: bad tuple");
+        if (a < 1 || d > 10) revert("WinProbTable: bad tuple");
+        if (a > b || b > c || c > d) revert("WinProbTable: bad tuple");
 
         for (uint8 i = 1; i < a; i++) {
             idx += _c3(uint8(13 - i)); // C((10-i)+3,3) = C(13-i,3)

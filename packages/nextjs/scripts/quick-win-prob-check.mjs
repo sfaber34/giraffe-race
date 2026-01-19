@@ -1,10 +1,10 @@
 import { keccak256, toHex } from "viem";
 
 /**
- * Quick Monte Carlo sanity check for readiness tuples.
+ * Quick Monte Carlo sanity check for effective-score tuples.
  *
  * Usage:
- *   node packages/nextjs/scripts/quick-readiness-check.mjs --samples 20000
+ *   node packages/nextjs/scripts/quick-win-prob-check.mjs --samples 20000
  */
 
 // -----------------------
@@ -86,7 +86,7 @@ function ceilLog2(n) {
 // Readiness + race sim (must match Solidity)
 // -----------------------
 
-function clampReadiness(r) {
+function clampScore(r) {
   const x = Math.floor(Number(r));
   if (!Number.isFinite(x)) return 10;
   if (x < 1) return 1;
@@ -94,8 +94,8 @@ function clampReadiness(r) {
   return x;
 }
 
-function readinessBps(readiness, minBps) {
-  const r = clampReadiness(readiness);
+function scoreBps(readiness, minBps) {
+  const r = clampScore(readiness);
   const range = 10_000 - minBps;
   return minBps + Math.floor(((r - 1) * range) / 9);
 }
@@ -109,7 +109,7 @@ function simulateRaceFromSeed({ seed, readiness }) {
   const dice = new DeterministicDice(seed);
   const distances = [0, 0, 0, 0];
   const minBps = readiness.minBps ?? 9000;
-  const bps = [0, 0, 0, 0].map((_, i) => readinessBps(readiness[i] ?? 10, minBps));
+  const bps = [0, 0, 0, 0].map((_, i) => scoreBps(readiness[i] ?? 10, minBps));
 
   const SPEED_RANGE = 10n;
   const TRACK_LENGTH = 1000;
@@ -197,7 +197,7 @@ function winRates(tuple, samples) {
 }
 
 function impliedOddsXFromPBps(pBps, houseEdgeBps = 500) {
-  // matches AnimalRace: oBps = ODDS_SCALE*(ODDS_SCALE-HOUSE_EDGE_BPS)/pBps, where ODDS_SCALE=10000.
+  // matches GiraffeRace: oBps = ODDS_SCALE*(ODDS_SCALE-HOUSE_EDGE_BPS)/pBps, where ODDS_SCALE=10000.
   const oBps = (10_000 * (10_000 - houseEdgeBps)) / Math.max(1, pBps);
   return oBps / 10_000;
 }

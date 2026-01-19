@@ -1,12 +1,12 @@
 "use client";
 
 import type { NextPage } from "next";
-import { AnimalNfts } from "~~/app/_components/AnimalNfts";
+import { GiraffeNfts } from "~~/app/_components/GiraffeNfts";
 
 const NftsPage: NextPage = () => {
   return (
     <div className="flex items-center flex-col grow">
-      <AnimalNfts />
+      <GiraffeNfts />
     </div>
   );
 };

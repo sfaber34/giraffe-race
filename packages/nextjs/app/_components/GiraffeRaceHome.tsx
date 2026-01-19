@@ -2,6 +2,6 @@
 
 import { RaceDashboard } from "~~/app/_components/RaceDashboard";
 
-export const AnimalRaceHome = () => {
+export const GiraffeRaceHome = () => {
   return <RaceDashboard />;
 };
