@@ -53,6 +53,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "baseTokenURI",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "string",
+              internalType: "string",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "conditioningOf",
           inputs: [
             {
@@ -386,6 +399,25 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "seedOf",
+          inputs: [
+            {
+              name: "tokenId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "setApprovalForAll",
           inputs: [
             {
@@ -397,6 +429,19 @@ const deployedContracts = {
               name: "approved",
               type: "bool",
               internalType: "bool",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "setBaseTokenURI",
+          inputs: [
+            {
+              name: "newBaseTokenURI",
+              type: "string",
+              internalType: "string",
             },
           ],
           outputs: [],
@@ -661,6 +706,50 @@ const deployedContracts = {
               type: "bool",
               indexed: false,
               internalType: "bool",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "BaseTokenURISet",
+          inputs: [
+            {
+              name: "baseTokenURI",
+              type: "string",
+              indexed: false,
+              internalType: "string",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "GiraffeMinted",
+          inputs: [
+            {
+              name: "tokenId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "to",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "seed",
+              type: "bytes32",
+              indexed: false,
+              internalType: "bytes32",
+            },
+            {
+              name: "name",
+              type: "string",
+              indexed: false,
+              internalType: "string",
             },
           ],
           anonymous: false,
@@ -961,7 +1050,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 2,
+      deployedOnBlock: 4,
     },
     GiraffeRace: {
       address: "0xed1db453c3156ff3155a97ad217b3087d5dc5f6e",
@@ -2180,7 +2269,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 3,
+      deployedOnBlock: 4,
     },
   },
 } as const;

@@ -41,4 +41,5 @@ ipfs-upload.config.json
 generated/readiness-prob-checkpoint.json
 
 # Large grids of different svg color schemes
-packages/nextjs/generated/giraffe-grid.html
+/generated/giraffe-grid.html
+/generated/giraffe-grid-*.html
