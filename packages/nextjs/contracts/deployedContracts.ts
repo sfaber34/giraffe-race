@@ -961,7 +961,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 3,
+      deployedOnBlock: 2,
     },
     GiraffeRace: {
       address: "0xed1db453c3156ff3155a97ad217b3087d5dc5f6e",

@@ -11,7 +11,12 @@ import { Ownable } from "../lib/openzeppelin-contracts/contracts/access/Ownable.
  */
 contract GiraffeNFT is ERC721, Ownable {
     uint256 public nextTokenId = 1;
+    /// @notice Base token URI used by OZ's ERC721 `tokenURI`.
+    /// @dev Set this to your Next.js route, e.g. "https://yourdomain.com/api/nft/".
+    string public baseTokenURI;
+
     mapping(uint256 => string) private _giraffeNames;
+    mapping(uint256 => bytes32) private _seeds;
     // Readiness is a simple 1-10 attribute that affects race performance.
     // New mints start at 10 and decrease by 1 (floored at 1) after running a race.
     mapping(uint256 => uint8) private _readiness; // 0 = legacy/uninitialized (treated as 10)
@@ -28,6 +33,9 @@ contract GiraffeNFT is ERC721, Ownable {
     mapping(address => uint256[]) private _ownedTokens;
     mapping(uint256 => uint256) private _ownedTokensIndex; // tokenId => index in _ownedTokens[owner]
 
+    event BaseTokenURISet(string baseTokenURI);
+    event GiraffeMinted(uint256 indexed tokenId, address indexed to, bytes32 seed, string name);
+
     constructor() ERC721("Giraffe", "GRF") Ownable(msg.sender) {}
 
     modifier onlyRace() {
@@ -43,6 +51,21 @@ contract GiraffeNFT is ERC721, Ownable {
 
     function setRaceContract(address _race) external onlyOwner {
         raceContract = _race;
+    }
+
+    function setBaseTokenURI(string calldata newBaseTokenURI) external onlyOwner {
+        baseTokenURI = newBaseTokenURI;
+        emit BaseTokenURISet(newBaseTokenURI);
+    }
+
+    /// @notice Random seed for a given tokenId (used by off-chain SVG/metadata rendering).
+    function seedOf(uint256 tokenId) external view returns (bytes32) {
+        require(_ownerOf(tokenId) != address(0), "GiraffeNFT: nonexistent token");
+        return _seeds[tokenId];
+    }
+
+    function _baseURI() internal view override returns (string memory) {
+        return baseTokenURI;
     }
 
     function _clampStat(uint8 stat) internal pure returns (uint8) {
@@ -93,12 +116,18 @@ contract GiraffeNFT is ERC721, Ownable {
         if (bytes(giraffeName).length != 0) {
             _giraffeNames[tokenId] = giraffeName;
         }
+        // On-chain entropy seed (gameable, but deterministic and reproducible).
+        // Uses previous blockhash so it's always available.
+        bytes32 bh = block.number > 0 ? blockhash(block.number - 1) : bytes32(0);
+        bytes32 seed = keccak256(abi.encodePacked(bh, address(this), tokenId, to, "GIRAFFE_SEED_V1"));
+        _seeds[tokenId] = seed;
         // All stats are [1..10] (0 treated as 10 for backwards compatibility).
         // New mints should be full stats (10), but we keep an explicit readiness parameter for local testing.
         _readiness[tokenId] = _clampStat(readiness);
         _conditioning[tokenId] = 10;
         _speed[tokenId] = 10;
         _safeMint(to, tokenId);
+        emit GiraffeMinted(tokenId, to, seed, giraffeName);
     }
 
     /// @notice Mint an GiraffeNFT to an arbitrary address (permissionless).
