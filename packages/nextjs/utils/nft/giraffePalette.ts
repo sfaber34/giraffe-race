@@ -97,12 +97,42 @@ export function giraffePaletteFromSeed(seed: Hex): GiraffePalette {
     l: clampInt(lightness - (spotsDarken + 12), 0, 100),
   });
 
+  // Legs/feet: analogous to body hue (NOT spot rules).
+  // We want them to feel like the same character, but with some variation and a darker value range.
+  const legsHue = modHue(hue + (Number(dice.roll(31n)) - 15)); // -15..+15
+  const legsSatDelta = Number(dice.roll(13n)); // 0..12
+  const legsDarken = 8 + Number(dice.roll(11n)); // -8..-18
+  const legs = hslToHex({
+    h: legsHue,
+    s: clampInt(saturation - legsSatDelta, 0, 100),
+    l: clampInt(lightness - legsDarken, 0, 100),
+  });
+
+  const feetHue = modHue(hue + (Number(dice.roll(21n)) - 10)); // -10..+10
+  const feetSatDelta = 8 + Number(dice.roll(13n)); // 8..20
+  const feetDarken = 22 + Number(dice.roll(13n)); // -22..-34
+  const feet = hslToHex({
+    h: feetHue,
+    s: clampInt(saturation - feetSatDelta, 0, 100),
+    l: clampInt(lightness - feetDarken, 0, 100),
+  });
+
+  // Horn circles/extra dark accents: close to feet but slightly different for separation.
+  const hornCircles = hslToHex({
+    h: feetHue,
+    s: clampInt(saturation - (feetSatDelta + 6), 0, 100),
+    l: clampInt(lightness - (feetDarken - 6), 0, 100),
+  });
+
   return {
     ...DEFAULT_GIRAFFE_PALETTE,
     body,
     faceHighlight,
     spots,
     accentDark,
+    legs,
+    feet,
+    hornCircles,
   };
 }
 

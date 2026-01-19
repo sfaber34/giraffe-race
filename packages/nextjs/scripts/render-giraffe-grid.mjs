@@ -131,7 +131,7 @@ const html = `<!doctype html>
   <body>
     <div class="wrap">
       <div class="hint">
-        ${count} samples. Today all images are identical (palette rules not applied yet), but each cell has a distinct seed in its tooltip.
+        ${count} samples. Seed-derived palette is applied (body + face + spots + accents + legs/feet). Each cell includes its seed in the tooltip.
       </div>
       <div class="grid">
         ${items.join("\n")}
@@ -181,11 +181,31 @@ function applyPaletteFromSeed(svg, seed) {
     clampInt(lightness - (spotsDarken + 12), 0, 100),
   );
 
+  // Legs/feet: analogous to body hue (NOT spot rules).
+  const legsHue = modHue(hue + (Number(dice.roll(31n)) - 15)); // -15..+15
+  const legsSatDelta = Number(dice.roll(13n)); // 0..12
+  const legsDarken = 8 + Number(dice.roll(11n)); // -8..-18
+  const legs = hslToHex(legsHue, clampInt(saturation - legsSatDelta, 0, 100), clampInt(lightness - legsDarken, 0, 100));
+
+  const feetHue = modHue(hue + (Number(dice.roll(21n)) - 10)); // -10..+10
+  const feetSatDelta = 8 + Number(dice.roll(13n)); // 8..20
+  const feetDarken = 22 + Number(dice.roll(13n)); // -22..-34
+  const feet = hslToHex(feetHue, clampInt(saturation - feetSatDelta, 0, 100), clampInt(lightness - feetDarken, 0, 100));
+
+  const hornCircles = hslToHex(
+    feetHue,
+    clampInt(saturation - (feetSatDelta + 6), 0, 100),
+    clampInt(lightness - (feetDarken - 6), 0, 100),
+  );
+
   return svg
     .replace(/#e8b84a/gi, body) // default body
     .replace(/#f5d76e/gi, face) // default highlight
     .replace(/#c4923a/gi, spots) // default spots / accents
-    .replace(/#8b6914/gi, accentDark); // neck accent rounded-rects + other dark accents
+    .replace(/#8b6914/gi, accentDark) // neck accent rounded-rects + other dark accents
+    .replace(/#b8862f/gi, legs) // legs
+    .replace(/#4e342e/gi, feet) // feet
+    .replace(/#5d4037/gi, hornCircles); // horn circles / extra dark accents
 }
 
 function modHue(h) {
