@@ -223,7 +223,8 @@ function pickEyePupilColor(dice) {
   const shades = {
     brown: ["#2b1b0e", "#3a240f", "#4b2d14", "#5c3b1a", "#6d4a22"],
     blue: ["#0b1d3a", "#0f2a52", "#173b73", "#1f4f96", "#2a63b8"],
-    green: ["#0d2b1f", "#113a2a", "#174b36", "#1f5f45", "#2a7556"],
+    // Muted greens: clearly green but not neon.
+    green: ["#1f4d2e", "#2a5c3a", "#2f6b47", "#357a54", "#3d8660"],
     grey: ["#1f2328", "#2b3036", "#3a414a", "#4b5560", "#5f6b78"],
   };
 
