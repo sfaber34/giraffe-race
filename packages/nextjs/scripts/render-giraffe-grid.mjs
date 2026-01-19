@@ -1,6 +1,65 @@
 import fs from "fs/promises";
 import path from "path";
-import { keccak256, toHex } from "viem";
+import { hexToBytes, keccak256, toHex } from "viem";
+
+// -----------------------
+// Deterministic dice (matches TS + Solidity)
+// -----------------------
+
+class DeterministicDice {
+  constructor(seed) {
+    this.entropy = hexToBytes(seed);
+    this.position = 0; // nibble position 0..63
+  }
+
+  roll(n) {
+    if (n <= 0n) throw new Error("DeterministicDice: n must be > 0");
+    const bitsNeeded = ceilLog2(n);
+    let hexCharsNeeded = Number((bitsNeeded + 3n) / 4n);
+    if (hexCharsNeeded === 0) hexCharsNeeded = 1;
+
+    const maxValue = 16n ** BigInt(hexCharsNeeded);
+    const threshold = maxValue - (maxValue % n);
+
+    let value;
+    do {
+      value = this.consumeNibbles(hexCharsNeeded);
+    } while (value >= threshold);
+
+    return value % n;
+  }
+
+  consumeNibbles(count) {
+    let value = 0n;
+    for (let i = 0; i < count; i++) {
+      if (this.position >= 64) {
+        this.entropy = hexToBytes(keccak256(this.entropy));
+        this.position = 0;
+      }
+      const nibble = getNibble(this.entropy, this.position);
+      value = (value << 4n) + BigInt(nibble);
+      this.position++;
+    }
+    return value;
+  }
+}
+
+function getNibble(bytes, pos) {
+  const byteIndex = Math.floor(pos / 2);
+  const byteValue = bytes[byteIndex] ?? 0;
+  return pos % 2 === 0 ? byteValue >> 4 : byteValue & 0x0f;
+}
+
+function ceilLog2(n) {
+  if (n <= 1n) return 0n;
+  let result = 0n;
+  let temp = n - 1n;
+  while (temp > 0n) {
+    result++;
+    temp >>= 1n;
+  }
+  return result;
+}
 
 /**
  * Generates a simple HTML grid of 1k giraffe SVGs for palette iteration.
@@ -42,7 +101,7 @@ const items = [];
 for (let i = 1; i <= count; i++) {
   const tokenId = BigInt(i);
   const seed = keccak256(toHex(tokenId, { size: 32 }));
-  const svg = applyBodyColorsFromSeed(svgTemplate, seed);
+  const svg = applyPaletteFromSeed(makeStaticSvg(svgTemplate), seed);
   const src = `data:image/svg+xml;base64,${base64(svg)}`;
   items.push(`
     <div class="cell" title="tokenId=${tokenId} seed=${seed}">
@@ -87,34 +146,36 @@ await fs.writeFile(outPath, html, "utf8");
 console.log(`Wrote ${outPath}`);
 
 // -----------------------
-// Seed → colors (match TS logic for body/face highlight)
+// Seed → colors (match TS logic via DeterministicDice)
 // -----------------------
 
-function applyBodyColorsFromSeed(svg, seed) {
+function applyPaletteFromSeed(svg, seed) {
   // Keep ranges aligned with `utils/nft/giraffePalette.ts`:
-  // hue: 0..359, sat: 55..80, light: 42..60, highlight: sat-10, light+18.
-  // We derive pseudo-random numbers from the seed with keccak (simple + deterministic).
-  const hue = mod(hashU32(seed, "h"), 360);
-  const saturation = 55 + mod(hashU32(seed, "s"), 26);
-  const lightness = 42 + mod(hashU32(seed, "l"), 19);
+  // hue: roll(360), sat: 55+roll(26), light: 42+roll(19)
+  const dice = new DeterministicDice(seed);
+  const hue = Number(dice.roll(360n)); // 0..359
+  const saturation = 55 + Number(dice.roll(26n)); // 55..80
+  const lightness = 42 + Number(dice.roll(19n)); // 42..60
 
   const body = hslToHex(hue, saturation, lightness);
   const face = hslToHex(hue, clampInt(saturation - 10, 0, 100), clampInt(lightness + 18, 0, 100));
 
+  // Spots: same hue, more saturated, darker (matches TS).
+  const spotsSatBump = 5 + Number(dice.roll(11n)); // +5..+15
+  const spotsDarken = 10 + Number(dice.roll(9n)); // -10..-18
+  const spots = hslToHex(hue, clampInt(saturation + spotsSatBump, 0, 100), clampInt(lightness - spotsDarken, 0, 100));
+
+  const accentDark = hslToHex(
+    hue,
+    clampInt(saturation + Math.max(0, spotsSatBump - 5), 0, 100),
+    clampInt(lightness - (spotsDarken + 12), 0, 100),
+  );
+
   return svg
     .replace(/#e8b84a/gi, body) // default body
-    .replace(/#f5d76e/gi, face); // default highlight
-}
-
-function hashU32(seed, tag) {
-  // Seed is 0x-prefixed hex string.
-  const h = keccak256(Buffer.from(`${seed}:${tag}`));
-  // take first 4 bytes as u32
-  return Number.parseInt(h.slice(2, 10), 16) >>> 0;
-}
-
-function mod(n, m) {
-  return ((n % m) + m) % m;
+    .replace(/#f5d76e/gi, face) // default highlight
+    .replace(/#c4923a/gi, spots) // default spots / accents
+    .replace(/#8b6914/gi, accentDark); // neck accent rounded-rects + other dark accents
 }
 
 function clampInt(n, min, max) {
@@ -178,3 +239,12 @@ function rgbToHex(r, g, b) {
   return `#${rr}${gg}${bb}`;
 }
 
+function makeStaticSvg(svg) {
+  // Disable CSS animations in the embedded SVG so the grid is a stable “thumbnail sheet”.
+  const style = `<style><![CDATA[
+svg * { animation: none !important; animation-play-state: paused !important; }
+]]></style>`;
+  const i = svg.indexOf(">");
+  if (i === -1) return svg + style;
+  return svg.slice(0, i + 1) + style + svg.slice(i + 1);
+}

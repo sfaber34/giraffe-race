@@ -65,10 +65,32 @@ export function giraffePaletteFromSeed(seed: Hex): GiraffePalette {
     l: clampInt(lightness + 18, 0, 100),
   });
 
+  // Spots should contrast body but still feel "related":
+  // - same hue
+  // - a bit more saturated
+  // - noticeably darker
+  const spotsSatBump = 5 + Number(dice.roll(11n)); // +5..+15
+  const spotsDarken = 10 + Number(dice.roll(9n)); // -10..-18
+  const spots = hslToHex({
+    h: hue,
+    s: clampInt(saturation + spotsSatBump, 0, 100),
+    l: clampInt(lightness - spotsDarken, 0, 100),
+  });
+
+  // Accent-dark is used by the small rounded-rect "neck accents" (and some line accents).
+  // Keep it in the same hue family, but push it darker than spots for visual hierarchy.
+  const accentDark = hslToHex({
+    h: hue,
+    s: clampInt(saturation + Math.max(0, spotsSatBump - 5), 0, 100),
+    l: clampInt(lightness - (spotsDarken + 12), 0, 100),
+  });
+
   return {
     ...DEFAULT_GIRAFFE_PALETTE,
     body,
     faceHighlight,
+    spots,
+    accentDark,
   };
 }
 
