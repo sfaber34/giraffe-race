@@ -259,6 +259,7 @@ export const GiraffeNfts = () => {
                         <span className="inline-flex items-center gap-2">
                           <GiraffeAnimated
                             idPrefix={`nft-${nft.tokenId.toString()}`}
+                            tokenId={nft.tokenId}
                             playbackRate={1}
                             playing={false}
                             sizePx={96}

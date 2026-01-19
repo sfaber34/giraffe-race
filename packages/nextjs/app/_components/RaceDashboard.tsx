@@ -932,6 +932,7 @@ export const RaceDashboard = () => {
                           <>
                             <GiraffeAnimated
                               idPrefix={`winner-${(viewingRaceId ?? 0n).toString()}-${revealedWinner}-${(parsedGiraffes?.tokenIds?.[revealedWinner] ?? 0n).toString()}`}
+                              tokenId={parsedGiraffes?.tokenIds?.[revealedWinner] ?? 0n}
                               playbackRate={1}
                               playing={true}
                               sizePx={48}
@@ -1074,6 +1075,7 @@ export const RaceDashboard = () => {
                             >
                               <GiraffeAnimated
                                 idPrefix={`lane-${i}`}
+                                tokenId={parsedGiraffes?.tokenIds?.[i] ?? 0n}
                                 playbackRate={speedFactor}
                                 resetNonce={svgResetNonce}
                                 playing={isPlaying && raceStarted && frame < lastFrameIndex}
@@ -1323,6 +1325,7 @@ export const RaceDashboard = () => {
                       <span className="font-semibold text-right">
                         <GiraffeAnimated
                           idPrefix={`claim-${nextWinningClaim.raceId.toString()}-${nextWinningClaim.betLane}-${nextWinningClaim.betTokenId.toString()}`}
+                          tokenId={nextWinningClaim.betTokenId}
                           playbackRate={1}
                           playing={true}
                           sizePx={48}
@@ -1451,6 +1454,7 @@ export const RaceDashboard = () => {
                           <span className="font-semibold">
                             <GiraffeAnimated
                               idPrefix={`submitted-${(viewingRaceId ?? 0n).toString()}-${(submittedTokenId ?? 0n).toString()}`}
+                              tokenId={submittedTokenId ?? 0n}
                               playbackRate={1}
                               playing={true}
                               sizePx={40}
@@ -1505,6 +1509,7 @@ export const RaceDashboard = () => {
                               <span className="flex items-center gap-2">
                                 <GiraffeAnimated
                                   idPrefix={`bet-${(viewingRaceId ?? 0n).toString()}-${lane}-${laneTokenIds[lane].toString()}`}
+                                  tokenId={laneTokenIds[lane]}
                                   playbackRate={1}
                                   playing={false}
                                   sizePx={56}

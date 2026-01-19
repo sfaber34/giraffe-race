@@ -1,6 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { Hex } from "viem";
+import { isHex } from "viem";
+import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
+import { DEFAULT_GIRAFFE_PALETTE, giraffePaletteFromSeed } from "~~/utils/nft/giraffePalette";
 
 type Props = {
   /**
@@ -8,6 +12,14 @@ type Props = {
    * Must be stable for the lifetime of the component instance.
    */
   idPrefix: string;
+  /**
+   * If provided, we will read `seedOf(tokenId)` from the GiraffeNFT contract and apply seed-based palette rules.
+   */
+  tokenId?: bigint;
+  /**
+   * Optional override if you already have the on-chain seed (bytes32 hex). If provided, no on-chain read is done.
+   */
+  seed?: Hex;
   /**
    * Controls animation speed without restarting by setting Web Animations API playbackRate.
    * 1 = normal speed, 2 = double speed, 0.5 = half speed.
@@ -106,6 +118,20 @@ function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function isBytes32Hex(value: unknown): value is Hex {
+  return typeof value === "string" && isHex(value) && value.length === 66;
+}
+
+function applyHexReplacements(svg: string, replacements: Record<string, string>): string {
+  let out = svg;
+  for (const [from, to] of Object.entries(replacements)) {
+    if (!from || !to) continue;
+    if (from.toLowerCase() === to.toLowerCase()) continue;
+    out = out.replace(new RegExp(escapeRegExp(from), "gi"), to);
+  }
+  return out;
+}
+
 function addRuntimeOverrides(svg: string): string {
   // Add a class so our override styles can be scoped to this SVG only.
   // Also add play-state overrides that are driven by CSS variables from the wrapper (fallback).
@@ -126,6 +152,8 @@ svg.giraffe-svg * {
 
 export function GiraffeAnimated({
   idPrefix,
+  tokenId,
+  seed,
   playbackRate,
   resetNonce = 0,
   playing = true,
@@ -140,12 +168,44 @@ export function GiraffeAnimated({
   const rateRafRef = useRef<number | null>(null);
   const rateLastTsRef = useRef<number | null>(null);
 
+  const seedEnabled = tokenId !== undefined && tokenId !== 0n && seed === undefined;
+  const { data: seedData } = useScaffoldReadContract({
+    contractName: "GiraffeNFT",
+    functionName: "seedOf",
+    args: [seedEnabled ? tokenId : undefined],
+    query: { enabled: seedEnabled },
+  });
+
+  const resolvedSeed = useMemo(() => {
+    if (isBytes32Hex(seed)) return seed;
+    if (isBytes32Hex(seedData)) return seedData;
+    return undefined;
+  }, [seed, seedData]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const raw = await fetchGiraffeSvgText();
       const decoded = decodeEmbeddedCssImport(raw);
-      const prefixed = prefixIds(decoded, idPrefix);
+      const colorized = resolvedSeed
+        ? (() => {
+            const palette = giraffePaletteFromSeed(resolvedSeed);
+            return applyHexReplacements(decoded, {
+              [DEFAULT_GIRAFFE_PALETTE.body]: palette.body,
+              [DEFAULT_GIRAFFE_PALETTE.faceHighlight]: palette.faceHighlight,
+              [DEFAULT_GIRAFFE_PALETTE.spots]: palette.spots,
+              [DEFAULT_GIRAFFE_PALETTE.accentDark]: palette.accentDark,
+              [DEFAULT_GIRAFFE_PALETTE.legs]: palette.legs,
+              [DEFAULT_GIRAFFE_PALETTE.tailStroke]: palette.tailStroke,
+              [DEFAULT_GIRAFFE_PALETTE.tailBall]: palette.tailBall,
+              [DEFAULT_GIRAFFE_PALETTE.feet]: palette.feet,
+              [DEFAULT_GIRAFFE_PALETTE.hornCircles]: palette.hornCircles,
+              [DEFAULT_GIRAFFE_PALETTE.eyePupil]: palette.eyePupil,
+              [DEFAULT_GIRAFFE_PALETTE.eyeWhite]: palette.eyeWhite,
+            });
+          })()
+        : decoded;
+      const prefixed = prefixIds(colorized, idPrefix);
       const finalSvg = addRuntimeOverrides(prefixed);
       if (!cancelled) setSvgMarkup(finalSvg);
     })().catch(() => {
@@ -154,7 +214,7 @@ export function GiraffeAnimated({
     return () => {
       cancelled = true;
     };
-  }, [idPrefix]);
+  }, [idPrefix, resolvedSeed]);
 
   // IMPORTANT: Don't use dangerouslySetInnerHTML in render, because React may re-apply it on every parent re-render,
   // which recreates the SVG subtree and restarts CSS animations. Instead, imperatively set innerHTML only when the
