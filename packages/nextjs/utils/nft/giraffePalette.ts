@@ -22,6 +22,8 @@ export type GiraffePalette = {
   body: string;
   faceHighlight: string;
   legs: string;
+  tailStroke: string;
+  tailBall: string;
   spots: string;
   accentDark: string;
   feet: string;
@@ -34,6 +36,9 @@ export const DEFAULT_GIRAFFE_PALETTE: GiraffePalette = {
   body: "#e8b84a",
   faceHighlight: "#f5d76e",
   legs: "#b8862f",
+  // NOTE: Tail is retagged to unique placeholder hexes so recoloring is isolated to only the two tail elements.
+  tailStroke: "#c4923c",
+  tailBall: "#8b6915",
   spots: "#c4923a",
   accentDark: "#8b6914",
   feet: "#4e342e",
@@ -109,6 +114,16 @@ export function giraffePaletteFromSeed(seed: Hex): GiraffePalette {
     l: clampInt(lightness - legsDarken, 0, 100),
   });
 
+  // Tail: analogous to body hue like legs, but intentionally NOT the same roll ranges so it diverges.
+  const tailHue = modHue(hue + (Number(dice.roll(51n)) - 25)); // -25..+25
+  const tailSatDelta = 4 + Number(dice.roll(13n)); // 4..16
+  const tailDarken = 14 + Number(dice.roll(13n)); // -14..-26
+  const tailStroke = hslToHex({
+    h: tailHue,
+    s: clampInt(saturation - tailSatDelta, 0, 100),
+    l: clampInt(lightness - tailDarken, 0, 100),
+  });
+
   const feetHue = modHue(hue + (Number(dice.roll(21n)) - 10)); // -10..+10
   const feetSatDelta = 8 + Number(dice.roll(13n)); // 8..20
   const feetDarken = 22 + Number(dice.roll(13n)); // -22..-34
@@ -125,6 +140,13 @@ export function giraffePaletteFromSeed(seed: Hex): GiraffePalette {
     l: clampInt(lightness - (feetDarken - 6), 0, 100),
   });
 
+  // Tail ball: related to tail stroke, but darker and a bit more desaturated.
+  const tailBall = hslToHex({
+    h: tailHue,
+    s: clampInt(saturation - (tailSatDelta + 10), 0, 100),
+    l: clampInt(lightness - (tailDarken + 10), 0, 100),
+  });
+
   // Eye color (pupil circle): pick from curated families (not fully random).
   const eyePupil = pickEyePupilColor(dice);
 
@@ -135,6 +157,8 @@ export function giraffePaletteFromSeed(seed: Hex): GiraffePalette {
     spots,
     accentDark,
     legs,
+    tailStroke,
+    tailBall,
     feet,
     hornCircles,
     eyePupil,

@@ -187,6 +187,16 @@ function applyPaletteFromSeed(svg, seed) {
   const legsDarken = 8 + Number(dice.roll(11n)); // -8..-18
   const legs = hslToHex(legsHue, clampInt(saturation - legsSatDelta, 0, 100), clampInt(lightness - legsDarken, 0, 100));
 
+  // Tail: analogous to body hue like legs, but distinct ranges so it diverges.
+  const tailHue = modHue(hue + (Number(dice.roll(51n)) - 25)); // -25..+25
+  const tailSatDelta = 4 + Number(dice.roll(13n)); // 4..16
+  const tailDarken = 14 + Number(dice.roll(13n)); // -14..-26
+  const tailStroke = hslToHex(
+    tailHue,
+    clampInt(saturation - tailSatDelta, 0, 100),
+    clampInt(lightness - tailDarken, 0, 100),
+  );
+
   const feetHue = modHue(hue + (Number(dice.roll(21n)) - 10)); // -10..+10
   const feetSatDelta = 8 + Number(dice.roll(13n)); // 8..20
   const feetDarken = 22 + Number(dice.roll(13n)); // -22..-34
@@ -198,6 +208,12 @@ function applyPaletteFromSeed(svg, seed) {
     clampInt(lightness - (feetDarken - 6), 0, 100),
   );
 
+  const tailBall = hslToHex(
+    tailHue,
+    clampInt(saturation - (tailSatDelta + 10), 0, 100),
+    clampInt(lightness - (tailDarken + 10), 0, 100),
+  );
+
   const eyePupil = pickEyePupilColor(dice);
 
   return svg
@@ -206,6 +222,8 @@ function applyPaletteFromSeed(svg, seed) {
     .replace(/#c4923a/gi, spots) // default spots / accents
     .replace(/#8b6914/gi, accentDark) // neck accent rounded-rects + other dark accents
     .replace(/#b8862f/gi, legs) // legs
+    .replace(/#c4923c/gi, tailStroke) // tail stroke placeholder (only the tail group)
+    .replace(/#8b6915/gi, tailBall) // tail ball placeholder (only the tail group)
     .replace(/#4e342e/gi, feet) // feet
     .replace(/#5d4037/gi, hornCircles) // horn circles / extra dark accents
     .replace(/#223\b/gi, eyePupil); // pupil circle placeholder (only this one element)

@@ -53,6 +53,8 @@ export async function renderGiraffeSvg({ tokenId, seed }: RenderGiraffeSvgParams
     [DEFAULT_GIRAFFE_PALETTE.body]: palette.body,
     [DEFAULT_GIRAFFE_PALETTE.faceHighlight]: palette.faceHighlight,
     [DEFAULT_GIRAFFE_PALETTE.legs]: palette.legs,
+    [DEFAULT_GIRAFFE_PALETTE.tailStroke]: palette.tailStroke,
+    [DEFAULT_GIRAFFE_PALETTE.tailBall]: palette.tailBall,
     [DEFAULT_GIRAFFE_PALETTE.spots]: palette.spots,
     [DEFAULT_GIRAFFE_PALETTE.accentDark]: palette.accentDark,
     [DEFAULT_GIRAFFE_PALETTE.feet]: palette.feet,
