@@ -240,10 +240,10 @@ export const RaceDashboard = () => {
     query: { enabled: hasAnyRace && viewingRaceId !== null },
   });
 
-  const { data: raceReadinessData } = useScaffoldReadContract({
+  const { data: raceScoreData } = useScaffoldReadContract({
     contractName: "GiraffeRace",
-    // Added in readiness upgrade; cast to avoid ABI typing mismatch until contracts are regenerated.
-    functionName: "getRaceReadinessById" as any,
+    // Added in score snapshot upgrade; cast to avoid ABI typing mismatch until contracts are regenerated.
+    functionName: "getRaceScoreById" as any,
     args: [viewingRaceId ?? 0n],
     query: { enabled: hasAnyRace && viewingRaceId !== null },
   } as any);
@@ -288,13 +288,13 @@ export const RaceDashboard = () => {
     };
   }, [raceOddsData]);
 
-  const laneReadiness = useMemo(() => {
-    if (!raceReadinessData) return [10, 10, 10, 10];
-    const raw = raceReadinessData as any;
+  const laneScore = useMemo(() => {
+    if (!raceScoreData) return [10, 10, 10, 10];
+    const raw = raceScoreData as any;
     const arr = (Array.isArray(raw) ? raw : []) as any[];
     const clamp = (n: number) => Math.max(1, Math.min(10, Math.floor(n)));
     return Array.from({ length: LANE_COUNT }, (_, i) => clamp(Number(arr[i] ?? 10)));
-  }, [raceReadinessData]);
+  }, [raceScoreData]);
 
   const laneTokenIds = useMemo(() => {
     if (!parsedGiraffes?.tokenIds) return [0n, 0n, 0n, 0n] as const;
@@ -530,9 +530,9 @@ export const RaceDashboard = () => {
       maxTicks: MAX_TICKS,
       speedRange: SPEED_RANGE,
       trackLength: TRACK_LENGTH,
-      readiness: laneReadiness,
+      score: laneScore,
     });
-  }, [parsed, canSimulate, laneReadiness]);
+  }, [parsed, canSimulate, laneScore]);
 
   const frames = useMemo(() => simulation?.frames ?? [], [simulation]);
   const lastFrameIndex = Math.max(0, frames.length - 1);
@@ -1229,7 +1229,7 @@ export const RaceDashboard = () => {
                 </div>
                 <div className="text-xs opacity-70">
                   Anyone can create/finalize/settle. Odds are auto-quoted on-chain at lineup finalization based on the
-                  locked stats snapshot (avg of readiness/conditioning/speed).
+                  locked effective score snapshot (avg of readiness/conditioning/speed).
                 </div>
               </div>
 
@@ -1531,7 +1531,7 @@ export const RaceDashboard = () => {
 
                         {lineupFinalized ? (
                           <div className="text-xs opacity-70">
-                            {"Odds are fixed and enforced on-chain (derived from the locked stats snapshot)."}
+                            {"Odds are fixed and enforced on-chain (derived from the locked effective score snapshot)."}
                           </div>
                         ) : null}
 

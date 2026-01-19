@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-/// @notice Readiness win probability lookup table (4 lanes).
+/// @notice Effective score win probability lookup table (4 lanes).
 /// @dev Index order is all sorted tuples (a<=b<=c<=d) with a,b,c,d in [1..10], in nested-loop order.
 /// Each entry is 8 bytes: 4x uint16 (basis points) in big-endian.
 /// @dev This is a deployable contract (not a library) so `GiraffeRace` doesn't exceed the 24KB size limit.

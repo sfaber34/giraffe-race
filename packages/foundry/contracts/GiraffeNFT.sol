@@ -15,7 +15,8 @@ contract GiraffeNFT is ERC721, Ownable {
     // Readiness is a simple 1-10 attribute that affects race performance.
     // New mints start at 10 and decrease by 1 (floored at 1) after running a race.
     mapping(uint256 => uint8) private _readiness; // 0 = legacy/uninitialized (treated as 10)
-    // Additional 1-10 attributes that affect race performance (equally weighted with readiness).
+    // Additional 1-10 attributes that affect race performance.
+    // Race performance uses the equally-weighted average of (readiness, conditioning, speed) as an effective score.
     // 0 = legacy/uninitialized (treated as 10)
     mapping(uint256 => uint8) private _conditioning;
     mapping(uint256 => uint8) private _speed;

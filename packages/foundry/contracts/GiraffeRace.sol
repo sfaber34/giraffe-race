@@ -107,10 +107,10 @@ contract GiraffeRace {
     mapping(uint256 => Race) private races;
     mapping(uint256 => mapping(address => Bet)) private bets;
     mapping(uint256 => RaceGiraffes) private raceGiraffes;
-    // Snapshot of "effective readiness" (1-10) for each lane at lineup finalization time.
-    // Effective readiness is computed as the equally-weighted average of:
+    // Snapshot of "effective score" (1-10) for each lane at lineup finalization time.
+    // Effective score is computed as the equally-weighted average of:
     //   readiness, conditioning, speed (each 1-10).
-    mapping(uint256 => uint8[4]) private raceReadiness;
+    mapping(uint256 => uint8[4]) private raceScore;
     mapping(uint256 => mapping(address => bool)) private hasSubmittedGiraffe;
     mapping(uint256 => RaceEntry[]) private raceEntries;
     mapping(uint256 => mapping(uint256 => bool)) private tokenEntered;
@@ -212,18 +212,18 @@ contract GiraffeRace {
      * @return distances Final distances after all ticks (units are arbitrary)
      */
     function simulate(bytes32 seed) external view returns (uint8 winner, uint16[LANE_COUNT] memory distances) {
-        // Backwards compatible: default "fresh" readiness.
+        // Default: all lanes have full effective score (10).
         return simulator.simulate(seed);
     }
 
-    /// @notice Deterministically simulate a race from a seed + lane readiness snapshot.
-    /// @dev Matches settlement behavior after readiness was introduced.
-    function simulateWithReadiness(bytes32 seed, uint8[LANE_COUNT] calldata readiness)
+    /// @notice Deterministically simulate a race from a seed + lane effective score snapshot.
+    /// @dev Effective score is typically the rounded average of readiness/conditioning/speed.
+    function simulateWithScore(bytes32 seed, uint8[LANE_COUNT] calldata score)
         external
         view
         returns (uint8 winner, uint16[LANE_COUNT] memory distances)
     {
-        return simulator.simulateWithReadiness(seed, readiness);
+        return simulator.simulateWithScore(seed, score);
     }
 
     function latestRaceId() public view returns (uint256 raceId) {
@@ -299,7 +299,7 @@ contract GiraffeRace {
     }
 
     /**
-     * @notice Publish the fixed decimal odds for a race (must be done after lineup/readiness are finalized).
+     * @notice Publish the fixed decimal odds for a race (must be done after lineup/effective score are finalized).
      * @dev Odds must be set before any bets can be placed. House-only to protect bankroll.
      *
      * House edge enforcement:
@@ -418,7 +418,7 @@ contract GiraffeRace {
         // Make sure lineup is finalized (it should have been finalized during betting window,
         // but keep settlement robust).
         _ensureGiraffesFinalized(raceId);
-        uint8 w = simulator.winnerWithReadiness(simSeed, raceReadiness[raceId]);
+        uint8 w = simulator.winnerWithScore(simSeed, raceScore[raceId]);
 
         r.settled = true;
         r.winner = w;
@@ -624,14 +624,14 @@ contract GiraffeRace {
         return (ra.assignedCount, ra.tokenIds, ra.originalOwners);
     }
 
-    function getRaceReadiness() external view returns (uint8[4] memory readiness) {
+    function getRaceScore() external view returns (uint8[4] memory score) {
         uint256 raceId = latestRaceId();
-        return raceReadiness[raceId];
+        return raceScore[raceId];
     }
 
-    /// @notice Read lane readiness snapshot for a specific race id (UI helper for replay).
-    function getRaceReadinessById(uint256 raceId) external view returns (uint8[4] memory readiness) {
-        return raceReadiness[raceId];
+    /// @notice Read lane effective score snapshot for a specific race id (UI helper for replay).
+    function getRaceScoreById(uint256 raceId) external view returns (uint8[4] memory score) {
+        return raceScore[raceId];
     }
 
     /// @notice How many unresolved bets remain in the caller's claim queue.
@@ -795,7 +795,7 @@ contract GiraffeRace {
 
         _finalizeGiraffesFromPool(raceId, fillSeed);
 
-        // Snapshot effective readiness for each lane at finalization time.
+        // Snapshot effective score for each lane at finalization time.
         RaceGiraffes storage raSnapshot = raceGiraffes[raceId];
         for (uint8 lane = 0; lane < LANE_COUNT; lane++) {
             (uint8 r0, uint8 c0, uint8 s0) = giraffeNft.statsOf(raSnapshot.tokenIds[lane]);
@@ -812,14 +812,14 @@ contract GiraffeRace {
 
             // Equally-weighted average of the 3 stats, rounded to nearest integer.
             uint16 sum = uint16(r0) + uint16(c0) + uint16(s0); // 3..30
-            uint8 rr = uint8((uint256(sum) + 1) / 3);
-            if (rr < 1) rr = 1;
-            if (rr > 10) rr = 10;
-            raceReadiness[raceId][lane] = rr;
+            uint8 score = uint8((uint256(sum) + 1) / 3);
+            if (score < 1) score = 1;
+            if (score > 10) score = 10;
+            raceScore[raceId][lane] = score;
         }
 
-        // Auto-quote fixed odds from the readiness snapshot (lookup table), so no extra tx is required.
-        _autoSetOddsFromReadiness(raceId);
+        // Auto-quote fixed odds from the effective score snapshot (lookup table), so no extra tx is required.
+        _autoSetOddsFromScore(raceId);
         r.giraffesFinalized = true;
 
         RaceGiraffes storage ra = raceGiraffes[raceId];
@@ -828,14 +828,14 @@ contract GiraffeRace {
         }
     }
 
-    function _autoSetOddsFromReadiness(uint256 raceId) internal {
+    function _autoSetOddsFromScore(uint256 raceId) internal {
         Race storage r = races[raceId];
         if (r.oddsSet) return;
 
-        uint8[4] memory rr = raceReadiness[raceId];
+        uint8[4] memory rr = raceScore[raceId];
         uint8[4] memory laneIdx = [uint8(0), 1, 2, 3];
 
-        // Sort readiness ascending (and keep lane indices aligned). Small fixed-size sort.
+        // Sort score ascending (and keep lane indices aligned). Small fixed-size sort.
         for (uint8 i = 0; i < LANE_COUNT; i++) {
             for (uint8 j = i + 1; j < LANE_COUNT; j++) {
                 if (rr[j] < rr[i]) {
@@ -847,9 +847,9 @@ contract GiraffeRace {
 
         uint16[4] memory probsBps = winProbTable.getSorted(rr[0], rr[1], rr[2], rr[3]);
 
-        // Symmetry fix: if multiple lanes have the same readiness, their true win probability is identical.
+        // Symmetry fix: if multiple lanes have the same score, their true win probability is identical.
         // The lookup table is Monte Carlo-estimated, so those positions can differ slightly; we set each
-        // equal-readiness group to the same rounded average (guarantees identical odds for identical readiness).
+        // equal-score group to the same rounded average (guarantees identical odds for identical score).
         uint16[4] memory probsAdj = probsBps;
         uint8 start = 0;
         while (start < LANE_COUNT) {

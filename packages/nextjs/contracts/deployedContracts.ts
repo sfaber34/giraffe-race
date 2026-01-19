@@ -908,7 +908,7 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "simulateWithReadiness",
+          name: "simulateWithScore",
           inputs: [
             {
               name: "seed",
@@ -916,7 +916,7 @@ const deployedContracts = {
               internalType: "bytes32",
             },
             {
-              name: "readiness",
+              name: "scores",
               type: "uint8[4]",
               internalType: "uint8[4]",
             },
@@ -937,7 +937,7 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "winnerWithReadiness",
+          name: "winnerWithScore",
           inputs: [
             {
               name: "seed",
@@ -945,7 +945,7 @@ const deployedContracts = {
               internalType: "bytes32",
             },
             {
-              name: "readiness",
+              name: "scores",
               type: "uint8[4]",
               internalType: "uint8[4]",
             },
@@ -961,7 +961,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 2,
+      deployedOnBlock: 3,
     },
     GiraffeRace: {
       address: "0xed1db453c3156ff3155a97ad217b3087d5dc5f6e",
@@ -1499,11 +1499,11 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "getRaceReadiness",
+          name: "getRaceScore",
           inputs: [],
           outputs: [
             {
-              name: "readiness",
+              name: "score",
               type: "uint8[4]",
               internalType: "uint8[4]",
             },
@@ -1512,7 +1512,7 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "getRaceReadinessById",
+          name: "getRaceScoreById",
           inputs: [
             {
               name: "raceId",
@@ -1522,7 +1522,7 @@ const deployedContracts = {
           ],
           outputs: [
             {
-              name: "readiness",
+              name: "score",
               type: "uint8[4]",
               internalType: "uint8[4]",
             },
@@ -1709,7 +1709,7 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "simulateWithReadiness",
+          name: "simulateWithScore",
           inputs: [
             {
               name: "seed",
@@ -1717,7 +1717,7 @@ const deployedContracts = {
               internalType: "bytes32",
             },
             {
-              name: "readiness",
+              name: "score",
               type: "uint8[4]",
               internalType: "uint8[4]",
             },
@@ -2180,7 +2180,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 4,
+      deployedOnBlock: 3,
     },
   },
 } as const;

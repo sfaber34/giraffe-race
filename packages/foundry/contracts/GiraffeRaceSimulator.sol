@@ -14,40 +14,44 @@ contract GiraffeRaceSimulator {
     uint8 internal constant SPEED_RANGE = 10;
     uint16 internal constant BPS_DENOM = 10000;
 
-    function winnerWithReadiness(bytes32 seed, uint8[4] calldata readiness)
+    /// @notice Deterministically choose a winner given a seed + lane effective score snapshot.
+    /// @dev `scores` is a 1-10 value per lane (typically the rounded average of readiness/conditioning/speed).
+    function winnerWithScore(bytes32 seed, uint8[4] memory scores)
         external
         pure
         returns (uint8 winner)
     {
-        (winner,) = _simulateWithReadiness(seed, readiness);
+        (winner,) = _simulateWithScore(seed, scores);
     }
 
     function simulate(bytes32 seed) external pure returns (uint8 winner, uint16[4] memory distances) {
-        uint8[4] memory readiness = [uint8(10), 10, 10, 10];
-        return _simulateWithReadiness(seed, readiness);
+        uint8[4] memory score = [uint8(10), 10, 10, 10];
+        return _simulateWithScore(seed, score);
     }
 
-    function simulateWithReadiness(bytes32 seed, uint8[4] calldata readiness)
+    /// @notice Deterministically simulate a race given a seed + lane effective score snapshot.
+    /// @dev `scores` is a 1-10 value per lane (typically the rounded average of readiness/conditioning/speed).
+    function simulateWithScore(bytes32 seed, uint8[4] memory scores)
         external
         pure
         returns (uint8 winner, uint16[4] memory distances)
     {
-        return _simulateWithReadiness(seed, readiness);
+        return _simulateWithScore(seed, scores);
     }
 
-    function _readinessBps(uint8 readiness) internal pure returns (uint16) {
-        // Map readiness 1..10 -> 0.9525x..1.00x (basis points).
+    function _scoreBps(uint8 score) internal pure returns (uint16) {
+        // Map score 1..10 -> 0.9525x..1.00x (basis points).
         // Tuned so that a worst-case tuple like [1,10,10,10] yields ~20x implied odds (not hundreds-x),
         // while 9 vs 10 is only a small effect (when combined with probabilistic rounding below).
-        if (readiness == 0) readiness = 10;
-        if (readiness > 10) readiness = 10;
-        if (readiness < 1) readiness = 1;
+        if (score == 0) score = 10;
+        if (score > 10) score = 10;
+        if (score < 1) score = 1;
         uint256 minBps = 9525;
         uint256 range = 10000 - minBps; // 475
-        return uint16(minBps + (uint256(readiness - 1) * range) / 9);
+        return uint16(minBps + (uint256(score - 1) * range) / 9);
     }
 
-    function _simulateWithReadiness(bytes32 seed, uint8[4] memory readiness)
+    function _simulateWithScore(bytes32 seed, uint8[4] memory scores)
         internal
         pure
         returns (uint8 winner, uint16[4] memory distances)
@@ -58,21 +62,21 @@ contract GiraffeRaceSimulator {
 
         uint16[4] memory bps;
         for (uint8 a = 0; a < LANE_COUNT; a++) {
-            bps[a] = _readinessBps(readiness[a]);
+            bps[a] = _scoreBps(scores[a]);
         }
 
         for (uint256 t = 0; t < MAX_TICKS; t++) {
             for (uint256 a = 0; a < LANE_COUNT; a++) {
-                (uint256 r, DeterministicDice.Dice memory updatedDice) = dice.roll(SPEED_RANGE);
-                dice = updatedDice;
+                uint256 r;
+                (r, dice) = dice.roll(SPEED_RANGE);
                 uint256 baseSpeed = r + 1;
                 // Probabilistic rounding (instead of floor) to avoid a chunky handicap.
                 uint256 raw = baseSpeed * uint256(bps[uint8(a)]);
                 uint256 q = raw / uint256(BPS_DENOM);
                 uint256 rem = raw % uint256(BPS_DENOM);
                 if (rem > 0) {
-                    (uint256 pickBps, DeterministicDice.Dice memory updatedDice2) = dice.roll(BPS_DENOM);
-                    dice = updatedDice2;
+                    uint256 pickBps;
+                    (pickBps, dice) = dice.roll(BPS_DENOM);
                     if (pickBps < rem) q += 1;
                 }
                 if (q == 0) q = 1;
@@ -111,7 +115,8 @@ contract GiraffeRaceSimulator {
             return (leaders[0], distances);
         }
 
-        (uint256 pick,) = dice.roll(leaderCount);
+        uint256 pick;
+        (pick, dice) = dice.roll(leaderCount);
         return (leaders[uint8(pick)], distances);
     }
 }

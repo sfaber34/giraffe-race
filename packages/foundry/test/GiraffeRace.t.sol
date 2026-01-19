@@ -26,7 +26,7 @@ contract GiraffeRaceTest is Test {
     uint256 internal constant MAX_TICKS = 500;
     uint256 internal constant SPEED_RANGE = 10;
     // These win-distribution "stats" tests are intentionally heavy and are mostly for manual inspection.
-    // With readiness (extra state updates per settle), we reduce the batch size to avoid OOG in CI/default runs.
+    // With readiness decay (extra state updates per settle), we reduce the batch size to avoid OOG in CI/default runs.
     uint256 internal constant STATS_BATCH_SIZE = 50;
     uint256 internal constant STATS_BATCHES = 10; // 10 * 50 = 500 races total (expected)
     string internal constant STATS_DIR = "./tmp/win-stats";
@@ -75,8 +75,8 @@ contract GiraffeRaceTest is Test {
         vm.roll(uint256(submissionCloseBlock));
         race.finalizeRaceGiraffes();
 
-        // Snapshot should show "fresh" readiness.
-        uint8[4] memory snap = race.getRaceReadinessById(raceId);
+        // Snapshot should show full effective score (all stats default to 10).
+        uint8[4] memory snap = race.getRaceScoreById(raceId);
         for (uint256 i = 0; i < 4; i++) {
             assertEq(uint256(snap[i]), 10);
             assertEq(uint256(giraffeNft.readinessOf(houseTokenIds[i])), 10);
@@ -95,7 +95,7 @@ contract GiraffeRaceTest is Test {
         }
     }
 
-    function testOddsAreEqualWhenAllReadinessEqual() public {
+    function testOddsAreEqualWhenAllScoresEqual() public {
         vm.roll(123);
         uint256 raceId = race.createRace();
         uint64 closeBlock;
@@ -258,7 +258,7 @@ contract GiraffeRaceTest is Test {
         vm.prank(bob);
         uint256 bobPayout = race.claim();
 
-        // Fixed odds are auto-quoted from the readiness snapshot using the lookup table.
+        // Fixed odds are auto-quoted from the effective score snapshot using the lookup table.
         (bool oddsSet, uint32[4] memory oddsBps) = race.getRaceOddsById(raceId);
         assertTrue(oddsSet);
         uint256 expectedAlice = (1 ether * uint256(oddsBps[0])) / 10_000;

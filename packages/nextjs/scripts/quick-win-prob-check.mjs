@@ -83,7 +83,7 @@ function ceilLog2(n) {
 }
 
 // -----------------------
-// Readiness + race sim (must match Solidity)
+// Effective score + race sim (must match Solidity)
 // -----------------------
 
 function clampScore(r) {
@@ -94,8 +94,8 @@ function clampScore(r) {
   return x;
 }
 
-function scoreBps(readiness, minBps) {
-  const r = clampScore(readiness);
+function scoreBps(score, minBps) {
+  const r = clampScore(score);
   const range = 10_000 - minBps;
   return minBps + Math.floor(((r - 1) * range) / 9);
 }
@@ -103,13 +103,13 @@ function scoreBps(readiness, minBps) {
 /**
  * @param {object} p
  * @param {`0x${string}`} p.seed
- * @param {number[]} p.readiness length 4
+ * @param {number[]} p.score length 4
  */
-function simulateRaceFromSeed({ seed, readiness }) {
+function simulateRaceFromSeed({ seed, score }) {
   const dice = new DeterministicDice(seed);
   const distances = [0, 0, 0, 0];
-  const minBps = readiness.minBps ?? 9000;
-  const bps = [0, 0, 0, 0].map((_, i) => scoreBps(readiness[i] ?? 10, minBps));
+  const minBps = score.minBps ?? 9000;
+  const bps = [0, 0, 0, 0].map((_, i) => scoreBps(score[i] ?? 10, minBps));
 
   const SPEED_RANGE = 10n;
   const TRACK_LENGTH = 1000;
@@ -190,7 +190,7 @@ function winRates(tuple, samples) {
   const state = { x: (BigInt(key) * 0x9e3779b97f4a7c15n) & MASK64 };
   for (let i = 0; i < samples; i++) {
     const seed = makeSeed32FromState(state);
-    const w = simulateRaceFromSeed({ seed, readiness: tuple });
+    const w = simulateRaceFromSeed({ seed, score: tuple });
     wins[w] += 1;
   }
   return wins.map(w => w / samples);

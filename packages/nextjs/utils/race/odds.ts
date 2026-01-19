@@ -15,7 +15,7 @@ export type MonteCarloOdds = {
 export type EstimateOddsParams = {
   raceId: bigint;
   tokenIds: readonly [bigint, bigint, bigint, bigint];
-  readiness: readonly [number, number, number, number];
+  score: readonly [number, number, number, number];
   samples?: number;
   edge?: number;
   // Prevent extreme odds when p is tiny.
@@ -41,7 +41,7 @@ function splitmix64Next(state: { x: bigint }): bigint {
   return (z ^ (z >> 31n)) & MASK64;
 }
 
-function clampReadiness(r: number): number {
+function clampScore(r: number): number {
   if (!Number.isFinite(r)) return 10;
   const x = Math.floor(r);
   if (x < 1) return 1;
@@ -58,7 +58,7 @@ export async function estimateOddsMonteCarlo(params: EstimateOddsParams): Promis
   const {
     raceId,
     tokenIds,
-    readiness,
+    score,
     samples = 10_000,
     edge = 0.05,
     minProb = 1 / samples,
@@ -72,7 +72,7 @@ export async function estimateOddsMonteCarlo(params: EstimateOddsParams): Promis
   if (samples <= 0) throw new Error("samples must be > 0");
   if (edge < 0 || edge >= 1) throw new Error("edge must be in [0, 1)");
 
-  // Deterministic base seed per finalized lineup+readiness so every client quotes the same odds.
+  // Deterministic base seed per finalized lineup+score so every client quotes the same odds.
   const base: Hex = keccak256(
     encodePacked(
       ["uint256", "uint256", "uint256", "uint256", "uint256", "uint8", "uint8", "uint8", "uint8"],
@@ -82,10 +82,10 @@ export async function estimateOddsMonteCarlo(params: EstimateOddsParams): Promis
         tokenIds[1],
         tokenIds[2],
         tokenIds[3],
-        clampReadiness(readiness[0]),
-        clampReadiness(readiness[1]),
-        clampReadiness(readiness[2]),
-        clampReadiness(readiness[3]),
+        clampScore(score[0]),
+        clampScore(score[1]),
+        clampScore(score[2]),
+        clampScore(score[3]),
       ],
     ),
   );
@@ -94,7 +94,7 @@ export async function estimateOddsMonteCarlo(params: EstimateOddsParams): Promis
   const prng = { x: (BigInt(base) ^ (raceId & MASK64)) & MASK64 };
 
   const wins = [0, 0, 0, 0] as [number, number, number, number];
-  const r4 = asTuple4(readiness.map(clampReadiness));
+  const s4 = asTuple4(score.map(clampScore));
 
   for (let i = 0; i < samples; i++) {
     if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
@@ -106,7 +106,7 @@ export async function estimateOddsMonteCarlo(params: EstimateOddsParams): Promis
     const seed256 = (a << 192n) | (b << 128n) | (c << 64n) | d;
     const seed = toHex(seed256, { size: 32 }) as Hex;
 
-    const sim = simulateRaceFromSeed({ seed, readiness: r4 });
+    const sim = simulateRaceFromSeed({ seed, score: s4 });
     wins[sim.winner] += 1;
 
     if (i % chunkSize === chunkSize - 1) {

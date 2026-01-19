@@ -7,7 +7,7 @@ import { keccak256, toHex } from "viem";
 /**
  * Precompute win probabilities by effective score (1-10) for 4-lane races.
  *
- * We compute only sorted readiness tuples (a<=b<=c<=d), count = 715.
+ * We compute only sorted score tuples (a<=b<=c<=d), count = 715.
  * The resulting table stores per-position win probabilities (basis points, 0..10000) for the sorted order.
  *
  * Output:
@@ -109,9 +109,9 @@ function clampScore(r) {
   return x;
 }
 
-// Match Solidity/TS: minBps + (readiness-1) * (10000-minBps) / 9
-function scoreBps(readiness) {
-  const r = clampScore(readiness);
+// Match Solidity/TS: minBps + (score-1) * (10000-minBps) / 9
+function scoreBps(score) {
+  const r = clampScore(score);
   const minBps = 9525;
   const range = 10_000 - minBps; // 475
   return minBps + Math.floor(((r - 1) * range) / 9);
@@ -120,12 +120,12 @@ function scoreBps(readiness) {
 /**
  * @param {object} p
  * @param {`0x${string}`} p.seed
- * @param {number[]} p.readiness length 4
+ * @param {number[]} p.score length 4
  */
-function simulateRaceFromSeed({ seed, readiness }) {
+function simulateRaceFromSeed({ seed, score }) {
   const dice = new DeterministicDice(seed);
   const distances = [0, 0, 0, 0];
-  const bps = [0, 0, 0, 0].map((_, i) => scoreBps(readiness[i] ?? 10));
+  const bps = [0, 0, 0, 0].map((_, i) => scoreBps(score[i] ?? 10));
 
   // constants (must match Solidity)
   const SPEED_RANGE = 10n;
@@ -258,7 +258,7 @@ function computeTupleProbs(tuple, samples) {
   const state = { x: (BigInt(key) * 0x9e3779b97f4a7c15n) & MASK64 };
   for (let i = 0; i < samples; i++) {
     const seed = makeSeed32FromState(state);
-    const winner = simulateRaceFromSeed({ seed, readiness: tuple });
+    const winner = simulateRaceFromSeed({ seed, score: tuple });
     wins[winner] += 1;
   }
   return probsToU16Bps(wins, samples);
@@ -282,7 +282,7 @@ function workerLoop() {
     }
   });
 
-  // Signal readiness
+  // Signal ready
   parentPort.postMessage({ type: "ready" });
 }
 

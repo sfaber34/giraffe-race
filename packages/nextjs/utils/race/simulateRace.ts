@@ -8,7 +8,7 @@ export type RaceSimulation = {
   ticks: number;
 };
 
-const clampReadiness = (r: number) => {
+const clampScore = (r: number) => {
   if (!Number.isFinite(r)) return 10;
   const x = Math.floor(r);
   if (x < 1) return 1;
@@ -16,9 +16,9 @@ const clampReadiness = (r: number) => {
   return x;
 };
 
-// Match Solidity: minBps + (readiness-1) * (10000-minBps) / 9
-const readinessBps = (readiness: number) => {
-  const r = clampReadiness(readiness);
+// Match Solidity: minBps + (score-1) * (10000-minBps) / 9
+const scoreBps = (score: number) => {
+  const r = clampScore(score);
   const minBps = 9525;
   const range = 10_000 - minBps; // 475
   return minBps + Math.floor(((r - 1) * range) / 9);
@@ -30,19 +30,19 @@ export function simulateRaceFromSeed({
   maxTicks = 500,
   speedRange = 10,
   trackLength = 1000,
-  readiness,
+  score,
 }: {
   seed: Hex;
   laneCount?: number;
   maxTicks?: number;
   speedRange?: number;
   trackLength?: number;
-  readiness?: number[]; // length should match laneCount; defaults to all 10 (fresh)
+  score?: number[]; // length should match laneCount; defaults to all 10 (full score)
 }): RaceSimulation {
   const dice = new DeterministicDice(seed);
   const distances = Array.from({ length: laneCount }, () => 0);
   const frames: number[][] = [distances.slice()];
-  const bps = Array.from({ length: laneCount }, (_, i) => readinessBps(readiness?.[i] ?? 10));
+  const bps = Array.from({ length: laneCount }, (_, i) => scoreBps(score?.[i] ?? 10));
 
   let finished = false;
   let ticks = 0;

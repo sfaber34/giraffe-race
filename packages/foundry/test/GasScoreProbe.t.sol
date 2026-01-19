@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import "../contracts/libraries/DeterministicDice.sol";
 
 /**
- * Gas probe for readiness speed scaling.
+ * Gas probe for effective score speed scaling.
  *
  * We compare:
  * - Floor scaling: q = floor(raw / 10000)
@@ -13,24 +13,24 @@ import "../contracts/libraries/DeterministicDice.sol";
  *
  * We run a fixed number of ticks to avoid variance from "race finishes early".
  */
-contract GasReadinessProbeTest is Test {
+contract GasScoreProbeTest is Test {
     using DeterministicDice for DeterministicDice.Dice;
 
     uint16 internal constant BPS_DENOM = 10000;
 
-    function _readinessBps(uint8 readiness) internal pure returns (uint16) {
-        if (readiness == 0) readiness = 10;
-        if (readiness > 10) readiness = 10;
-        if (readiness < 1) readiness = 1;
+    function _scoreBps(uint8 score) internal pure returns (uint16) {
+        if (score == 0) score = 10;
+        if (score > 10) score = 10;
+        if (score < 1) score = 1;
         uint256 minBps = 9525;
         uint256 range = 10000 - minBps; // 475
-        return uint16(minBps + (uint256(readiness - 1) * range) / 9);
+        return uint16(minBps + (uint256(score - 1) * range) / 9);
     }
 
-    function _probeFloor(bytes32 seed, uint8[4] memory readiness, uint16 ticks) internal pure returns (uint256 acc) {
+    function _probeFloor(bytes32 seed, uint8[4] memory score, uint16 ticks) internal pure returns (uint256 acc) {
         DeterministicDice.Dice memory dice = DeterministicDice.create(seed);
         uint16[4] memory bps;
-        for (uint8 a = 0; a < 4; a++) bps[a] = _readinessBps(readiness[a]);
+        for (uint8 a = 0; a < 4; a++) bps[a] = _scoreBps(score[a]);
 
         for (uint16 t = 0; t < ticks; t++) {
             for (uint8 a = 0; a < 4; a++) {
@@ -45,10 +45,10 @@ contract GasReadinessProbeTest is Test {
         }
     }
 
-    function _probeProbRound(bytes32 seed, uint8[4] memory readiness, uint16 ticks) internal pure returns (uint256 acc) {
+    function _probeProbRound(bytes32 seed, uint8[4] memory score, uint16 ticks) internal pure returns (uint256 acc) {
         DeterministicDice.Dice memory dice = DeterministicDice.create(seed);
         uint16[4] memory bps;
-        for (uint8 a = 0; a < 4; a++) bps[a] = _readinessBps(readiness[a]);
+        for (uint8 a = 0; a < 4; a++) bps[a] = _scoreBps(score[a]);
 
         for (uint16 t = 0; t < ticks; t++) {
             for (uint8 a = 0; a < 4; a++) {
@@ -71,7 +71,7 @@ contract GasReadinessProbeTest is Test {
     }
 
     function testGas_FloorScaling() public returns (uint256 acc) {
-        // Use a readiness tuple that produces a remainder (i.e. triggers probabilistic rounding) and a fixed tick count.
+        // Use a score tuple that produces a remainder (i.e. triggers probabilistic rounding) and a fixed tick count.
         uint8[4] memory rr = [uint8(1), 10, 10, 10];
         acc = _probeFloor(keccak256("seed"), rr, 250);
         // prevent optimizer removing logic
