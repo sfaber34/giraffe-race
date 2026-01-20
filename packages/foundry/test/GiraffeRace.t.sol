@@ -89,9 +89,10 @@ contract GiraffeRaceTest is Test {
         vm.roll(uint256(closeBlock) + 1);
         race.settleRace();
 
-        // After settling, every participant's readiness should decrease by 1.
+        // TEMP (testing): readiness decay after races is disabled in `GiraffeRace`.
+        // When re-enabled, this should go back to expecting 9.
         for (uint256 i = 0; i < LANE_COUNT; i++) {
-            assertEq(uint256(giraffeNft.readinessOf(houseTokenIds[i])), 9);
+            assertEq(uint256(giraffeNft.readinessOf(houseTokenIds[i])), 10);
         }
     }
 

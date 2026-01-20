@@ -435,7 +435,8 @@ contract GiraffeRace {
             settledLiability += raceLiability;
         }
 
-        _decreaseReadinessAfterRace(raceId);
+        // TEMP (testing): disable readiness decay after races.
+        // _decreaseReadinessAfterRace(raceId);
 
         emit RaceSettled(raceId, simSeed, r.winner);
     }
