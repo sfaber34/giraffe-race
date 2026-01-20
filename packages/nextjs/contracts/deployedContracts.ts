@@ -966,7 +966,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 3,
+      deployedOnBlock: 2,
     },
     GiraffeRaceSimulator: {
       address: "0xb19b36b1456e65e3a6d514d3f715f204bd59f431",
@@ -1050,7 +1050,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 2,
+      deployedOnBlock: 3,
     },
     GiraffeRace: {
       address: "0x12975173b87f7595ee45dffb2ab812ece596bf84",
@@ -2251,7 +2251,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 5,
+      deployedOnBlock: 3,
     },
   },
 } as const;
