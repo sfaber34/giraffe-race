@@ -638,8 +638,6 @@ export const RaceDashboard = () => {
   };
 
   const verifiedWinner = parsed?.settled ? parsed.winner : null;
-  const simulatedWinner = simulation ? simulation.winner : null;
-  const winnersMatch = verifiedWinner !== null && simulatedWinner !== null && verifiedWinner === simulatedWinner;
   const raceIsOver = !!simulation && frame >= lastFrameIndex;
   const revealOutcome = raceIsOver;
   const revealedWinner = revealOutcome ? verifiedWinner : null;
@@ -938,54 +936,7 @@ export const RaceDashboard = () => {
                   <span>
                     Tick: <span className="font-semibold opacity-100">{frame}</span> / {lastFrameIndex}
                   </span>
-                  <span>
-                    Finish: <span className="font-semibold opacity-100">{TRACK_LENGTH}</span>
-                  </span>
                 </div>
-
-                {revealOutcome ? (
-                  <>
-                    <div className="flex justify-between text-sm">
-                      <span className="opacity-70">Winner</span>
-                      <span className="font-semibold">
-                        {revealedWinner === null ? (
-                          "-"
-                        ) : (
-                          <>
-                            <GiraffeAnimated
-                              idPrefix={`winner-${(viewingRaceId ?? 0n).toString()}-${revealedWinner}-${(parsedGiraffes?.tokenIds?.[revealedWinner] ?? 0n).toString()}`}
-                              tokenId={parsedGiraffes?.tokenIds?.[revealedWinner] ?? 0n}
-                              playbackRate={1}
-                              playing={true}
-                              sizePx={48}
-                              className="inline-block align-middle"
-                            />{" "}
-                            {parsedGiraffes ? (
-                              <LaneName
-                                tokenId={parsedGiraffes.tokenIds[revealedWinner] ?? 0n}
-                                fallback={`Lane ${revealedWinner}`}
-                              />
-                            ) : (
-                              `Lane ${revealedWinner}`
-                            )}
-                          </>
-                        )}
-                      </span>
-                    </div>
-
-                    {verifiedWinner !== null && simulatedWinner !== null ? (
-                      <div className={`alert ${winnersMatch ? "alert-success" : "alert-warning"}`}>
-                        <span className="text-sm">
-                          {winnersMatch
-                            ? "Verified: simulation matches on-chain winner."
-                            : "Mismatch: check seed/constants."}
-                        </span>
-                      </div>
-                    ) : null}
-                  </>
-                ) : (
-                  <div className="text-sm opacity-70">Winner is hidden until the replay finishes.</div>
-                )}
 
                 <div
                   ref={viewportRefCb}
