@@ -801,7 +801,7 @@ export const RaceDashboard = () => {
     <div className="flex flex-col w-full">
       {/* Mine controls: stay at top of page content (non-sticky) */}
       <div className="bg-base-100/80 backdrop-blur border-b border-base-200">
-        <div className="mx-auto w-full max-w-6xl px-6 py-3">
+        <div className="w-full max-w-none px-[30px] py-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-col">
               <div className="text-sm font-medium">Mine blocks (local)</div>
@@ -822,7 +822,7 @@ export const RaceDashboard = () => {
         </div>
       </div>
 
-      <div className="mx-auto flex flex-col gap-8 w-full max-w-6xl px-6 py-8">
+      <div className="flex flex-col gap-8 w-full max-w-none px-[30px] py-8">
         <div className="flex flex-col gap-2">
           <h1 className="text-4xl font-bold">Giraffe Race</h1>
           <p className="text-base-content/70">
@@ -833,7 +833,7 @@ export const RaceDashboard = () => {
 
         {/* Replay is the hero element */}
         <div className="card bg-base-200 shadow w-full">
-          <div className="card-body gap-4">
+          <div className="card-body gap-4 px-0">
             <div className="flex items-center justify-between">
               <h2 className="card-title">Race replay</h2>
               <div className="flex items-center gap-2">
