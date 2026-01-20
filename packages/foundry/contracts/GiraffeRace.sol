@@ -2,7 +2,6 @@
 pragma solidity ^0.8.19;
 
 import { DeterministicDice } from "./libraries/DeterministicDice.sol";
-import { WinProbTable } from "./libraries/WinProbTable.sol";
 import { GiraffeRaceSimulator } from "./GiraffeRaceSimulator.sol";
 import { IERC721 } from "../lib/openzeppelin-contracts/contracts/token/ERC721/IERC721.sol";
 
@@ -53,7 +52,6 @@ contract GiraffeRace {
 
     address public house;
     IGiraffeNFT public giraffeNft;
-    WinProbTable public winProbTable;
     GiraffeRaceSimulator public simulator;
     // NOTE (testing): readiness decay after races is currently disabled in code.
     // When deploying a live version where readiness should always decay, uncomment the call in `_settleRace`.
@@ -177,12 +175,10 @@ contract GiraffeRace {
         address _giraffeNft,
         address _house,
         uint256[LANE_COUNT] memory _houseGiraffeTokenIds,
-        address _winProbTable,
         address _simulator
     ) {
         giraffeNft = IGiraffeNFT(_giraffeNft);
         house = _house;
-        winProbTable = WinProbTable(_winProbTable);
         simulator = GiraffeRaceSimulator(_simulator);
         houseGiraffeTokenIds = _houseGiraffeTokenIds;
 
@@ -859,8 +855,7 @@ contract GiraffeRace {
             }
         }
 
-        // NOTE: Probability-table-based odds (disabled temporarily).
-        // uint16[4] memory probsBps = winProbTable.getSorted(rr[0], rr[1], rr[2], rr[3]);
+        // NOTE: Probability-table-based odds (4-lane) was removed; odds are now set externally via `setRaceOdds`.
 
         // Symmetry fix: if multiple lanes have the same score, their true win probability is identical.
         // The lookup table is Monte Carlo-estimated, so those positions can differ slightly; we set each

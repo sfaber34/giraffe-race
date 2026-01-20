@@ -5,7 +5,6 @@ import "./DeployHelpers.s.sol";
 import "../contracts/GiraffeRace.sol";
 import "../contracts/GiraffeRaceSimulator.sol";
 import "../contracts/GiraffeNFT.sol";
-import "../contracts/libraries/WinProbTable.sol";
 
 /**
  * @notice Deploy script for GiraffeRace contract
@@ -21,7 +20,6 @@ contract DeployGiraffeRace is ScaffoldETHDeploy {
         // Deploy the GiraffeNFT collection (permissionless mint).
         // We'll mint the initial "house giraffes" to `houseForGame`.
         GiraffeNFT giraffeNft = new GiraffeNFT();
-        WinProbTable table = new WinProbTable();
         GiraffeRaceSimulator simulator = new GiraffeRaceSimulator();
 
         uint256[6] memory houseTokenIds;
@@ -33,7 +31,7 @@ contract DeployGiraffeRace is ScaffoldETHDeploy {
         houseTokenIds[5] = giraffeNft.mint(houseForGame, "house-6");
 
         // Deploy the race contract with the NFT + house configuration.
-        GiraffeRace race = new GiraffeRace(address(giraffeNft), houseForGame, houseTokenIds, address(table), address(simulator));
+        GiraffeRace race = new GiraffeRace(address(giraffeNft), houseForGame, houseTokenIds, address(simulator));
 
         // Allow the race contract to update readiness after races.
         giraffeNft.setRaceContract(address(race));

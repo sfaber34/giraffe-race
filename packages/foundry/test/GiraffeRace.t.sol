@@ -7,7 +7,6 @@ import "forge-std/StdJson.sol";
 import "../contracts/GiraffeRace.sol";
 import "../contracts/GiraffeRaceSimulator.sol";
 import "../contracts/GiraffeNFT.sol";
-import "../contracts/libraries/WinProbTable.sol";
 import { DeterministicDice } from "../contracts/libraries/DeterministicDice.sol";
 
 contract GiraffeRaceTest is Test {
@@ -37,9 +36,8 @@ contract GiraffeRaceTest is Test {
             houseTokenIds[i] = giraffeNft.mint(owner, string(abi.encodePacked("house-", vm.toString(i))));
         }
 
-        WinProbTable table = new WinProbTable();
         GiraffeRaceSimulator simulator = new GiraffeRaceSimulator();
-        race = new GiraffeRace(address(giraffeNft), owner, houseTokenIds, address(table), address(simulator));
+        race = new GiraffeRace(address(giraffeNft), owner, houseTokenIds, address(simulator));
         giraffeNft.setRaceContract(address(race));
         vm.deal(alice, 10 ether);
         vm.deal(bob, 10 ether);

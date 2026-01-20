@@ -927,49 +927,8 @@ const deployedContracts = {
       inheritedFunctions: {},
       deployedOnBlock: 1,
     },
-    WinProbTable: {
-      address: "0xa15bb66138824a1c7167f5e85b957d04dd34e468",
-      abi: [
-        {
-          type: "function",
-          name: "getSorted",
-          inputs: [
-            {
-              name: "a",
-              type: "uint8",
-              internalType: "uint8",
-            },
-            {
-              name: "b",
-              type: "uint8",
-              internalType: "uint8",
-            },
-            {
-              name: "c",
-              type: "uint8",
-              internalType: "uint8",
-            },
-            {
-              name: "d",
-              type: "uint8",
-              internalType: "uint8",
-            },
-          ],
-          outputs: [
-            {
-              name: "probsBps",
-              type: "uint16[4]",
-              internalType: "uint16[4]",
-            },
-          ],
-          stateMutability: "pure",
-        },
-      ],
-      inheritedFunctions: {},
-      deployedOnBlock: 2,
-    },
     GiraffeRaceSimulator: {
-      address: "0xb19b36b1456e65e3a6d514d3f715f204bd59f431",
+      address: "0xa15bb66138824a1c7167f5e85b957d04dd34e468",
       abi: [
         {
           type: "function",
@@ -1050,10 +1009,10 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 3,
+      deployedOnBlock: 2,
     },
     GiraffeRace: {
-      address: "0x12975173b87f7595ee45dffb2ab812ece596bf84",
+      address: "0xf7cd8fa9b94db2aa972023b379c7f72c65e4de9d",
       abi: [
         {
           type: "constructor",
@@ -1072,11 +1031,6 @@ const deployedContracts = {
               name: "_houseGiraffeTokenIds",
               type: "uint256[6]",
               internalType: "uint256[6]",
-            },
-            {
-              name: "_winProbTable",
-              type: "address",
-              internalType: "address",
             },
             {
               name: "_simulator",
@@ -1891,19 +1845,6 @@ const deployedContracts = {
           stateMutability: "pure",
         },
         {
-          type: "function",
-          name: "winProbTable",
-          inputs: [],
-          outputs: [
-            {
-              name: "",
-              type: "address",
-              internalType: "contract WinProbTable",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
           type: "event",
           name: "BetPlaced",
           inputs: [
@@ -2251,7 +2192,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 3,
+      deployedOnBlock: 4,
     },
   },
 } as const;

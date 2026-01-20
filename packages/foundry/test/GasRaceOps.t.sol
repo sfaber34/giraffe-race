@@ -6,7 +6,6 @@ import "forge-std/console2.sol";
 import "../contracts/GiraffeRace.sol";
 import "../contracts/GiraffeRaceSimulator.sol";
 import "../contracts/GiraffeNFT.sol";
-import "../contracts/libraries/WinProbTable.sol";
 
 /// @notice Gas measurement harness for core race operations.
 /// @dev This measures EVM gas used by the calls inside Foundry tests (good for relative comparisons).
@@ -25,9 +24,8 @@ contract GasRaceOpsTest is Test {
             houseTokenIds[i] = giraffeNft.mint(house, string(abi.encodePacked("house-", vm.toString(i))));
         }
 
-        WinProbTable table = new WinProbTable();
         simulator = new GiraffeRaceSimulator();
-        race = new GiraffeRace(address(giraffeNft), house, houseTokenIds, address(table), address(simulator));
+        race = new GiraffeRace(address(giraffeNft), house, houseTokenIds, address(simulator));
         giraffeNft.setRaceContract(address(race));
 
         vm.deal(house, 200 ether);
