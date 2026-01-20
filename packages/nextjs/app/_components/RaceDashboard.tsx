@@ -1025,13 +1025,25 @@ export const RaceDashboard = () => {
                         {/* Track background */}
                         <div className="absolute inset-0">
                           <div
-                            className="absolute top-3 bottom-3 w-[3px] bg-base-300"
+                            className="absolute top-0 bottom-0 w-[3px] bg-base-300"
                             style={{ left: `${worldPaddingLeftPx}px` }}
                           />
                           <div
-                            className="absolute top-3 bottom-3 w-[3px] bg-base-300"
+                            className="absolute top-0 bottom-0 w-[3px] bg-base-300"
                             style={{ left: `${worldPaddingLeftPx + trackLengthPx}px` }}
                           />
+                          {/* Distance markers: thin vertical lines every 100 units */}
+                          {Array.from({ length: Math.floor(TRACK_LENGTH / 100) - 1 }).map((_, idx) => {
+                            const dist = (idx + 1) * 100; // 100..900
+                            const x = worldPaddingLeftPx + (dist / TRACK_LENGTH) * trackLengthPx;
+                            return (
+                              <div
+                                key={dist}
+                                className="absolute top-0 bottom-0 w-px bg-base-300 opacity-95 pointer-events-none"
+                                style={{ left: `${x}px` }}
+                              />
+                            );
+                          })}
                           <div
                             className="absolute inset-0 opacity-30"
                             style={{
