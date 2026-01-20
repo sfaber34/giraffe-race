@@ -88,7 +88,7 @@ export const RaceDashboard = () => {
   const [isMining, setIsMining] = useState(false);
   const [selectedTokenId, setSelectedTokenId] = useState<bigint | null>(null);
   const [submittedTokenId, setSubmittedTokenId] = useState<bigint | null>(null);
-  const [betLane, setBetLane] = useState<number>(0);
+  const [betLane, setBetLane] = useState<number | null>(null);
   const [betAmountEth, setBetAmountEth] = useState("");
   const [fundAmountEth, setFundAmountEth] = useState("");
   const [isFundingRace, setIsFundingRace] = useState(false);
@@ -214,7 +214,9 @@ export const RaceDashboard = () => {
     }
   }, [settledLiabilityData]);
 
-  const [viewRaceId, setViewRaceId] = useState<bigint | null>(null);
+  // Intentionally keep the setter around (plumbing for future "view past races" UI),
+  // but don't use the state value right now since the UI is always pinned to latest.
+  const [, setViewRaceId] = useState<bigint | null>(null);
 
   useEffect(() => {
     if (latestRaceId === null) return;
@@ -225,7 +227,9 @@ export const RaceDashboard = () => {
     });
   }, [latestRaceId]);
 
-  const viewingRaceId = viewRaceId ?? latestRaceId;
+  // NOTE: We intentionally always show the latest race in the UI right now.
+  // Keep `viewRaceId` + `setViewRaceId` plumbing around so we can re-enable "view past races" controls later.
+  const viewingRaceId = latestRaceId;
   // Treat "no race yet" (and the brief initial-load null state) as "viewing latest" so core actions
   // like "Create race" / "Submit NFT" aren't incorrectly disabled on a fresh chain.
   const isViewingLatest =
@@ -391,6 +395,12 @@ export const RaceDashboard = () => {
     setSubmittedTokenId(null);
   }, [connectedAddress, viewingRaceId]);
 
+  // Reset the local bet lane selection on a new race (or wallet), so we don't carry over
+  // the previously-selected lane button into the next race.
+  useEffect(() => {
+    setBetLane(null);
+  }, [connectedAddress, viewingRaceId]);
+
   const lineupFinalized = (parsedGiraffes?.assignedCount ?? 0) === Number(LANE_COUNT);
   const canFinalize = status === "betting_open" && !lineupFinalized;
   // Contract requires oddsSet (auto-derived at finalization), so avoid enabling bets until odds are loaded+set.
@@ -449,6 +459,7 @@ export const RaceDashboard = () => {
   const estimatedPayoutWei = useMemo(() => {
     if (!parsedOdds?.oddsSet) return null;
     const lane = myBet?.hasBet ? myBet.lane : betLane;
+    if (lane === null || lane === undefined) return null;
     const amountWei = myBet?.hasBet ? myBet.amount : placeBetValue;
     if (!amountWei) return null;
     const oddsBps = parsedOdds.oddsBps?.[lane] ?? 0n;
@@ -502,6 +513,15 @@ export const RaceDashboard = () => {
       closeBlock: BigInt(out?.closeBlock ?? 0),
     };
   }, [nextWinningClaimData]);
+
+  // Claim UI needs to preserve the last "revealed" state while a new replay is running,
+  // so the claim card doesn't appear to flicker/clear mid-race.
+  type ClaimSnapshot = {
+    nextWinningClaim: typeof nextWinningClaim;
+    winningClaimRemaining: bigint | null;
+  };
+  const [claimSnapshot, setClaimSnapshot] = useState<ClaimSnapshot | null>(null);
+  const [syncClaimSnapshotAfterUserAction, setSyncClaimSnapshotAfterUserAction] = useState(false);
 
   const [jumpToNextWinningClaimAfterClaim, setJumpToNextWinningClaimAfterClaim] = useState(false);
 
@@ -701,6 +721,32 @@ export const RaceDashboard = () => {
   const raceIsOver = !!simulation && frame >= lastFrameIndex;
   const revealOutcome = raceIsOver;
   const revealedWinner = revealOutcome ? verifiedWinner : null;
+  // Keep the "replay is the source of truth" illusion: don't reveal claimable payout state
+  // (which is ultimately on-chain) until the replay reaches the end.
+  // If there's no replay available (e.g. not settled / no sim), show the normal claim status.
+  const claimUiUnlocked = !simulation || raceIsOver;
+
+  // Only update the "revealed" claim snapshot when the replay has finished (or after the user claims),
+  // so the claim card stays stable during the next race replay.
+  useEffect(() => {
+    if (!connectedAddress) {
+      setClaimSnapshot(null);
+      setSyncClaimSnapshotAfterUserAction(false);
+      return;
+    }
+    if (!claimUiUnlocked && !syncClaimSnapshotAfterUserAction) return;
+    // Wait until the reads have resolved.
+    if (!nextWinningClaim || winningClaimRemaining === null) return;
+
+    setClaimSnapshot({ nextWinningClaim, winningClaimRemaining });
+    if (syncClaimSnapshotAfterUserAction) setSyncClaimSnapshotAfterUserAction(false);
+  }, [connectedAddress, claimUiUnlocked, syncClaimSnapshotAfterUserAction, nextWinningClaim, winningClaimRemaining]);
+
+  const displayedNextWinningClaim = claimUiUnlocked ? nextWinningClaim : (claimSnapshot?.nextWinningClaim ?? null);
+  const displayedWinningClaimRemaining = claimUiUnlocked
+    ? winningClaimRemaining
+    : (claimSnapshot?.winningClaimRemaining ?? null);
+  const hasRevealedClaimSnapshot = claimSnapshot !== null;
 
   // ---- Track + camera geometry (restored camera-follow viewport) ----
   const laneHeightPx = 86;
@@ -859,29 +905,6 @@ export const RaceDashboard = () => {
 
   return (
     <div className="flex flex-col w-full">
-      {/* Mine controls: stay at top of page content (non-sticky) */}
-      <div className="bg-base-100/80 backdrop-blur border-b border-base-200">
-        <div className="w-full max-w-none px-[30px] py-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-col">
-              <div className="text-sm font-medium">Mine blocks (local)</div>
-              <div className="text-xs opacity-70">Keep these for fast state transitions.</div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button className="btn btn-sm" onClick={() => mineBlocks(1)} disabled={!publicClient || isMining}>
-                Mine +1
-              </button>
-              <button className="btn btn-sm" onClick={() => mineBlocks(10)} disabled={!publicClient || isMining}>
-                Mine +10
-              </button>
-              <button className="btn btn-sm" onClick={() => mineBlocks(50)} disabled={!publicClient || isMining}>
-                Mine +50
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <div className="flex flex-col gap-8 w-full max-w-none px-[30px] py-8">
         <div className="flex flex-col gap-2">
           <h1 className="text-4xl font-bold">Giraffe Race</h1>
@@ -897,37 +920,6 @@ export const RaceDashboard = () => {
             <div className="flex items-center justify-between">
               <h2 className="card-title">Race replay</h2>
               <div className="flex items-center gap-2">
-                <div className="hidden md:flex items-center gap-2">
-                  <span className="text-xs opacity-70">Viewing</span>
-                  <span className="text-xs font-mono">{viewingRaceId?.toString() ?? "-"}</span>
-                  <span className="text-xs opacity-70">/ Latest</span>
-                  <span className="text-xs font-mono">{latestRaceId?.toString() ?? "-"}</span>
-                </div>
-                <div className="join">
-                  <button
-                    className="btn btn-sm join-item"
-                    disabled={!hasAnyRace || viewingRaceId === null || viewingRaceId === 0n}
-                    onClick={() => setViewRaceId(id => (id === null ? id : id > 0n ? id - 1n : 0n))}
-                  >
-                    Prev
-                  </button>
-                  <button
-                    className="btn btn-sm join-item"
-                    disabled={
-                      !hasAnyRace || viewingRaceId === null || latestRaceId === null || viewingRaceId >= latestRaceId
-                    }
-                    onClick={() => setViewRaceId(id => (id === null ? id : id + 1n))}
-                  >
-                    Next
-                  </button>
-                  <button
-                    className="btn btn-sm join-item"
-                    disabled={!hasAnyRace || latestRaceId === null || viewingRaceId === latestRaceId}
-                    onClick={() => setViewRaceId(latestRaceId)}
-                  >
-                    Latest
-                  </button>
-                </div>
                 {/* Claim UX is handled in the Claim panel; keep replay controls focused on replay */}
                 <div className="join">
                   <button
@@ -1317,6 +1309,18 @@ export const RaceDashboard = () => {
                     Settle race
                   </button>
                 </div>
+                <div className="flex flex-wrap items-center gap-2 mt-1">
+                  <span className="text-xs opacity-70">Mine blocks (local)</span>
+                  <button className="btn btn-xs" onClick={() => mineBlocks(1)} disabled={!publicClient || isMining}>
+                    Mine +1
+                  </button>
+                  <button className="btn btn-xs" onClick={() => mineBlocks(10)} disabled={!publicClient || isMining}>
+                    Mine +10
+                  </button>
+                  <button className="btn btn-xs" onClick={() => mineBlocks(50)} disabled={!publicClient || isMining}>
+                    Mine +50
+                  </button>
+                </div>
                 <div className="text-xs opacity-70">
                   Anyone can create/finalize/settle. Odds are auto-quoted on-chain at lineup finalization based on the
                   locked effective score snapshot (avg of readiness/conditioning/speed).
@@ -1389,45 +1393,49 @@ export const RaceDashboard = () => {
               <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between">
                   <div className="text-sm font-medium">Claim payout</div>
-                  {connectedAddress && winningClaimRemaining !== null && winningClaimRemaining > 0n ? (
+                  {connectedAddress &&
+                  displayedWinningClaimRemaining !== null &&
+                  displayedWinningClaimRemaining > 0n ? (
                     <div className="badge badge-outline">
-                      {winningClaimRemaining.toString()}
+                      {displayedWinningClaimRemaining.toString()}
                       <span className="ml-1 opacity-70">pending</span>
                     </div>
                   ) : null}
                 </div>
                 {!connectedAddress ? (
                   <div className="text-xs opacity-70">Connect wallet to see your next claim.</div>
-                ) : !nextWinningClaim ? (
+                ) : !claimUiUnlocked && !hasRevealedClaimSnapshot ? (
+                  <div className="text-xs opacity-70">Finish the replay to reveal claim status.</div>
+                ) : !displayedNextWinningClaim ? (
                   <div className="text-xs opacity-70">Loading claim status…</div>
-                ) : !nextWinningClaim.hasClaim ? (
+                ) : !displayedNextWinningClaim.hasClaim ? (
                   <div className="text-xs opacity-70">No claimable payouts.</div>
                 ) : (
                   <div className="text-xs">
                     <div className="flex justify-between">
                       <span className="opacity-70">Next payout race</span>
-                      <span className="font-mono">{nextWinningClaim.raceId.toString()}</span>
+                      <span className="font-mono">{displayedNextWinningClaim.raceId.toString()}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="opacity-70">Your bet</span>
                       <span className="font-semibold text-right">
                         <GiraffeAnimated
-                          idPrefix={`claim-${nextWinningClaim.raceId.toString()}-${nextWinningClaim.betLane}-${nextWinningClaim.betTokenId.toString()}`}
-                          tokenId={nextWinningClaim.betTokenId}
+                          idPrefix={`claim-${displayedNextWinningClaim.raceId.toString()}-${displayedNextWinningClaim.betLane}-${displayedNextWinningClaim.betTokenId.toString()}`}
+                          tokenId={displayedNextWinningClaim.betTokenId}
                           playbackRate={1}
                           playing={true}
                           sizePx={48}
                           className="inline-block align-middle"
                         />{" "}
-                        {nextWinningClaim.betTokenId !== 0n ? (
+                        {displayedNextWinningClaim.betTokenId !== 0n ? (
                           <LaneName
-                            tokenId={nextWinningClaim.betTokenId}
-                            fallback={`Lane ${nextWinningClaim.betLane}`}
+                            tokenId={displayedNextWinningClaim.betTokenId}
+                            fallback={`Lane ${displayedNextWinningClaim.betLane}`}
                           />
                         ) : (
-                          `Lane ${nextWinningClaim.betLane}`
+                          `Lane ${displayedNextWinningClaim.betLane}`
                         )}{" "}
-                        · {formatEther(nextWinningClaim.betAmount)} ETH
+                        · {formatEther(displayedNextWinningClaim.betAmount)} ETH
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -1436,21 +1444,26 @@ export const RaceDashboard = () => {
                     </div>
                     <div className="flex justify-between">
                       <span className="opacity-70">Estimated payout</span>
-                      <span className="font-mono">{formatEther(nextWinningClaim.payout)} ETH</span>
+                      <span className="font-mono">{formatEther(displayedNextWinningClaim.payout)} ETH</span>
                     </div>
                   </div>
                 )}
                 <button
                   className="btn btn-sm btn-primary"
-                  disabled={!giraffeRaceContract || !connectedAddress || !nextWinningClaim?.hasClaim}
+                  disabled={!giraffeRaceContract || !connectedAddress || !displayedNextWinningClaim?.hasClaim}
                   onClick={async () => {
                     await writeGiraffeRaceAsync({ functionName: "claimNextWinningPayout" } as any);
+                    setSyncClaimSnapshotAfterUserAction(true);
                     setJumpToNextWinningClaimAfterClaim(true);
                   }}
                 >
                   Claim payout
                 </button>
-                <div className="text-xs opacity-70">Claim is enabled only when you have a payout to claim.</div>
+                <div className="text-xs opacity-70">
+                  {!claimUiUnlocked
+                    ? "Claim status may increase after the replay finishes."
+                    : "Claim is enabled only when you have a payout to claim."}
+                </div>
               </div>
             </div>
           </div>
@@ -1666,12 +1679,14 @@ export const RaceDashboard = () => {
                             !giraffeRaceContract ||
                             !connectedAddress ||
                             !canBet ||
+                            betLane === null ||
                             !placeBetValue ||
                             !!myBet?.hasBet ||
                             !isViewingLatest
                           }
                           onClick={async () => {
                             if (!placeBetValue) return;
+                            if (betLane === null) return;
                             await writeGiraffeRaceAsync({
                               functionName: "placeBet",
                               args: [BigInt(Math.max(0, Math.min(Number(LANE_COUNT - 1), Math.floor(betLane))))],
