@@ -7,6 +7,7 @@ import { useAccount, useBlockNumber, usePublicClient } from "wagmi";
 import { GiraffeAnimated } from "~~/components/assets/GiraffeAnimated";
 import {
   useDeployedContractInfo,
+  useScaffoldEventHistory,
   useScaffoldReadContract,
   useScaffoldWriteContract,
   useTargetNetwork,
@@ -249,6 +250,15 @@ export const RaceDashboard = () => {
     query: { enabled: hasAnyRace && viewingRaceId !== null },
   });
 
+  // Entry pool is not exposed via a view; build it from `GiraffeSubmitted` events for the active race.
+  const { data: submittedEvents } = useScaffoldEventHistory({
+    contractName: "GiraffeRace",
+    eventName: "GiraffeSubmitted",
+    filters: viewingRaceId !== null ? ({ raceId: viewingRaceId } as any) : undefined,
+    watch: true,
+    enabled: hasAnyRace && viewingRaceId !== null,
+  });
+
   const { data: raceScoreData } = useScaffoldReadContract({
     contractName: "GiraffeRace",
     // Added in score snapshot upgrade; cast to avoid ABI typing mismatch until contracts are regenerated.
@@ -286,6 +296,43 @@ export const RaceDashboard = () => {
       originalOwners: originalOwners as readonly `0x${string}`[],
     };
   }, [raceGiraffesData]);
+
+  // Track the last raceId we fetched events for to detect transitions and avoid stale data.
+  const [entryPoolRaceId, setEntryPoolRaceId] = useState<bigint | null>(null);
+  useEffect(() => {
+    setEntryPoolRaceId(viewingRaceId);
+  }, [viewingRaceId]);
+
+  const entryPoolTokenIds = useMemo(() => {
+    // If raceId changed but events haven't caught up yet, return empty to avoid showing stale data.
+    if (entryPoolRaceId !== viewingRaceId) return [];
+    const evs = (submittedEvents as any[] | undefined) ?? [];
+    const out: bigint[] = [];
+    const seen = new Set<string>();
+    for (const e of evs) {
+      // Only include events for the current race (double-check since filters may lag).
+      const eventRaceId = BigInt((e as any)?.args?.raceId ?? 0);
+      if (viewingRaceId !== null && eventRaceId !== viewingRaceId) continue;
+      const tokenId = BigInt((e as any)?.args?.tokenId ?? 0);
+      if (tokenId === 0n) continue;
+      const k = tokenId.toString();
+      if (seen.has(k)) continue;
+      seen.add(k);
+      out.push(tokenId);
+    }
+    return out;
+  }, [submittedEvents, viewingRaceId, entryPoolRaceId]);
+
+  const selectedLineupTokenIdSet = useMemo(() => {
+    const set = new Set<string>();
+    const ids = parsedGiraffes?.tokenIds ?? [];
+    for (const id of ids) {
+      const tokenId = BigInt(id ?? 0);
+      if (tokenId === 0n) continue;
+      set.add(tokenId.toString());
+    }
+    return set;
+  }, [parsedGiraffes?.tokenIds]);
 
   const parsedOdds = useMemo(() => {
     if (!raceOddsData) return null;
@@ -402,6 +449,51 @@ export const RaceDashboard = () => {
   }, [connectedAddress, viewingRaceId]);
 
   const lineupFinalized = (parsedGiraffes?.assignedCount ?? 0) === Number(LANE_COUNT);
+
+  // After lineup finalization, briefly highlight the selected entrants (from the entry pool)
+  // before revealing the betting UI.
+  const [isFinalizeRevealActive, setIsFinalizeRevealActive] = useState(false);
+  const [canShowBetCard, setCanShowBetCard] = useState(false);
+  const finalizeRevealTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (finalizeRevealTimeoutRef.current) window.clearTimeout(finalizeRevealTimeoutRef.current);
+    finalizeRevealTimeoutRef.current = null;
+    setIsFinalizeRevealActive(false);
+    setCanShowBetCard(false);
+  }, [viewingRaceId]);
+
+  useEffect(() => {
+    // Once settled or betting_closed, keep the bet card visible and don't regress.
+    if (status === "settled" || status === "betting_closed") {
+      setIsFinalizeRevealActive(false);
+      setCanShowBetCard(true);
+      return;
+    }
+    // Don't reset canShowBetCard to false if lineupFinalized briefly becomes false due to stale data
+    // (e.g. during re-fetch). Only reset if we're clearly in an early phase.
+    if (!lineupFinalized && status === "submissions_open") {
+      setIsFinalizeRevealActive(false);
+      setCanShowBetCard(false);
+      return;
+    }
+    // If lineupFinalized is false but we're in betting_open, don't reset - wait for data to stabilize.
+    if (!lineupFinalized) {
+      return;
+    }
+
+    if (finalizeRevealTimeoutRef.current) window.clearTimeout(finalizeRevealTimeoutRef.current);
+    setIsFinalizeRevealActive(true);
+    setCanShowBetCard(false);
+    finalizeRevealTimeoutRef.current = window.setTimeout(() => {
+      setIsFinalizeRevealActive(false);
+      setCanShowBetCard(true);
+    }, 3000);
+    return () => {
+      if (finalizeRevealTimeoutRef.current) window.clearTimeout(finalizeRevealTimeoutRef.current);
+      finalizeRevealTimeoutRef.current = null;
+    };
+  }, [lineupFinalized, status]);
   const canFinalize = status === "betting_open" && !lineupFinalized;
   // Contract requires oddsSet (auto-derived at finalization), so avoid enabling bets until odds are loaded+set.
   const canBet = status === "betting_open" && lineupFinalized && parsedOdds?.oddsSet === true;
@@ -411,8 +503,24 @@ export const RaceDashboard = () => {
     status === "no_race" || // will auto-create a race
     status === "settled"; // will auto-create the next race
 
-  const showEnterNftCard = !lineupFinalized;
-  const showPlaceBetCard = lineupFinalized || status === "settled";
+  // Show "Enter an NFT" during submissions, and also during the 3s finalize reveal.
+  // Never show once we're past betting (betting_closed or settled).
+  const showEnterNftCard =
+    (!lineupFinalized || isFinalizeRevealActive) && status !== "betting_closed" && status !== "settled";
+  // Show "Entry pool" during submissions AND during the betting_open phase BEFORE finalization,
+  // AND during the 3s finalize reveal (with highlights). Hide once bet card appears.
+  // Also hide during race transitions (when entryPoolRaceId doesn't match viewingRaceId yet) to avoid flicker.
+  // Never show once we're past betting (betting_closed or settled).
+  const isEntryPoolReady = entryPoolRaceId === viewingRaceId;
+  const showEntryPoolCard =
+    isEntryPoolReady &&
+    (status === "submissions_open" || (status === "betting_open" && !lineupFinalized) || isFinalizeRevealActive) &&
+    !canShowBetCard &&
+    status !== "betting_closed" &&
+    status !== "settled" &&
+    status !== "no_race";
+  // Show Place a bet card once lineup is finalized and 3s reveal is done, OR once betting is closed, OR once settled.
+  const showPlaceBetCard = status === "settled" || status === "betting_closed" || (lineupFinalized && canShowBetCard);
   const isEnterLocked = submittedTokenId !== null && isViewingLatest;
 
   const oddsLabelForLane = (lane: number) => {
@@ -1135,7 +1243,9 @@ export const RaceDashboard = () => {
                                   transform: `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%)`,
                                   transition: `transform ${Math.floor(120 / (playbackSpeed * BASE_REPLAY_SPEED_MULTIPLIER))}ms linear`,
                                   willChange: "transform",
-                                  filter: isWinner ? "drop-shadow(0 6px 10px rgba(0,0,0,0.25))" : undefined,
+                                  filter: isWinner
+                                    ? "drop-shadow(0 0 12px rgba(255, 215, 0, 0.9)) drop-shadow(0 0 24px rgba(255, 215, 0, 0.6))"
+                                    : undefined,
                                 }}
                               >
                                 <div className="relative">
@@ -1574,6 +1684,59 @@ export const RaceDashboard = () => {
                           Submissions are only available during the submissions window.
                         </div>
                       ) : null}
+                    </div>
+                  </div>
+                ) : null}
+
+                {showEntryPoolCard ? (
+                  <div className="card bg-base-100 border border-base-300">
+                    <div className="card-body gap-3">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-semibold">Entry pool</h3>
+                        <div className="text-xs opacity-70">{entryPoolTokenIds.length} submitted</div>
+                      </div>
+
+                      {entryPoolTokenIds.length === 0 ? (
+                        <div className="text-sm opacity-70">No NFTs have been submitted yet.</div>
+                      ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+                          {entryPoolTokenIds.map(tokenId => {
+                            const isSelected =
+                              isFinalizeRevealActive && selectedLineupTokenIdSet.has(tokenId.toString());
+                            return (
+                              <div
+                                key={tokenId.toString()}
+                                className={`relative rounded-xl border border-base-300 bg-base-200/40 p-2 ${
+                                  isSelected ? "ring-2 ring-primary ring-offset-2 ring-offset-base-100" : ""
+                                }`}
+                              >
+                                <GiraffeAnimated
+                                  idPrefix={`pool-${(viewingRaceId ?? 0n).toString()}-${tokenId.toString()}`}
+                                  tokenId={tokenId}
+                                  playbackRate={1}
+                                  playing={false}
+                                  sizePx={84}
+                                  className="mx-auto block"
+                                />
+                                <div className="mt-1 text-[11px] text-center opacity-70 truncate max-w-[84px] mx-auto">
+                                  <LaneName tokenId={tokenId} fallback={`#${tokenId.toString()}`} />
+                                </div>
+                                {isSelected ? (
+                                  <div className="absolute top-2 right-2 badge badge-primary badge-sm">Selected</div>
+                                ) : null}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {isFinalizeRevealActive ? (
+                        <div className="text-xs opacity-70">Lineup finalized — selected entrants are highlighted.</div>
+                      ) : (
+                        <div className="text-xs opacity-70">
+                          These are the NFTs submitted for the current race (before lineup finalization).
+                        </div>
+                      )}
                     </div>
                   </div>
                 ) : null}
