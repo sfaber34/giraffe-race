@@ -760,14 +760,16 @@ export const RaceDashboard = () => {
 
     const distances = currentDistances.map(x => Number(x ?? 0));
     const maxDist = Math.max(...distances);
-    const maxRunnerX = worldPaddingLeftPx + (maxDist / TRACK_LENGTH) * trackLengthPx;
+    // Render positions are centered; we offset the sprite center left by half its width so the "nose" (front edge)
+    // touches the start/finish line instead of the center sitting on it.
+    const spriteHalf = giraffeSizePx / 2;
+    const maxRunnerX = worldPaddingLeftPx + (maxDist / TRACK_LENGTH) * trackLengthPx - spriteHalf;
 
     // Use the average position of all runners as the camera focal point.
     const avgDist = distances.length ? distances.reduce((sum, d) => sum + d, 0) / distances.length : 0;
-    const focalX = worldPaddingLeftPx + (avgDist / TRACK_LENGTH) * trackLengthPx;
+    const focalX = worldPaddingLeftPx + (avgDist / TRACK_LENGTH) * trackLengthPx - spriteHalf;
 
     // Keep the leader fully visible (account for sprite width), not just the leader point.
-    const spriteHalf = giraffeSizePx / 2;
     const spritePad = 12;
     const minLeaderScreenX = spriteHalf + spritePad;
     const maxLeaderScreenX = Math.max(minLeaderScreenX, viewportWorldWidth - (spriteHalf + spritePad));
@@ -1068,7 +1070,7 @@ export const RaceDashboard = () => {
                         {/* Distance markers: thin vertical lines every 100 units */}
                         {Array.from({ length: Math.floor(TRACK_LENGTH / 100) - 1 }).map((_, idx) => {
                           const dist = (idx + 1) * 100; // 100..900
-                          const x = worldPaddingLeftPx + (dist / TRACK_LENGTH) * trackLengthPx;
+                          const x = worldPaddingLeftPx + (dist / TRACK_LENGTH) * trackLengthPx - giraffeSizePx / 2;
                           return (
                             <div
                               key={dist}
@@ -1129,7 +1131,8 @@ export const RaceDashboard = () => {
 
                             const x =
                               worldPaddingLeftPx +
-                              (Math.min(TRACK_LENGTH, Math.max(0, d)) / TRACK_LENGTH) * trackLengthPx;
+                              (Math.min(TRACK_LENGTH, Math.max(0, d)) / TRACK_LENGTH) * trackLengthPx -
+                              giraffeSizePx / 2;
                             const y = i * (laneHeightPx + laneGapPx) + laneHeightPx / 2;
 
                             return (
