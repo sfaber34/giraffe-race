@@ -175,7 +175,8 @@ function tupleKey([a, b, c, d]) {
 }
 
 function parseArgs(argv) {
-  const out = { samples: 20_000, minBps: 9525 };
+  // Tuning: keep consistent with Solidity/TS sim.
+  const out = { samples: 20_000, minBps: 9585 };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--samples") out.samples = Number(argv[++i]);

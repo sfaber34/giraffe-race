@@ -112,8 +112,9 @@ function clampScore(r) {
 // Match Solidity/TS: minBps + (score-1) * (10000-minBps) / 9
 function scoreBps(score) {
   const r = clampScore(score);
-  const minBps = 9525;
-  const range = 10_000 - minBps; // 475
+  // Tuning: keep consistent with Solidity/TS sim.
+  const minBps = 9585;
+  const range = 10_000 - minBps; // 415
   return minBps + Math.floor(((r - 1) * range) / 9);
 }
 

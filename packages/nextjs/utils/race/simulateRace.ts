@@ -19,8 +19,9 @@ const clampScore = (r: number) => {
 // Match Solidity: minBps + (score-1) * (10000-minBps) / 9
 const scoreBps = (score: number) => {
   const r = clampScore(score);
-  const minBps = 9525;
-  const range = 10_000 - minBps; // 475
+  // Tuning: reduce how much score=1 handicaps speed so extreme mismatches aren't ~50x longshots.
+  const minBps = 9585;
+  const range = 10_000 - minBps; // 415
   return minBps + Math.floor(((r - 1) * range) / 9);
 };
 

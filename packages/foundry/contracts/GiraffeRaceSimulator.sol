@@ -40,14 +40,13 @@ contract GiraffeRaceSimulator {
     }
 
     function _scoreBps(uint8 score) internal pure returns (uint16) {
-        // Map score 1..10 -> 0.9525x..1.00x (basis points).
-        // Tuned so that a worst-case tuple like [1,10,10,10] yields ~20x implied odds (not hundreds-x),
-        // while 9 vs 10 is only a small effect (when combined with probabilistic rounding below).
+        // Map score 1..10 -> multiplier in basis points.
+        // Tuning: reduce how much score=1 handicaps speed so extreme mismatches aren't ~50x longshots.
         if (score == 0) score = 10;
         if (score > 10) score = 10;
         if (score < 1) score = 1;
-        uint256 minBps = 9525;
-        uint256 range = 10000 - minBps; // 475
+        uint256 minBps = 9585;
+        uint256 range = 10000 - minBps; // 415
         return uint16(minBps + (uint256(score - 1) * range) / 9);
     }
 

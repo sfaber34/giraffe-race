@@ -22,8 +22,9 @@ contract GasScoreProbeTest is Test {
         if (score == 0) score = 10;
         if (score > 10) score = 10;
         if (score < 1) score = 1;
-        uint256 minBps = 9525;
-        uint256 range = 10000 - minBps; // 475
+        // Tuning: keep consistent with GiraffeRaceSimulator / TS sim.
+        uint256 minBps = 9585;
+        uint256 range = 10000 - minBps; // 415
         return uint16(minBps + (uint256(score - 1) * range) / 9);
     }
 
@@ -34,8 +35,8 @@ contract GasScoreProbeTest is Test {
 
         for (uint16 t = 0; t < ticks; t++) {
             for (uint8 a = 0; a < 4; a++) {
-                (uint256 r, DeterministicDice.Dice memory d2) = dice.roll(10);
-                dice = d2;
+                uint256 r;
+                (r, dice) = dice.roll(10);
                 uint256 baseSpeed = r + 1; // 1..10
                 uint256 raw = baseSpeed * uint256(bps[a]);
                 uint256 q = raw / uint256(BPS_DENOM);
@@ -52,16 +53,16 @@ contract GasScoreProbeTest is Test {
 
         for (uint16 t = 0; t < ticks; t++) {
             for (uint8 a = 0; a < 4; a++) {
-                (uint256 r, DeterministicDice.Dice memory d2) = dice.roll(10);
-                dice = d2;
+                uint256 r;
+                (r, dice) = dice.roll(10);
                 uint256 baseSpeed = r + 1; // 1..10
 
                 uint256 raw = baseSpeed * uint256(bps[a]);
                 uint256 q = raw / uint256(BPS_DENOM);
                 uint256 rem = raw % uint256(BPS_DENOM);
                 if (rem > 0) {
-                    (uint256 pick, DeterministicDice.Dice memory d3) = dice.roll(BPS_DENOM);
-                    dice = d3;
+                    uint256 pick;
+                    (pick, dice) = dice.roll(BPS_DENOM);
                     if (pick < rem) q += 1;
                 }
                 if (q == 0) q = 1;

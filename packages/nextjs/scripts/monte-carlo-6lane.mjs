@@ -98,8 +98,11 @@ function clampScore(r) {
 // Match Solidity/TS: minBps + (score-1) * (10000-minBps) / 9
 function scoreBps(score) {
   const r = clampScore(score);
-  const minBps = 9525;
-  const range = 10_000 - minBps; // 475
+  // TUNING: reduce how much score=1 handicaps speed.
+  // Baseline (original): minBps=9525 (0.9525x at score=1)
+  // Target tuning: aim for ~30x odds (edge=5%) for [10,10,10,10,10,1]
+  const minBps = 9585; // 0.9585x at score=1
+  const range = 10_000 - minBps; // 415
   return minBps + Math.floor(((r - 1) * range) / 9);
 }
 
