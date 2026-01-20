@@ -1082,6 +1082,7 @@ export const RaceDashboard = () => {
                           const prev = Number(prevDistances[i] ?? 0);
                           const delta = Math.max(0, d - prev);
                           const isWinner = revealedWinner === i;
+                          const isUserBetLane = !!myBet?.hasBet && myBet.lane === i;
 
                           const MIN_ANIMATION_SPEED_FACTOR = 2.0;
                           const MAX_ANIMATION_SPEED_FACTOR = 5.0;
@@ -1107,14 +1108,27 @@ export const RaceDashboard = () => {
                                 filter: isWinner ? "drop-shadow(0 6px 10px rgba(0,0,0,0.25))" : undefined,
                               }}
                             >
-                              <GiraffeAnimated
-                                idPrefix={`lane-${i}`}
-                                tokenId={parsedGiraffes?.tokenIds?.[i] ?? 0n}
-                                playbackRate={speedFactor}
-                                resetNonce={svgResetNonce}
-                                playing={isPlaying && raceStarted && frame < lastFrameIndex}
-                                sizePx={giraffeSizePx}
-                              />
+                              <div className="relative">
+                                {isUserBetLane ? (
+                                  <div
+                                    className="absolute left-1/3 -translate-x-1/2 z-20 pointer-events-none select-none"
+                                    role="img"
+                                    aria-label="Your bet"
+                                  >
+                                    <span className="inline-flex items-center justify-center rounded-full bg-base-100/80 px-1.5 py-0.5 text-green-500 font-extrabold drop-shadow">
+                                      $
+                                    </span>
+                                  </div>
+                                ) : null}
+                                <GiraffeAnimated
+                                  idPrefix={`lane-${i}`}
+                                  tokenId={parsedGiraffes?.tokenIds?.[i] ?? 0n}
+                                  playbackRate={speedFactor}
+                                  resetNonce={svgResetNonce}
+                                  playing={isPlaying && raceStarted && frame < lastFrameIndex}
+                                  sizePx={giraffeSizePx}
+                                />
+                              </div>
                             </div>
                           );
                         })}
