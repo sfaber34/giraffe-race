@@ -748,7 +748,7 @@ export const RaceDashboard = () => {
   // Drive camera via scrollLeft with spring smoothing (Unity-style SmoothDamp).
   useEffect(() => {
     const el = cameraScrollEl;
-    if (!el) return;
+    if (!el || !simulation) return;
     cameraSmoothLastTsRef.current = null;
     cameraSpringXRef.current = null;
     cameraSpringVRef.current = 0;
@@ -791,7 +791,7 @@ export const RaceDashboard = () => {
       cameraSmoothRafRef.current = null;
       cameraSmoothLastTsRef.current = null;
     };
-  }, [cameraScrollEl]);
+  }, [cameraScrollEl, simulation]);
 
   const activeRaceExists = status !== "no_race" && !parsed?.settled;
 
@@ -918,184 +918,191 @@ export const RaceDashboard = () => {
               </div>
             </div>
 
-            {!parsed ? (
-              <div className="alert alert-info">
-                <span className="text-sm">Start a race to see status and replay.</span>
-              </div>
-            ) : !parsed.settled ? (
-              <div className="alert alert-info">
-                <span className="text-sm">Race isn’t settled yet, so the seed is unknown. Settle it to replay.</span>
-              </div>
-            ) : !simulation ? (
-              <div className="alert alert-warning">
-                <span className="text-sm">Missing/invalid seed. Try settling the race again.</span>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3">
+              {!parsed ? (
+                <div className="alert alert-info">
+                  <span className="text-sm">Start a race to see status and replay.</span>
+                </div>
+              ) : !parsed.settled ? (
+                <div className="alert alert-info">
+                  <span className="text-sm">Race isn’t settled yet, so the seed is unknown. Settle it to replay.</span>
+                </div>
+              ) : !simulation ? (
+                <div className="alert alert-warning">
+                  <span className="text-sm">Missing/invalid seed. Try settling the race again.</span>
+                </div>
+              ) : null}
+
+              {simulation ? (
                 <div className="flex justify-between text-sm opacity-70">
                   <span>
                     Tick: <span className="font-semibold opacity-100">{frame}</span> / {lastFrameIndex}
                   </span>
                 </div>
+              ) : null}
 
-                <div
-                  ref={viewportRefCb}
-                  className="relative w-full rounded-2xl bg-base-100 border border-base-300 overflow-hidden"
-                  style={{ height: `${trackHeightPx}px` }}
-                >
-                  {/* Fixed lane labels */}
-                  <div className="absolute left-3 top-3 bottom-3 z-10 flex flex-col justify-between pointer-events-none">
-                    {Array.from({ length: LANE_COUNT }).map((_, i) => {
-                      const d = Number(currentDistances[i] ?? 0);
-                      const isWinner = revealedWinner === i;
-                      return (
+              <div
+                ref={viewportRefCb}
+                className="relative w-full rounded-2xl bg-base-100 border border-base-300 overflow-hidden"
+                style={{ height: `${trackHeightPx}px` }}
+              >
+                {/* Fixed lane labels */}
+                <div className="absolute left-3 top-3 bottom-3 z-10 flex flex-col justify-between pointer-events-none">
+                  {Array.from({ length: LANE_COUNT }).map((_, i) => {
+                    const d = Number(currentDistances[i] ?? 0);
+                    const isWinner = revealedWinner === i;
+                    return (
+                      <div
+                        key={i}
+                        className="flex items-center gap-2 text-xs opacity-80"
+                        style={{ height: `${laneHeightPx}px` }}
+                      >
+                        <span className="font-medium whitespace-nowrap">
+                          Lane {i}
+                          {isWinner ? " (winner)" : ""}
+                        </span>
+                        <span className="opacity-60 tabular-nums">· {d}</span>
+                        <span className="opacity-60">
+                          {parsedGiraffes ? (
+                            <LaneName tokenId={parsedGiraffes.tokenIds[i] ?? 0n} fallback={`Lane ${i}`} />
+                          ) : null}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Camera viewport */}
+                <div className="absolute inset-0">
+                  <div ref={cameraScrollRefCb} className="absolute inset-0 overflow-hidden">
+                    <div className="relative" style={{ width: `${worldWidthPx}px`, height: `${trackHeightPx}px` }}>
+                      {/* Track background */}
+                      <div className="absolute inset-0">
                         <div
-                          key={i}
-                          className="flex items-center gap-2 text-xs opacity-80"
-                          style={{ height: `${laneHeightPx}px` }}
-                        >
-                          <span className="font-medium whitespace-nowrap">
-                            Lane {i}
-                            {isWinner ? " (winner)" : ""}
-                          </span>
-                          <span className="opacity-60 tabular-nums">· {d}</span>
-                          <span className="opacity-60">
-                            {parsedGiraffes ? (
-                              <LaneName tokenId={parsedGiraffes.tokenIds[i] ?? 0n} fallback={`Lane ${i}`} />
-                            ) : null}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Camera viewport */}
-                  <div className="absolute inset-0">
-                    <div ref={cameraScrollRefCb} className="absolute inset-0 overflow-hidden">
-                      <div className="relative" style={{ width: `${worldWidthPx}px`, height: `${trackHeightPx}px` }}>
-                        {/* Track background */}
-                        <div className="absolute inset-0">
-                          <div
-                            className="absolute top-0 bottom-0 w-[3px] bg-base-300"
-                            style={{ left: `${worldPaddingLeftPx}px` }}
-                          />
-                          <div
-                            className="absolute top-0 bottom-0 w-[3px] bg-base-300"
-                            style={{ left: `${worldPaddingLeftPx + trackLengthPx}px` }}
-                          />
-                          {/* Distance markers: thin vertical lines every 100 units */}
-                          {Array.from({ length: Math.floor(TRACK_LENGTH / 100) - 1 }).map((_, idx) => {
-                            const dist = (idx + 1) * 100; // 100..900
-                            const x = worldPaddingLeftPx + (dist / TRACK_LENGTH) * trackLengthPx;
-                            return (
-                              <div
-                                key={dist}
-                                className="absolute top-0 bottom-0 w-px bg-base-300 opacity-95 pointer-events-none"
-                                style={{ left: `${x}px` }}
-                              />
-                            );
-                          })}
-                          <div
-                            className="absolute inset-0 opacity-30"
-                            style={{
-                              background:
-                                "repeating-linear-gradient(90deg, transparent, transparent 29px, rgba(0,0,0,0.10) 30px)",
-                            }}
-                          />
-                          {Array.from({ length: LANE_COUNT }).map((_, i) => {
-                            const top = i * (laneHeightPx + laneGapPx);
-                            return (
-                              <div
-                                key={i}
-                                className="absolute left-0 right-0 rounded-xl"
-                                style={{
-                                  top: `${top}px`,
-                                  height: `${laneHeightPx}px`,
-                                  background: [
-                                    "linear-gradient(180deg, rgba(255,255,255,0.06), rgba(0,0,0,0.10))",
-                                    "linear-gradient(90deg, rgba(168,118,72,0.20), rgba(168,118,72,0.12))",
-                                    "radial-gradient(circle at 20% 30%, rgba(0,0,0,0.12) 0 1px, transparent 2px)",
-                                    "radial-gradient(circle at 70% 60%, rgba(0,0,0,0.10) 0 1px, transparent 2px)",
-                                    "radial-gradient(circle at 40% 80%, rgba(255,255,255,0.06) 0 1px, transparent 2px)",
-                                    "repeating-linear-gradient(90deg, rgba(0,0,0,0.00), rgba(0,0,0,0.00) 10px, rgba(0,0,0,0.06) 11px)",
-                                  ].join(", "),
-                                  backgroundSize: "auto, auto, 18px 18px, 22px 22px, 26px 26px, auto",
-                                  border: "1px solid rgba(0,0,0,0.06)",
-                                }}
-                              />
-                            );
-                          })}
-                        </div>
-
-                        {/* Giraffes */}
+                          className="absolute top-0 bottom-0 w-[3px] bg-base-300"
+                          style={{ left: `${worldPaddingLeftPx}px` }}
+                        />
+                        <div
+                          className="absolute top-0 bottom-0 w-[3px] bg-base-300"
+                          style={{ left: `${worldPaddingLeftPx + trackLengthPx}px` }}
+                        />
+                        {/* Distance markers: thin vertical lines every 100 units */}
+                        {Array.from({ length: Math.floor(TRACK_LENGTH / 100) - 1 }).map((_, idx) => {
+                          const dist = (idx + 1) * 100; // 100..900
+                          const x = worldPaddingLeftPx + (dist / TRACK_LENGTH) * trackLengthPx;
+                          return (
+                            <div
+                              key={dist}
+                              className="absolute top-0 bottom-0 w-px bg-base-300 opacity-95 pointer-events-none"
+                              style={{ left: `${x}px` }}
+                            />
+                          );
+                        })}
+                        <div
+                          className="absolute inset-0 opacity-30"
+                          style={{
+                            background:
+                              "repeating-linear-gradient(90deg, transparent, transparent 29px, rgba(0,0,0,0.10) 30px)",
+                          }}
+                        />
                         {Array.from({ length: LANE_COUNT }).map((_, i) => {
-                          const d = Number(currentDistances[i] ?? 0);
-                          const prev = Number(prevDistances[i] ?? 0);
-                          const delta = Math.max(0, d - prev);
-                          const isWinner = revealedWinner === i;
-                          const isUserBetLane = !!myBet?.hasBet && myBet.lane === i;
-
-                          const MIN_ANIMATION_SPEED_FACTOR = 2.0;
-                          const MAX_ANIMATION_SPEED_FACTOR = 5.0;
-                          const minDelta = 1;
-                          const maxDelta = SPEED_RANGE;
-                          const t = Math.max(0, Math.min(1, (delta - minDelta) / (maxDelta - minDelta)));
-                          const speedFactor =
-                            MIN_ANIMATION_SPEED_FACTOR + t * (MAX_ANIMATION_SPEED_FACTOR - MIN_ANIMATION_SPEED_FACTOR);
-
-                          const x =
-                            worldPaddingLeftPx +
-                            (Math.min(TRACK_LENGTH, Math.max(0, d)) / TRACK_LENGTH) * trackLengthPx;
-                          const y = i * (laneHeightPx + laneGapPx) + laneHeightPx / 2;
-
+                          const top = i * (laneHeightPx + laneGapPx);
                           return (
                             <div
                               key={i}
-                              className="absolute left-0 top-0"
+                              className="absolute left-0 right-0 rounded-xl"
                               style={{
-                                transform: `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%)`,
-                                transition: `transform ${Math.floor(120 / (playbackSpeed * BASE_REPLAY_SPEED_MULTIPLIER))}ms linear`,
-                                willChange: "transform",
-                                filter: isWinner ? "drop-shadow(0 6px 10px rgba(0,0,0,0.25))" : undefined,
+                                top: `${top}px`,
+                                height: `${laneHeightPx}px`,
+                                background: [
+                                  "linear-gradient(180deg, rgba(255,255,255,0.06), rgba(0,0,0,0.10))",
+                                  "linear-gradient(90deg, rgba(168,118,72,0.20), rgba(168,118,72,0.12))",
+                                  "radial-gradient(circle at 20% 30%, rgba(0,0,0,0.12) 0 1px, transparent 2px)",
+                                  "radial-gradient(circle at 70% 60%, rgba(0,0,0,0.10) 0 1px, transparent 2px)",
+                                  "radial-gradient(circle at 40% 80%, rgba(255,255,255,0.06) 0 1px, transparent 2px)",
+                                  "repeating-linear-gradient(90deg, rgba(0,0,0,0.00), rgba(0,0,0,0.00) 10px, rgba(0,0,0,0.06) 11px)",
+                                ].join(", "),
+                                backgroundSize: "auto, auto, 18px 18px, 22px 22px, 26px 26px, auto",
+                                border: "1px solid rgba(0,0,0,0.06)",
                               }}
-                            >
-                              <div className="relative">
-                                {isUserBetLane ? (
-                                  <div
-                                    className="absolute left-1/3 -translate-x-1/2 z-20 pointer-events-none select-none"
-                                    role="img"
-                                    aria-label="Your bet"
-                                  >
-                                    <span className="inline-flex items-center justify-center rounded-full bg-base-100/80 px-1.5 py-0.5 text-green-500 font-extrabold drop-shadow">
-                                      $
-                                    </span>
-                                  </div>
-                                ) : null}
-                                <GiraffeAnimated
-                                  idPrefix={`lane-${i}`}
-                                  tokenId={parsedGiraffes?.tokenIds?.[i] ?? 0n}
-                                  playbackRate={speedFactor}
-                                  resetNonce={svgResetNonce}
-                                  playing={isPlaying && raceStarted && frame < lastFrameIndex}
-                                  sizePx={giraffeSizePx}
-                                />
-                              </div>
-                            </div>
+                            />
                           );
                         })}
                       </div>
+
+                      {/* Giraffes (only once simulation is available) */}
+                      {simulation
+                        ? Array.from({ length: LANE_COUNT }).map((_, i) => {
+                            const d = Number(currentDistances[i] ?? 0);
+                            const prev = Number(prevDistances[i] ?? 0);
+                            const delta = Math.max(0, d - prev);
+                            const isWinner = revealedWinner === i;
+                            const isUserBetLane = !!myBet?.hasBet && myBet.lane === i;
+
+                            const MIN_ANIMATION_SPEED_FACTOR = 2.0;
+                            const MAX_ANIMATION_SPEED_FACTOR = 5.0;
+                            const minDelta = 1;
+                            const maxDelta = SPEED_RANGE;
+                            const t = Math.max(0, Math.min(1, (delta - minDelta) / (maxDelta - minDelta)));
+                            const speedFactor =
+                              MIN_ANIMATION_SPEED_FACTOR +
+                              t * (MAX_ANIMATION_SPEED_FACTOR - MIN_ANIMATION_SPEED_FACTOR);
+
+                            const x =
+                              worldPaddingLeftPx +
+                              (Math.min(TRACK_LENGTH, Math.max(0, d)) / TRACK_LENGTH) * trackLengthPx;
+                            const y = i * (laneHeightPx + laneGapPx) + laneHeightPx / 2;
+
+                            return (
+                              <div
+                                key={i}
+                                className="absolute left-0 top-0"
+                                style={{
+                                  transform: `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%)`,
+                                  transition: `transform ${Math.floor(120 / (playbackSpeed * BASE_REPLAY_SPEED_MULTIPLIER))}ms linear`,
+                                  willChange: "transform",
+                                  filter: isWinner ? "drop-shadow(0 6px 10px rgba(0,0,0,0.25))" : undefined,
+                                }}
+                              >
+                                <div className="relative">
+                                  {isUserBetLane ? (
+                                    <div
+                                      className="absolute left-1/3 -translate-x-1/2 z-20 pointer-events-none select-none"
+                                      role="img"
+                                      aria-label="Your bet"
+                                    >
+                                      <span className="inline-flex items-center justify-center rounded-full bg-base-100/80 px-1.5 py-0.5 text-green-500 font-extrabold drop-shadow">
+                                        $
+                                      </span>
+                                    </div>
+                                  ) : null}
+                                  <GiraffeAnimated
+                                    idPrefix={`lane-${i}`}
+                                    tokenId={parsedGiraffes?.tokenIds?.[i] ?? 0n}
+                                    playbackRate={speedFactor}
+                                    resetNonce={svgResetNonce}
+                                    playing={isPlaying && raceStarted && frame < lastFrameIndex}
+                                    sizePx={giraffeSizePx}
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })
+                        : null}
                     </div>
                   </div>
                 </div>
+              </div>
 
+              {parsed?.settled ? (
                 <details className="collapse collapse-arrow bg-base-100">
                   <summary className="collapse-title text-sm font-medium">Seed (bytes32)</summary>
                   <div className="collapse-content">
                     <code className="text-xs break-all">{parsed.seed}</code>
                   </div>
                 </details>
-              </div>
-            )}
+              ) : null}
+            </div>
           </div>
         </div>
 
