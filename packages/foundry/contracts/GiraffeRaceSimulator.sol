@@ -8,7 +8,7 @@ import { DeterministicDice } from "./libraries/DeterministicDice.sol";
 contract GiraffeRaceSimulator {
     using DeterministicDice for DeterministicDice.Dice;
 
-    uint8 internal constant LANE_COUNT = 4;
+    uint8 internal constant LANE_COUNT = 6;
     uint16 internal constant TRACK_LENGTH = 1000;
     uint16 internal constant MAX_TICKS = 500;
     uint8 internal constant SPEED_RANGE = 10;
@@ -16,7 +16,7 @@ contract GiraffeRaceSimulator {
 
     /// @notice Deterministically choose a winner given a seed + lane effective score snapshot.
     /// @dev `scores` is a 1-10 value per lane (typically the rounded average of readiness/conditioning/speed).
-    function winnerWithScore(bytes32 seed, uint8[4] memory scores)
+    function winnerWithScore(bytes32 seed, uint8[LANE_COUNT] memory scores)
         external
         pure
         returns (uint8 winner)
@@ -24,17 +24,17 @@ contract GiraffeRaceSimulator {
         (winner,) = _simulateWithScore(seed, scores);
     }
 
-    function simulate(bytes32 seed) external pure returns (uint8 winner, uint16[4] memory distances) {
-        uint8[4] memory score = [uint8(10), 10, 10, 10];
+    function simulate(bytes32 seed) external pure returns (uint8 winner, uint16[LANE_COUNT] memory distances) {
+        uint8[LANE_COUNT] memory score = [uint8(10), 10, 10, 10, 10, 10];
         return _simulateWithScore(seed, score);
     }
 
     /// @notice Deterministically simulate a race given a seed + lane effective score snapshot.
     /// @dev `scores` is a 1-10 value per lane (typically the rounded average of readiness/conditioning/speed).
-    function simulateWithScore(bytes32 seed, uint8[4] memory scores)
+    function simulateWithScore(bytes32 seed, uint8[LANE_COUNT] memory scores)
         external
         pure
-        returns (uint8 winner, uint16[4] memory distances)
+        returns (uint8 winner, uint16[LANE_COUNT] memory distances)
     {
         return _simulateWithScore(seed, scores);
     }
@@ -51,16 +51,16 @@ contract GiraffeRaceSimulator {
         return uint16(minBps + (uint256(score - 1) * range) / 9);
     }
 
-    function _simulateWithScore(bytes32 seed, uint8[4] memory scores)
+    function _simulateWithScore(bytes32 seed, uint8[LANE_COUNT] memory scores)
         internal
         pure
-        returns (uint8 winner, uint16[4] memory distances)
+        returns (uint8 winner, uint16[LANE_COUNT] memory distances)
     {
         DeterministicDice.Dice memory dice = DeterministicDice.create(seed);
 
         bool finished = false;
 
-        uint16[4] memory bps;
+        uint16[LANE_COUNT] memory bps;
         for (uint8 a = 0; a < LANE_COUNT; a++) {
             bps[a] = _scoreBps(scores[a]);
         }
@@ -83,20 +83,20 @@ contract GiraffeRaceSimulator {
                 distances[a] += uint16(q);
             }
 
-            if (
-                distances[0] >= TRACK_LENGTH || distances[1] >= TRACK_LENGTH || distances[2] >= TRACK_LENGTH
-                    || distances[3] >= TRACK_LENGTH
-            ) {
-                finished = true;
-                break;
+            for (uint8 i = 0; i < LANE_COUNT; i++) {
+                if (distances[i] >= TRACK_LENGTH) {
+                    finished = true;
+                    break;
+                }
             }
+            if (finished) break;
         }
 
         require(finished, "GiraffeRace: race did not finish");
 
         uint16 best = distances[0];
         uint8 leaderCount = 1;
-        uint8[4] memory leaders;
+        uint8[LANE_COUNT] memory leaders;
         leaders[0] = 0;
 
         for (uint8 i = 1; i < LANE_COUNT; i++) {

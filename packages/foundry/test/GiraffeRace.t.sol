@@ -19,9 +19,9 @@ contract GiraffeRaceTest is Test {
     address public owner = address(0xBEEF);
     address public alice = address(0xA11CE);
     address public bob = address(0xB0B);
-    uint256[4] internal houseTokenIds;
+    uint256[6] internal houseTokenIds;
 
-    uint256 internal constant LANE_COUNT = 4;
+    uint256 internal constant LANE_COUNT = 6;
     uint256 internal constant TRACK_LENGTH = 1000;
     uint256 internal constant MAX_TICKS = 500;
     uint256 internal constant SPEED_RANGE = 10;
@@ -33,7 +33,7 @@ contract GiraffeRaceTest is Test {
 
     function setUp() public {
         giraffeNft = new GiraffeNFT();
-        for (uint256 i = 0; i < 4; i++) {
+        for (uint256 i = 0; i < LANE_COUNT; i++) {
             houseTokenIds[i] = giraffeNft.mint(owner, string(abi.encodePacked("house-", vm.toString(i))));
         }
 
@@ -76,8 +76,8 @@ contract GiraffeRaceTest is Test {
         race.finalizeRaceGiraffes();
 
         // Snapshot should show full effective score (all stats default to 10).
-        uint8[4] memory snap = race.getRaceScoreById(raceId);
-        for (uint256 i = 0; i < 4; i++) {
+        uint8[LANE_COUNT] memory snap = race.getRaceScoreById(raceId);
+        for (uint256 i = 0; i < LANE_COUNT; i++) {
             assertEq(uint256(snap[i]), 10);
             assertEq(uint256(giraffeNft.readinessOf(houseTokenIds[i])), 10);
         }
@@ -90,7 +90,7 @@ contract GiraffeRaceTest is Test {
         race.settleRace();
 
         // After settling, every participant's readiness should decrease by 1.
-        for (uint256 i = 0; i < 4; i++) {
+        for (uint256 i = 0; i < LANE_COUNT; i++) {
             assertEq(uint256(giraffeNft.readinessOf(houseTokenIds[i])), 9);
         }
     }
@@ -103,11 +103,11 @@ contract GiraffeRaceTest is Test {
         bytes32 forcedLineupBh = keccak256("forced lineup blockhash odds equal");
         _finalize(raceId, closeBlock, forcedLineupBh);
 
-        (bool oddsSet, uint32[4] memory oddsBps) = race.getRaceOddsById(raceId);
+        (bool oddsSet, uint32[LANE_COUNT] memory oddsBps) = race.getRaceOddsById(raceId);
         assertTrue(oddsSet);
-        assertEq(oddsBps[0], oddsBps[1]);
-        assertEq(oddsBps[1], oddsBps[2]);
-        assertEq(oddsBps[2], oddsBps[3]);
+        for (uint256 i = 1; i < LANE_COUNT; i++) {
+            assertEq(oddsBps[0], oddsBps[i]);
+        }
     }
 
     function testReadinessFloorsAt1() public {
@@ -124,7 +124,7 @@ contract GiraffeRaceTest is Test {
     function _expectedWinner(bytes32 seed) internal pure returns (uint8) {
         DeterministicDice.Dice memory dice = DeterministicDice.create(seed);
 
-        uint16[4] memory distances;
+        uint16[LANE_COUNT] memory distances;
         bool finished = false;
         for (uint256 t = 0; t < MAX_TICKS; t++) {
             for (uint256 a = 0; a < LANE_COUNT; a++) {
@@ -134,21 +134,21 @@ contract GiraffeRaceTest is Test {
                 dice = updatedDice1;
                 distances[a] += uint16(r + 1);
             }
-            if (
-                distances[0] >= TRACK_LENGTH || distances[1] >= TRACK_LENGTH || distances[2] >= TRACK_LENGTH
-                    || distances[3] >= TRACK_LENGTH
-            ) {
-                finished = true;
-                break;
+            for (uint256 i = 0; i < LANE_COUNT; i++) {
+                if (distances[i] >= TRACK_LENGTH) {
+                    finished = true;
+                    break;
+                }
             }
+            if (finished) break;
         }
         require(finished, "test: race did not finish");
 
         uint16 best = distances[0];
         uint8 leaderCount = 1;
-        uint8[4] memory leaders;
+        uint8[LANE_COUNT] memory leaders;
         leaders[0] = 0;
-        for (uint8 i = 1; i < 4; i++) {
+        for (uint8 i = 1; i < LANE_COUNT; i++) {
             uint16 d = distances[i];
             if (d > best) {
                 best = d;
@@ -259,7 +259,7 @@ contract GiraffeRaceTest is Test {
         uint256 bobPayout = race.claim();
 
         // Fixed odds are auto-quoted from the effective score snapshot using the lookup table.
-        (bool oddsSet, uint32[4] memory oddsBps) = race.getRaceOddsById(raceId);
+        (bool oddsSet, uint32[LANE_COUNT] memory oddsBps) = race.getRaceOddsById(raceId);
         assertTrue(oddsSet);
         uint256 expectedAlice = (1 ether * uint256(oddsBps[0])) / 10_000;
         uint256 expectedBob = (3 ether * uint256(oddsBps[0])) / 10_000;
@@ -366,14 +366,14 @@ contract GiraffeRaceTest is Test {
         return string.concat(STATS_DIR, "/house_only_batch_", vm.toString(batchIndex), ".json");
     }
 
-    function _arr4(uint256[4] memory a) internal pure returns (uint256[] memory out) {
-        out = new uint256[](4);
-        for (uint256 i = 0; i < 4; i++) out[i] = a[i];
+    function _arrLaneCount(uint256[LANE_COUNT] memory a) internal pure returns (uint256[] memory out) {
+        out = new uint256[](LANE_COUNT);
+        for (uint256 i = 0; i < LANE_COUNT; i++) out[i] = a[i];
     }
 
     function _runHouseOnlyBatch(uint256 batchIndex, uint256 racesInBatch)
         internal
-        returns (uint256[4] memory laneWins, uint256[4] memory tokenWins)
+        returns (uint256[LANE_COUNT] memory laneWins, uint256[LANE_COUNT] memory tokenWins)
     {
         // Keep blocks close together so `blockhash()` remains available for closeBlock and submissionClose-1.
         uint256 startBlock = 1_000_000 + batchIndex * 10_000;
@@ -394,7 +394,7 @@ contract GiraffeRaceTest is Test {
             vm.roll(uint256(submissionCloseBlock));
             race.finalizeRaceGiraffes();
 
-            (, uint256[4] memory tokenIds,) = race.getRaceGiraffes();
+            (, uint256[LANE_COUNT] memory tokenIds,) = race.getRaceGiraffes();
 
             // Settlement entropy uses blockhash(closeBlock).
             bytes32 forcedBh = keccak256(abi.encodePacked("settle", globalI));
@@ -405,13 +405,13 @@ contract GiraffeRaceTest is Test {
 
             (, bool settled, uint8 winner,,,) = race.getRace();
             assertTrue(settled);
-            assertLt(winner, 4);
+            assertLt(winner, uint8(LANE_COUNT));
 
             laneWins[winner] += 1;
 
             uint256 winningTokenId = tokenIds[winner];
             // With house-only races, these should always be one of the 4 configured house tokens.
-            for (uint256 t = 0; t < 4; t++) {
+            for (uint256 t = 0; t < LANE_COUNT; t++) {
                 if (winningTokenId == houseTokenIds[t]) {
                     tokenWins[t] += 1;
                     break;
@@ -420,21 +420,27 @@ contract GiraffeRaceTest is Test {
         }
     }
 
-    function _writeBatch(uint256 batchIndex, uint256 racesInBatch, uint256[4] memory laneWins, uint256[4] memory tokenWins)
+    function _writeBatch(
+        uint256 batchIndex,
+        uint256 racesInBatch,
+        uint256[LANE_COUNT] memory laneWins,
+        uint256[LANE_COUNT] memory tokenWins
+    )
         internal
     {
         vm.createDir(STATS_DIR, true);
         string memory obj = string.concat("house_only_batch_", vm.toString(batchIndex));
         string memory json = vm.serializeUint(obj, "batchIndex", batchIndex);
         json = vm.serializeUint(obj, "races", racesInBatch);
-        json = vm.serializeUint(obj, "laneWins", _arr4(laneWins));
-        json = vm.serializeUint(obj, "tokenWins", _arr4(tokenWins));
-        json = vm.serializeUint(obj, "houseTokenIds", _arr4(houseTokenIds));
+        json = vm.serializeUint(obj, "laneWins", _arrLaneCount(laneWins));
+        json = vm.serializeUint(obj, "tokenWins", _arrLaneCount(tokenWins));
+        json = vm.serializeUint(obj, "houseTokenIds", _arrLaneCount(houseTokenIds));
         vm.writeJson(json, _batchPath(batchIndex));
     }
 
     function _runAndWriteBatch(uint256 batchIndex) internal {
-        (uint256[4] memory laneWins, uint256[4] memory tokenWins) = _runHouseOnlyBatch(batchIndex, STATS_BATCH_SIZE);
+        (uint256[LANE_COUNT] memory laneWins, uint256[LANE_COUNT] memory tokenWins) =
+            _runHouseOnlyBatch(batchIndex, STATS_BATCH_SIZE);
         _writeBatch(batchIndex, STATS_BATCH_SIZE, laneWins, tokenWins);
     }
 
@@ -457,8 +463,8 @@ contract GiraffeRaceTest is Test {
     ///      `forge test --offline --threads 1 --match-test testWinDistribution_HouseOnly_ -vv`
     function testWinDistribution_HouseOnly_99_AggregateAndPrint() public {
         uint256 totalRaces = 0;
-        uint256[4] memory laneWinsAgg;
-        uint256[4] memory tokenWinsAgg;
+        uint256[LANE_COUNT] memory laneWinsAgg;
+        uint256[LANE_COUNT] memory tokenWinsAgg;
         uint256 filesRead = 0;
 
         Vm.DirEntry[] memory entries;
@@ -489,8 +495,14 @@ contract GiraffeRaceTest is Test {
             uint256[] memory lane = json.readUintArray(".laneWins");
             uint256[] memory token = json.readUintArray(".tokenWins");
 
+            // Defensive: skip stale/mismatched files (e.g. from a previous run with a different lane count).
+            if (lane.length < LANE_COUNT || token.length < LANE_COUNT) {
+                console2.log("Skipping mismatched stats file (laneWins/tokenWins length too small):", ent.path);
+                continue;
+            }
+
             totalRaces += racesInBatch;
-            for (uint256 i = 0; i < 4; i++) {
+            for (uint256 i = 0; i < LANE_COUNT; i++) {
                 laneWinsAgg[i] += lane[i];
                 tokenWinsAgg[i] += token[i];
             }
@@ -505,13 +517,13 @@ contract GiraffeRaceTest is Test {
             console2.log("Tip: run the aggregator after the batches (or rerun with `--threads 1`).");
         }
 
-        for (uint256 lane = 0; lane < 4; lane++) {
+        for (uint256 lane = 0; lane < LANE_COUNT; lane++) {
             uint256 wins = laneWinsAgg[lane];
             console2.log("Lane", lane, "wins", wins);
             console2.log("  bps", _bps(wins, totalRaces));
         }
 
-        for (uint256 t = 0; t < 4; t++) {
+        for (uint256 t = 0; t < LANE_COUNT; t++) {
             uint256 tokenId = houseTokenIds[t];
             string memory name = giraffeNft.nameOf(tokenId);
             uint256 wins = tokenWinsAgg[t];

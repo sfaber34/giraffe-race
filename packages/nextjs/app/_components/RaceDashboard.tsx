@@ -14,7 +14,7 @@ import {
 } from "~~/hooks/scaffold-eth";
 import { simulateRaceFromSeed } from "~~/utils/race/simulateRace";
 
-const LANE_COUNT = 4 as const;
+const LANE_COUNT = 6 as const;
 // Keep in sync with `GiraffeRace.sol`
 const SUBMISSION_CLOSE_OFFSET_BLOCKS = 10n;
 const BETTING_CLOSE_OFFSET_BLOCKS = 20n;
@@ -88,7 +88,7 @@ export const RaceDashboard = () => {
   const [isMining, setIsMining] = useState(false);
   const [selectedTokenId, setSelectedTokenId] = useState<bigint | null>(null);
   const [submittedTokenId, setSubmittedTokenId] = useState<bigint | null>(null);
-  const [betLane, setBetLane] = useState<0 | 1 | 2 | 3>(0);
+  const [betLane, setBetLane] = useState<number>(0);
   const [betAmountEth, setBetAmountEth] = useState("");
   const [fundAmountEth, setFundAmountEth] = useState("");
   const [isFundingRace, setIsFundingRace] = useState(false);
@@ -261,7 +261,7 @@ export const RaceDashboard = () => {
     return {
       closeBlock: closeBlock as bigint,
       settled: settled as boolean,
-      winner: Number(winner as any) as 0 | 1 | 2 | 3,
+      winner: Number(winner as any),
       seed: seed as Hex,
       totalPot: totalPot as bigint,
       totalOnLane: (totalOnLane as readonly bigint[]).map(x => BigInt(x)),
@@ -289,7 +289,7 @@ export const RaceDashboard = () => {
   }, [raceOddsData]);
 
   const laneScore = useMemo(() => {
-    if (!raceScoreData) return [10, 10, 10, 10];
+    if (!raceScoreData) return Array.from({ length: LANE_COUNT }, () => 10);
     const raw = raceScoreData as any;
     const arr = (Array.isArray(raw) ? raw : []) as any[];
     const clamp = (n: number) => Math.max(1, Math.min(10, Math.floor(n)));
@@ -297,9 +297,9 @@ export const RaceDashboard = () => {
   }, [raceScoreData]);
 
   const laneTokenIds = useMemo(() => {
-    if (!parsedGiraffes?.tokenIds) return [0n, 0n, 0n, 0n] as const;
-    const arr = parsedGiraffes.tokenIds;
-    return [BigInt(arr[0] ?? 0n), BigInt(arr[1] ?? 0n), BigInt(arr[2] ?? 0n), BigInt(arr[3] ?? 0n)] as const;
+    if (!parsedGiraffes?.tokenIds) return Array.from({ length: LANE_COUNT }, () => 0n);
+    const arr = parsedGiraffes.tokenIds ?? [];
+    return Array.from({ length: LANE_COUNT }, (_, i) => BigInt(arr[i] ?? 0n));
   }, [parsedGiraffes?.tokenIds]);
 
   const { data: lane0StatsData } = useScaffoldReadContract({
@@ -326,6 +326,18 @@ export const RaceDashboard = () => {
     args: [laneTokenIds[3]],
     query: { enabled: !!giraffeNftContract && laneTokenIds[3] !== 0n },
   } as any);
+  const { data: lane4StatsData } = useScaffoldReadContract({
+    contractName: "GiraffeNFT",
+    functionName: "statsOf" as any,
+    args: [laneTokenIds[4] ?? 0n],
+    query: { enabled: !!giraffeNftContract && (laneTokenIds[4] ?? 0n) !== 0n },
+  } as any);
+  const { data: lane5StatsData } = useScaffoldReadContract({
+    contractName: "GiraffeNFT",
+    functionName: "statsOf" as any,
+    args: [laneTokenIds[5] ?? 0n],
+    query: { enabled: !!giraffeNftContract && (laneTokenIds[5] ?? 0n) !== 0n },
+  } as any);
 
   const laneStats = useMemo(() => {
     const clamp = (n: number) => Math.max(1, Math.min(10, Math.floor(n)));
@@ -337,8 +349,15 @@ export const RaceDashboard = () => {
         speed: clamp(Number(t[2] ?? 10)),
       };
     };
-    return [parse(lane0StatsData), parse(lane1StatsData), parse(lane2StatsData), parse(lane3StatsData)];
-  }, [lane0StatsData, lane1StatsData, lane2StatsData, lane3StatsData]);
+    return [
+      parse(lane0StatsData),
+      parse(lane1StatsData),
+      parse(lane2StatsData),
+      parse(lane3StatsData),
+      parse(lane4StatsData),
+      parse(lane5StatsData),
+    ];
+  }, [lane0StatsData, lane1StatsData, lane2StatsData, lane3StatsData, lane4StatsData, lane5StatsData]);
 
   const submissionCloseBlock = useMemo(() => {
     if (!parsed) return null;
@@ -367,7 +386,7 @@ export const RaceDashboard = () => {
     setSubmittedTokenId(null);
   }, [connectedAddress, viewingRaceId]);
 
-  const lineupFinalized = (parsedGiraffes?.assignedCount ?? 0) === 4;
+  const lineupFinalized = (parsedGiraffes?.assignedCount ?? 0) === Number(LANE_COUNT);
   const canFinalize = status === "betting_open" && !lineupFinalized;
   // Contract requires oddsSet (auto-derived at finalization), so avoid enabling bets until odds are loaded+set.
   const canBet = status === "betting_open" && lineupFinalized && parsedOdds?.oddsSet === true;
@@ -413,7 +432,7 @@ export const RaceDashboard = () => {
     const amt = BigInt(amount as any);
     return {
       amount: amt,
-      lane: Number(lane as any) as 0 | 1 | 2 | 3,
+      lane: Number(lane as any),
       claimed: claimed as boolean,
       hasBet: amt !== 0n,
     };
@@ -469,11 +488,11 @@ export const RaceDashboard = () => {
       hasClaim: Boolean(out?.hasClaim),
       raceId: BigInt(out?.raceId ?? 0),
       // Always 3 for a settled win; included for compatibility with the shared struct.
-      status: Number(out?.status ?? 0) as 0 | 1 | 2 | 3,
-      betLane: Number(out?.betLane ?? 0) as 0 | 1 | 2 | 3,
+      status: Number(out?.status ?? 0),
+      betLane: Number(out?.betLane ?? 0),
       betTokenId: BigInt(out?.betTokenId ?? 0),
       betAmount: BigInt(out?.betAmount ?? 0),
-      winner: Number(out?.winner ?? 0) as 0 | 1 | 2 | 3,
+      winner: Number(out?.winner ?? 0),
       payout: BigInt(out?.payout ?? 0),
       closeBlock: BigInt(out?.closeBlock ?? 0),
     };
@@ -600,8 +619,11 @@ export const RaceDashboard = () => {
     return () => window.clearInterval(id);
   }, [isPlaying, simulation, raceStarted, lastFrameIndex, playbackSpeed]);
 
-  const currentDistances = useMemo(() => frames[frame] ?? [0, 0, 0, 0], [frames, frame]);
-  const prevDistances = useMemo(() => frames[Math.max(0, frame - 1)] ?? [0, 0, 0, 0], [frames, frame]);
+  const currentDistances = useMemo(() => frames[frame] ?? Array.from({ length: LANE_COUNT }, () => 0), [frames, frame]);
+  const prevDistances = useMemo(
+    () => frames[Math.max(0, frame - 1)] ?? Array.from({ length: LANE_COUNT }, () => 0),
+    [frames, frame],
+  );
 
   const stepBy = (delta: -1 | 1) => {
     setIsPlaying(false);
@@ -1502,14 +1524,14 @@ export const RaceDashboard = () => {
                                   ? "ring-2 ring-primary ring-offset-2 ring-offset-base-100 disabled:opacity-100"
                                   : ""
                               }`}
-                              onClick={() => setBetLane(lane as 0 | 1 | 2 | 3)}
+                              onClick={() => setBetLane(lane)}
                               disabled={!canBet || isBetLocked}
                               type="button"
                             >
                               <span className="flex items-center gap-2">
                                 <GiraffeAnimated
-                                  idPrefix={`bet-${(viewingRaceId ?? 0n).toString()}-${lane}-${laneTokenIds[lane].toString()}`}
-                                  tokenId={laneTokenIds[lane]}
+                                  idPrefix={`bet-${(viewingRaceId ?? 0n).toString()}-${lane}-${(laneTokenIds[lane] ?? 0n).toString()}`}
+                                  tokenId={laneTokenIds[lane] ?? 0n}
                                   playbackRate={1}
                                   playing={false}
                                   sizePx={56}
@@ -1586,7 +1608,7 @@ export const RaceDashboard = () => {
                             if (!placeBetValue) return;
                             await writeGiraffeRaceAsync({
                               functionName: "placeBet",
-                              args: [betLane],
+                              args: [BigInt(Math.max(0, Math.min(Number(LANE_COUNT - 1), Math.floor(betLane))))],
                               value: placeBetValue,
                             } as any);
                             setBetAmountEth("");

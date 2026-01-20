@@ -17,11 +17,11 @@ contract GasRaceOpsTest is Test {
 
     address internal house = address(0xBEEF);
     address internal alice = address(0xA11CE);
-    uint256[4] internal houseTokenIds;
+    uint256[6] internal houseTokenIds;
 
     function setUp() public {
         giraffeNft = new GiraffeNFT();
-        for (uint256 i = 0; i < 4; i++) {
+        for (uint256 i = 0; i < 6; i++) {
             houseTokenIds[i] = giraffeNft.mint(house, string(abi.encodePacked("house-", vm.toString(i))));
         }
 
@@ -158,12 +158,12 @@ contract GasRaceOpsTest is Test {
         vm.stopPrank();
 
         // simulator winner cost (pure computation for 4 lanes).
-        uint8[4] memory score = [uint8(10), 10, 10, 10];
+        uint8[6] memory score = [uint8(10), 10, 10, 10, 10, 10];
         g0 = gasleft();
         simulator.winnerWithScore(keccak256("seed"), score);
         uint256 gSimWinner = g0 - gasleft();
 
-        console2.log("---- Gas micro-benchmarks (4 lanes) ----");
+        console2.log("---- Gas micro-benchmarks (6 lanes) ----");
         console2.log("GiraffeNFT.statsOf:", gStats);
         console2.log("GiraffeNFT.decreaseReadiness:", gDec);
         console2.log("Simulator.winnerWithScore:", gSimWinner);

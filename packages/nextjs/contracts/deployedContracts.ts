@@ -966,7 +966,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 2,
+      deployedOnBlock: 3,
     },
     GiraffeRaceSimulator: {
       address: "0xb19b36b1456e65e3a6d514d3f715f204bd59f431",
@@ -989,8 +989,8 @@ const deployedContracts = {
             },
             {
               name: "distances",
-              type: "uint16[4]",
-              internalType: "uint16[4]",
+              type: "uint16[6]",
+              internalType: "uint16[6]",
             },
           ],
           stateMutability: "pure",
@@ -1006,8 +1006,8 @@ const deployedContracts = {
             },
             {
               name: "scores",
-              type: "uint8[4]",
-              internalType: "uint8[4]",
+              type: "uint8[6]",
+              internalType: "uint8[6]",
             },
           ],
           outputs: [
@@ -1018,8 +1018,8 @@ const deployedContracts = {
             },
             {
               name: "distances",
-              type: "uint16[4]",
-              internalType: "uint16[4]",
+              type: "uint16[6]",
+              internalType: "uint16[6]",
             },
           ],
           stateMutability: "pure",
@@ -1035,8 +1035,8 @@ const deployedContracts = {
             },
             {
               name: "scores",
-              type: "uint8[4]",
-              internalType: "uint8[4]",
+              type: "uint8[6]",
+              internalType: "uint8[6]",
             },
           ],
           outputs: [
@@ -1053,7 +1053,7 @@ const deployedContracts = {
       deployedOnBlock: 2,
     },
     GiraffeRace: {
-      address: "0xed1db453c3156ff3155a97ad217b3087d5dc5f6e",
+      address: "0x12975173b87f7595ee45dffb2ab812ece596bf84",
       abi: [
         {
           type: "constructor",
@@ -1070,8 +1070,8 @@ const deployedContracts = {
             },
             {
               name: "_houseGiraffeTokenIds",
-              type: "uint256[4]",
-              internalType: "uint256[4]",
+              type: "uint256[6]",
+              internalType: "uint256[6]",
             },
             {
               name: "_winProbTable",
@@ -1460,8 +1460,8 @@ const deployedContracts = {
             },
             {
               name: "totalOnLane",
-              type: "uint256[4]",
-              internalType: "uint256[4]",
+              type: "uint256[6]",
+              internalType: "uint256[6]",
             },
           ],
           stateMutability: "view",
@@ -1504,8 +1504,8 @@ const deployedContracts = {
             },
             {
               name: "totalOnLane",
-              type: "uint256[4]",
-              internalType: "uint256[4]",
+              type: "uint256[6]",
+              internalType: "uint256[6]",
             },
           ],
           stateMutability: "view",
@@ -1522,13 +1522,13 @@ const deployedContracts = {
             },
             {
               name: "tokenIds",
-              type: "uint256[4]",
-              internalType: "uint256[4]",
+              type: "uint256[6]",
+              internalType: "uint256[6]",
             },
             {
               name: "originalOwners",
-              type: "address[4]",
-              internalType: "address[4]",
+              type: "address[6]",
+              internalType: "address[6]",
             },
           ],
           stateMutability: "view",
@@ -1551,13 +1551,13 @@ const deployedContracts = {
             },
             {
               name: "tokenIds",
-              type: "uint256[4]",
-              internalType: "uint256[4]",
+              type: "uint256[6]",
+              internalType: "uint256[6]",
             },
             {
               name: "originalOwners",
-              type: "address[4]",
-              internalType: "address[4]",
+              type: "address[6]",
+              internalType: "address[6]",
             },
           ],
           stateMutability: "view",
@@ -1580,8 +1580,8 @@ const deployedContracts = {
             },
             {
               name: "decimalOddsBps",
-              type: "uint32[4]",
-              internalType: "uint32[4]",
+              type: "uint32[6]",
+              internalType: "uint32[6]",
             },
           ],
           stateMutability: "view",
@@ -1593,8 +1593,8 @@ const deployedContracts = {
           outputs: [
             {
               name: "score",
-              type: "uint8[4]",
-              internalType: "uint8[4]",
+              type: "uint8[6]",
+              internalType: "uint8[6]",
             },
           ],
           stateMutability: "view",
@@ -1612,8 +1612,8 @@ const deployedContracts = {
           outputs: [
             {
               name: "score",
-              type: "uint8[4]",
-              internalType: "uint8[4]",
+              type: "uint8[6]",
+              internalType: "uint8[6]",
             },
           ],
           stateMutability: "view",
@@ -1745,8 +1745,8 @@ const deployedContracts = {
             },
             {
               name: "decimalOddsBps",
-              type: "uint32[4]",
-              internalType: "uint32[4]",
+              type: "uint32[6]",
+              internalType: "uint32[6]",
             },
           ],
           outputs: [],
@@ -1790,8 +1790,8 @@ const deployedContracts = {
             },
             {
               name: "distances",
-              type: "uint16[4]",
-              internalType: "uint16[4]",
+              type: "uint16[6]",
+              internalType: "uint16[6]",
             },
           ],
           stateMutability: "view",
@@ -1807,8 +1807,8 @@ const deployedContracts = {
             },
             {
               name: "score",
-              type: "uint8[4]",
-              internalType: "uint8[4]",
+              type: "uint8[6]",
+              internalType: "uint8[6]",
             },
           ],
           outputs: [
@@ -1819,8 +1819,8 @@ const deployedContracts = {
             },
             {
               name: "distances",
-              type: "uint16[4]",
-              internalType: "uint16[4]",
+              type: "uint16[6]",
+              internalType: "uint16[6]",
             },
           ],
           stateMutability: "view",
@@ -2076,28 +2076,10 @@ const deployedContracts = {
               internalType: "uint256",
             },
             {
-              name: "odds0Bps",
-              type: "uint32",
+              name: "decimalOddsBps",
+              type: "uint32[6]",
               indexed: false,
-              internalType: "uint32",
-            },
-            {
-              name: "odds1Bps",
-              type: "uint32",
-              indexed: false,
-              internalType: "uint32",
-            },
-            {
-              name: "odds2Bps",
-              type: "uint32",
-              indexed: false,
-              internalType: "uint32",
-            },
-            {
-              name: "odds3Bps",
-              type: "uint32",
-              indexed: false,
-              internalType: "uint32",
+              internalType: "uint32[6]",
             },
           ],
           anonymous: false,
@@ -2269,7 +2251,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 2,
+      deployedOnBlock: 5,
     },
   },
 } as const;

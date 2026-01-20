@@ -28,7 +28,7 @@ interface IGiraffeNFT is IERC721 {
 contract GiraffeRace {
     using DeterministicDice for DeterministicDice.Dice;
 
-    uint8 public constant LANE_COUNT = 4;
+    uint8 public constant LANE_COUNT = 6;
     // Fixed-odds params (v3):
     // - decimal odds are stored in basis points (1e4). Example: 3.80x => 38000.
     // - house edge is enforced by requiring an overround >= 1/(1-edge).
@@ -66,20 +66,20 @@ contract GiraffeRace {
         // Fixed odds quoted for lanes (locked once set; required before betting).
         bool oddsSet;
         bool settled;
-        uint8 winner; // 0-3, valid only if settled
+        uint8 winner; // 0-(LANE_COUNT-1), valid only if settled
         bytes32 seed; // stored on settlement for later verification
         uint256 totalPot;
-        uint256[4] totalOnLane;
-        uint32[4] decimalOddsBps; // per lane, scaled by ODDS_SCALE
+        uint256[LANE_COUNT] totalOnLane;
+        uint32[LANE_COUNT] decimalOddsBps; // per lane, scaled by ODDS_SCALE
     }
 
     struct RaceGiraffes {
         // Number of lanes that have been assigned tokenIds (selected entrants + house fill).
         uint8 assignedCount;
-        // Token ID for each lane (0..3). 0 means unassigned (valid tokenIds start at 1 in our GiraffeNFT).
-        uint256[4] tokenIds;
+        // Token ID for each lane (0..LANE_COUNT-1). 0 means unassigned (valid tokenIds start at 1 in our GiraffeNFT).
+        uint256[LANE_COUNT] tokenIds;
         // The owner snapshot for each lane at the time the entrant was selected (or `house` for house fill).
-        address[4] originalOwners;
+        address[LANE_COUNT] originalOwners;
     }
 
     struct RaceEntry {
@@ -89,7 +89,7 @@ contract GiraffeRace {
 
     struct Bet {
         uint128 amount;
-        uint8 lane; // 0-3
+        uint8 lane; // 0-(LANE_COUNT-1)
         bool claimed;
     }
 
@@ -114,7 +114,7 @@ contract GiraffeRace {
     // Snapshot of "effective score" (1-10) for each lane at lineup finalization time.
     // Effective score is computed as the equally-weighted average of:
     //   readiness, conditioning, speed (each 1-10).
-    mapping(uint256 => uint8[4]) private raceScore;
+    mapping(uint256 => uint8[LANE_COUNT]) private raceScore;
     mapping(uint256 => mapping(address => bool)) private hasSubmittedGiraffe;
     mapping(uint256 => RaceEntry[]) private raceEntries;
     mapping(uint256 => mapping(uint256 => bool)) private tokenEntered;
@@ -126,10 +126,10 @@ contract GiraffeRace {
 
     // Fixed pool of house giraffes used to auto-fill empty lanes.
     // These are NOT escrowed by default (no approvals required); we just reference them as house-owned racers.
-    uint256[4] public houseGiraffeTokenIds;
+    uint256[LANE_COUNT] public houseGiraffeTokenIds;
 
     event RaceCreated(uint256 indexed raceId, uint64 closeBlock);
-    event RaceOddsSet(uint256 indexed raceId, uint32 odds0Bps, uint32 odds1Bps, uint32 odds2Bps, uint32 odds3Bps);
+    event RaceOddsSet(uint256 indexed raceId, uint32[LANE_COUNT] decimalOddsBps);
     event BetPlaced(uint256 indexed raceId, address indexed bettor, uint8 indexed lane, uint256 amount);
     event RaceSettled(uint256 indexed raceId, bytes32 seed, uint8 winner);
     event Claimed(uint256 indexed raceId, address indexed bettor, uint256 payout);
@@ -282,7 +282,7 @@ contract GiraffeRace {
 
         // Risk control (fixed odds): ensure the contract can cover worst-case payout for this race,
         // while also reserving funds for already-settled liabilities.
-        uint256[4] memory projectedTotals = r.totalOnLane;
+        uint256[LANE_COUNT] memory projectedTotals = r.totalOnLane;
         projectedTotals[lane] += msg.value;
         uint256 maxPayout;
         for (uint8 i = 0; i < LANE_COUNT; i++) {
@@ -311,7 +311,7 @@ contract GiraffeRace {
      * Using basis points, we enforce:
      *   sum(ODDS_SCALE^2 / O_i_bps) >= ceil(ODDS_SCALE*ODDS_SCALE / (ODDS_SCALE - HOUSE_EDGE_BPS))
      */
-    function setRaceOdds(uint256 raceId, uint32[4] calldata decimalOddsBps) external onlyHouse {
+    function setRaceOdds(uint256 raceId, uint32[LANE_COUNT] calldata decimalOddsBps) external onlyHouse {
         Race storage r = races[raceId];
         if (r.closeBlock == 0) revert InvalidRace();
         if (r.settled) revert AlreadySettled();
@@ -339,7 +339,7 @@ contract GiraffeRace {
 
         r.decimalOddsBps = decimalOddsBps;
         r.oddsSet = true;
-        emit RaceOddsSet(raceId, decimalOddsBps[0], decimalOddsBps[1], decimalOddsBps[2], decimalOddsBps[3]);
+        emit RaceOddsSet(raceId, decimalOddsBps);
     }
 
     /**
@@ -557,7 +557,7 @@ contract GiraffeRace {
             uint8 winner,
             bytes32 seed,
             uint256 totalPot,
-            uint256[4] memory totalOnLane
+            uint256[LANE_COUNT] memory totalOnLane
         )
     {
         uint256 raceId = latestRaceId();
@@ -575,14 +575,14 @@ contract GiraffeRace {
             uint8 winner,
             bytes32 seed,
             uint256 totalPot,
-            uint256[4] memory totalOnLane
+            uint256[LANE_COUNT] memory totalOnLane
         )
     {
         Race storage r = races[raceId];
         return (r.closeBlock, r.settled, r.winner, r.seed, r.totalPot, r.totalOnLane);
     }
 
-    function getRaceOddsById(uint256 raceId) external view returns (bool oddsSet, uint32[4] memory decimalOddsBps) {
+    function getRaceOddsById(uint256 raceId) external view returns (bool oddsSet, uint32[LANE_COUNT] memory decimalOddsBps) {
         Race storage r = races[raceId];
         return (r.oddsSet, r.decimalOddsBps);
     }
@@ -604,8 +604,8 @@ contract GiraffeRace {
         view
         returns (
             uint8 assignedCount,
-            uint256[4] memory tokenIds,
-            address[4] memory originalOwners
+            uint256[LANE_COUNT] memory tokenIds,
+            address[LANE_COUNT] memory originalOwners
         )
     {
         uint256 raceId = latestRaceId();
@@ -620,21 +620,21 @@ contract GiraffeRace {
         view
         returns (
             uint8 assignedCount,
-            uint256[4] memory tokenIds,
-            address[4] memory originalOwners
+            uint256[LANE_COUNT] memory tokenIds,
+            address[LANE_COUNT] memory originalOwners
         )
     {
         RaceGiraffes storage ra = raceGiraffes[raceId];
         return (ra.assignedCount, ra.tokenIds, ra.originalOwners);
     }
 
-    function getRaceScore() external view returns (uint8[4] memory score) {
+    function getRaceScore() external view returns (uint8[LANE_COUNT] memory score) {
         uint256 raceId = latestRaceId();
         return raceScore[raceId];
     }
 
     /// @notice Read lane effective score snapshot for a specific race id (UI helper for replay).
-    function getRaceScoreById(uint256 raceId) external view returns (uint8[4] memory score) {
+    function getRaceScoreById(uint256 raceId) external view returns (uint8[LANE_COUNT] memory score) {
         return raceScore[raceId];
     }
 
@@ -836,8 +836,8 @@ contract GiraffeRace {
         Race storage r = races[raceId];
         if (r.oddsSet) return;
 
-        uint8[4] memory rr = raceScore[raceId];
-        uint8[4] memory laneIdx = [uint8(0), 1, 2, 3];
+        uint8[LANE_COUNT] memory rr = raceScore[raceId];
+        uint8[LANE_COUNT] memory laneIdx = [uint8(0), 1, 2, 3, 4, 5];
 
         // TEMP: fixed odds (disable probability table usage without deleting code).
         // This keeps the flow "finalize -> odds set -> betting open" working.
@@ -845,7 +845,7 @@ contract GiraffeRace {
             r.decimalOddsBps[lane] = TEMP_FIXED_DECIMAL_ODDS_BPS;
         }
         r.oddsSet = true;
-        emit RaceOddsSet(raceId, r.decimalOddsBps[0], r.decimalOddsBps[1], r.decimalOddsBps[2], r.decimalOddsBps[3]);
+        emit RaceOddsSet(raceId, r.decimalOddsBps);
         return;
 
         // Sort score ascending (and keep lane indices aligned). Small fixed-size sort.
@@ -895,7 +895,7 @@ contract GiraffeRace {
         }
 
         r.oddsSet = true;
-        emit RaceOddsSet(raceId, r.decimalOddsBps[0], r.decimalOddsBps[1], r.decimalOddsBps[2], r.decimalOddsBps[3]);
+        emit RaceOddsSet(raceId, r.decimalOddsBps);
     }
 
     function _finalizeGiraffesFromPool(uint256 raceId, bytes32 fillSeed) internal {
@@ -906,8 +906,8 @@ contract GiraffeRace {
         // Deterministically shuffle/select pool entrants + house giraffes per race using independent entropy.
         DeterministicDice.Dice memory dice = DeterministicDice.create(fillSeed);
 
-        uint8[4] memory availableIdx = [0, 1, 2, 3];
-        uint8 availableCount = 4;
+        uint8[LANE_COUNT] memory availableIdx = [0, 1, 2, 3, 4, 5];
+        uint8 availableCount = LANE_COUNT;
 
         RaceEntry[] storage entries = raceEntries[raceId];
         uint256 n = entries.length;
