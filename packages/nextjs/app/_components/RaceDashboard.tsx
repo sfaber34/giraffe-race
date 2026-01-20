@@ -98,11 +98,16 @@ export const RaceDashboard = () => {
   // Replay controls
   const [isPlaying, setIsPlaying] = useState(true);
   const [frame, setFrame] = useState(0);
+  const frameRef = useRef(0);
   const [playbackSpeed, setPlaybackSpeed] = useState<1 | 2 | 3>(1);
   const [raceStarted, setRaceStarted] = useState(false);
   const [startDelayRemainingMs, setStartDelayRemainingMs] = useState(3000);
   const startDelayEndAtRef = useRef<number | null>(null);
   const startDelayTimeoutRef = useRef<number | null>(null);
+  const [goPhase, setGoPhase] = useState<null | "solid" | "fade">(null);
+  const goPhaseTimeoutRef = useRef<number | null>(null);
+  const goHideTimeoutRef = useRef<number | null>(null);
+  const prevRaceStartedRef = useRef(false);
   const [svgResetNonce, setSvgResetNonce] = useState(0);
 
   const { data: giraffeRaceContract, isLoading: isGiraffeRaceLoading } = useDeployedContractInfo({
@@ -557,6 +562,10 @@ export const RaceDashboard = () => {
   const lastFrameIndex = Math.max(0, frames.length - 1);
 
   useEffect(() => {
+    frameRef.current = frame;
+  }, [frame]);
+
+  useEffect(() => {
     setFrame(0);
     setRaceStarted(false);
     setStartDelayRemainingMs(3000);
@@ -598,6 +607,57 @@ export const RaceDashboard = () => {
       }
     };
   }, [simulation, isPlaying, raceStarted, frame, startDelayRemainingMs]);
+
+  // While the start-delay is active, tick remaining ms so the UI can show 3..2..1 smoothly.
+  useEffect(() => {
+    if (!simulation) return;
+    if (!isPlaying) return;
+    if (raceStarted) return;
+    if (frame !== 0) return;
+    if (startDelayEndAtRef.current === null) return;
+
+    const id = window.setInterval(() => {
+      const endAt = startDelayEndAtRef.current;
+      if (endAt === null) return;
+      setStartDelayRemainingMs(Math.max(0, endAt - Date.now()));
+    }, 50);
+
+    return () => window.clearInterval(id);
+  }, [simulation, isPlaying, raceStarted, frame]);
+
+  // "GO!" overlay: show for 1s, then fade out over 250ms, then hide.
+  useEffect(() => {
+    const clearGoTimers = () => {
+      if (goPhaseTimeoutRef.current) window.clearTimeout(goPhaseTimeoutRef.current);
+      if (goHideTimeoutRef.current) window.clearTimeout(goHideTimeoutRef.current);
+      goPhaseTimeoutRef.current = null;
+      goHideTimeoutRef.current = null;
+    };
+
+    const prev = prevRaceStartedRef.current;
+    prevRaceStartedRef.current = raceStarted;
+
+    if (!simulation) {
+      clearGoTimers();
+      setGoPhase(null);
+      return;
+    }
+
+    // If the race is reset/stopped, hide GO.
+    if (!raceStarted) {
+      clearGoTimers();
+      setGoPhase(null);
+      return;
+    }
+
+    // Only trigger for the initial start (end of the 3s hold), not for manual tick scrubbing.
+    if (!prev && raceStarted && frameRef.current === 0) {
+      clearGoTimers();
+      setGoPhase("solid");
+      goPhaseTimeoutRef.current = window.setTimeout(() => setGoPhase("fade"), 500);
+      goHideTimeoutRef.current = window.setTimeout(() => setGoPhase(null), 750);
+    }
+  }, [raceStarted, simulation]);
 
   useEffect(() => {
     if (frame > 0 && !raceStarted) {
@@ -946,6 +1006,25 @@ export const RaceDashboard = () => {
                 className="relative w-full rounded-2xl bg-base-100 border border-base-300 overflow-hidden"
                 style={{ height: `${trackHeightPx}px` }}
               >
+                {/* Center countdown overlay */}
+                {simulation ? (
+                  <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
+                    {goPhase ? (
+                      <div
+                        className={`text-6xl font-black text-primary drop-shadow transition-opacity duration-[250ms] ${
+                          goPhase === "solid" ? "opacity-100" : "opacity-0"
+                        }`}
+                      >
+                        GO!
+                      </div>
+                    ) : isPlaying && !raceStarted && frame === 0 ? (
+                      <div className="text-6xl font-black text-primary drop-shadow">
+                        {Math.max(1, Math.ceil(startDelayRemainingMs / 1000))}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+
                 {/* Fixed lane labels */}
                 <div className="absolute left-3 top-3 bottom-3 z-10 flex flex-col justify-between pointer-events-none">
                   {Array.from({ length: LANE_COUNT }).map((_, i) => {
