@@ -961,6 +961,17 @@ export const RaceDashboard = () => {
     cameraTargetXRef.current = Math.max(0, cameraX);
   }, [cameraX]);
 
+  // Reset camera scroll position when there's no simulation (new race created, not settled yet)
+  useEffect(() => {
+    if (!cameraScrollEl) return;
+    if (!simulation) {
+      // Instantly reset to start line when no simulation
+      cameraScrollEl.scrollLeft = 0;
+      cameraSpringXRef.current = 0;
+      cameraSpringVRef.current = 0;
+    }
+  }, [cameraScrollEl, simulation]);
+
   // Drive camera via scrollLeft with spring smoothing (Unity-style SmoothDamp).
   useEffect(() => {
     const el = cameraScrollEl;
@@ -1767,46 +1778,54 @@ export const RaceDashboard = () => {
                           "you didn't bet" message block.
                         */}
                         <div className="flex flex-col gap-2 w-full">
-                          {Array.from({ length: LANE_COUNT }).map((_, lane) => (
-                            <button
-                              key={lane}
-                              className={`btn w-full justify-between h-auto py-3 min-h-[4.5rem] ${
-                                selectedBetLane === lane ? "btn-primary" : "btn-outline"
-                              } ${
-                                isBetLocked && selectedBetLane === lane
-                                  ? "ring-2 ring-primary ring-offset-2 ring-offset-base-100 disabled:opacity-100"
-                                  : ""
-                              }`}
-                              onClick={() => setBetLane(lane)}
-                              disabled={!canBet || isBetLocked}
-                              type="button"
-                            >
-                              <span className="flex items-center gap-2">
-                                <GiraffeAnimated
-                                  idPrefix={`bet-${(viewingRaceId ?? 0n).toString()}-${lane}-${(laneTokenIds[lane] ?? 0n).toString()}`}
-                                  tokenId={laneTokenIds[lane] ?? 0n}
-                                  playbackRate={1}
-                                  playing={false}
-                                  sizePx={56}
-                                />
-                                {lineupFinalized &&
-                                parsedGiraffes?.tokenIds?.[lane] &&
-                                parsedGiraffes.tokenIds[lane] !== 0n ? (
-                                  <LaneName tokenId={parsedGiraffes.tokenIds[lane]} fallback={`Lane ${lane}`} />
-                                ) : (
-                                  <span>Lane {lane}</span>
-                                )}
-                              </span>
-                              <span className="flex flex-col items-end text-xs opacity-80">
-                                <span>Readiness {laneStats[lane]?.readiness ?? 10}/10</span>
-                                <span>Conditioning {laneStats[lane]?.conditioning ?? 10}/10</span>
-                                <span>Speed {laneStats[lane]?.speed ?? 10}/10</span>
-                                {lineupFinalized ? (
-                                  <span className="font-mono opacity-90">{oddsLabelForLane(lane)}</span>
+                          {Array.from({ length: LANE_COUNT }).map((_, lane) => {
+                            const isUserLockedBet = isBetLocked && selectedBetLane === lane;
+                            return (
+                              <button
+                                key={lane}
+                                className={`btn w-full justify-between h-auto py-3 min-h-[4.5rem] relative ${
+                                  selectedBetLane === lane ? "btn-primary" : "btn-outline"
+                                } ${
+                                  isUserLockedBet
+                                    ? "ring-2 ring-primary ring-offset-2 ring-offset-base-100 disabled:opacity-100 !bg-primary/20"
+                                    : ""
+                                }`}
+                                onClick={() => setBetLane(lane)}
+                                disabled={!canBet || isBetLocked}
+                                type="button"
+                              >
+                                {isUserLockedBet ? (
+                                  <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                    <span className="badge badge-primary">YOUR BET</span>
+                                  </span>
                                 ) : null}
-                              </span>
-                            </button>
-                          ))}
+                                <span className="flex items-center gap-2">
+                                  <GiraffeAnimated
+                                    idPrefix={`bet-${(viewingRaceId ?? 0n).toString()}-${lane}-${(laneTokenIds[lane] ?? 0n).toString()}`}
+                                    tokenId={laneTokenIds[lane] ?? 0n}
+                                    playbackRate={1}
+                                    playing={false}
+                                    sizePx={56}
+                                  />
+                                  {lineupFinalized &&
+                                  parsedGiraffes?.tokenIds?.[lane] &&
+                                  parsedGiraffes.tokenIds[lane] !== 0n ? (
+                                    <LaneName tokenId={parsedGiraffes.tokenIds[lane]} fallback={`Lane ${lane}`} />
+                                  ) : (
+                                    <span>Lane {lane}</span>
+                                  )}
+                                </span>
+                                <span className="flex flex-col items-end text-xs opacity-80">
+                                  <span>Readiness {laneStats[lane]?.readiness ?? 10}/10</span>
+                                  <span>Conditioning {laneStats[lane]?.conditioning ?? 10}/10</span>
+                                  <span>Speed {laneStats[lane]?.speed ?? 10}/10</span>
+                                  {lineupFinalized ? (
+                                    <span className="font-mono opacity-90">{oddsLabelForLane(lane)}</span>
+                                  ) : null}
+                                </span>
+                              </button>
+                            );
+                          })}
                         </div>
 
                         {lineupFinalized ? (
