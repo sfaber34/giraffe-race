@@ -1711,12 +1711,7 @@ export const RaceDashboard = () => {
                         if (amount <= 0n) return;
                         try {
                           setIsFundingRace(true);
-                          // First approve USDC to treasury
-                          await (writeUsdcAsync as any)({
-                            functionName: "approve",
-                            args: [treasuryContract.address, amount],
-                          });
-                          // Then transfer USDC to treasury
+                          // Direct transfer to treasury (no approval needed - it's your own tokens)
                           await (writeUsdcAsync as any)({
                             functionName: "transfer",
                             args: [treasuryContract.address, amount],
