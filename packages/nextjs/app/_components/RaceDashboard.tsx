@@ -228,9 +228,53 @@ export const RaceDashboard = () => {
     });
   }, [latestRaceId]);
 
+  // Delayed viewing: when a new race is created, hold the previous race visible for 5 seconds
+  // so users can see race results before the UI resets.
+  const [delayedViewingRaceId, setDelayedViewingRaceId] = useState<bigint | null>(null);
+  const raceTransitionTimeoutRef = useRef<number | null>(null);
+  const prevLatestRaceIdRef = useRef<bigint | null>(null);
+
+  useEffect(() => {
+    // Initialize on first load
+    if (delayedViewingRaceId === null && latestRaceId !== null) {
+      setDelayedViewingRaceId(latestRaceId);
+      prevLatestRaceIdRef.current = latestRaceId;
+      return;
+    }
+
+    // Detect when a new race is created (latestRaceId increases)
+    const prevLatest = prevLatestRaceIdRef.current;
+    prevLatestRaceIdRef.current = latestRaceId;
+
+    if (latestRaceId === null) return;
+    if (prevLatest === null) {
+      setDelayedViewingRaceId(latestRaceId);
+      return;
+    }
+    if (latestRaceId <= prevLatest) return;
+
+    // New race detected! Keep showing previous race for 5 seconds.
+    if (raceTransitionTimeoutRef.current) {
+      window.clearTimeout(raceTransitionTimeoutRef.current);
+    }
+
+    raceTransitionTimeoutRef.current = window.setTimeout(() => {
+      raceTransitionTimeoutRef.current = null;
+      setDelayedViewingRaceId(latestRaceId);
+    }, 5000);
+
+    return () => {
+      if (raceTransitionTimeoutRef.current) {
+        window.clearTimeout(raceTransitionTimeoutRef.current);
+        raceTransitionTimeoutRef.current = null;
+      }
+    };
+  }, [latestRaceId, delayedViewingRaceId]);
+
   // NOTE: We intentionally always show the latest race in the UI right now.
   // Keep `viewRaceId` + `setViewRaceId` plumbing around so we can re-enable "view past races" controls later.
-  const viewingRaceId = latestRaceId;
+  // Use delayedViewingRaceId to give users time to see race results before transitioning.
+  const viewingRaceId = delayedViewingRaceId ?? latestRaceId;
   // Treat "no race yet" (and the brief initial-load null state) as "viewing latest" so core actions
   // like "Create race" / "Submit NFT" aren't incorrectly disabled on a fresh chain.
   const isViewingLatest =
@@ -1119,40 +1163,129 @@ export const RaceDashboard = () => {
                 className="relative w-full rounded-2xl bg-base-100 border border-base-300 overflow-hidden"
                 style={{ height: `${trackHeightPx}px` }}
               >
-                {/* Center countdown overlay */}
-                {simulation ? (
-                  <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
-                    {goPhase ? (
-                      <div
-                        className={`flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-base-100/90 backdrop-blur-sm shadow-lg transition-opacity duration-[250ms] ${
-                          goPhase === "solid" ? "opacity-100" : "opacity-0"
-                        }`}
-                      >
-                        <div className="text-6xl font-black text-primary drop-shadow">GO!</div>
-                      </div>
-                    ) : isPlaying && !raceStarted && frame === 0 ? (
-                      <div className="flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-base-100/90 backdrop-blur-sm shadow-lg">
-                        <div className="text-6xl font-black text-primary drop-shadow">
-                          {Math.max(1, Math.ceil(startDelayRemainingMs / 1000))}
+                {/* Center overlay - pre-race messages, countdown, and results */}
+                <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
+                  {simulation ? (
+                    // Race replay overlay (countdown, GO!, results)
+                    <>
+                      {goPhase ? (
+                        <div
+                          className={`flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-base-100/90 backdrop-blur-sm shadow-lg transition-opacity duration-[250ms] ${
+                            goPhase === "solid" ? "opacity-100" : "opacity-0"
+                          }`}
+                        >
+                          <div className="text-6xl font-black text-primary drop-shadow">GO!</div>
                         </div>
-                      </div>
-                    ) : raceIsOver && myBet?.hasBet && revealedWinner !== null ? (
-                      <div className="flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-base-100/90 backdrop-blur-sm shadow-lg">
-                        {myBet.lane === revealedWinner ? (
-                          <>
-                            <div className="text-4xl font-black text-success drop-shadow">Your bet hit!</div>
-                            <div className="text-xl font-semibold text-success/80">Claim your winnings</div>
-                          </>
-                        ) : (
-                          <>
-                            <div className="text-4xl font-black text-error drop-shadow">Sorry</div>
-                            <div className="text-xl font-semibold text-error/80">Your bet didn&apos;t win</div>
-                          </>
-                        )}
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
+                      ) : isPlaying && !raceStarted && frame === 0 ? (
+                        <div className="flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-base-100/90 backdrop-blur-sm shadow-lg">
+                          <div className="text-6xl font-black text-primary drop-shadow">
+                            {Math.max(1, Math.ceil(startDelayRemainingMs / 1000))}
+                          </div>
+                        </div>
+                      ) : raceIsOver && myBet?.hasBet && revealedWinner !== null ? (
+                        <div className="flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-base-100/90 backdrop-blur-sm shadow-lg">
+                          {myBet.lane === revealedWinner ? (
+                            <>
+                              <div className="text-4xl font-black text-success drop-shadow">Your bet hit!</div>
+                              <div className="text-xl font-semibold text-success/80">
+                                {myBet.claimed
+                                  ? "Payout claimed"
+                                  : `Claim your ${estimatedPayoutWei ? formatEther(estimatedPayoutWei) : "—"} ETH payout`}
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="text-4xl font-black text-error drop-shadow">Sorry</div>
+                              <div className="text-xl font-semibold text-error/80">Your bet didn&apos;t win</div>
+                            </>
+                          )}
+                        </div>
+                      ) : null}
+                    </>
+                  ) : (
+                    // Pre-race overlay (submissions open, betting open, bet placed)
+                    <>
+                      {status === "submissions_open" ? (
+                        <div className="flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-base-100/90 backdrop-blur-sm shadow-lg">
+                          <div className="text-3xl font-black text-primary drop-shadow">Submissions open</div>
+                          {submittedTokenId ? (
+                            <div className="text-xl font-semibold text-base-content/80 flex items-center gap-2">
+                              <span>You entered</span>
+                              <GiraffeAnimated
+                                idPrefix={`overlay-submitted-${(viewingRaceId ?? 0n).toString()}-${submittedTokenId.toString()}`}
+                                tokenId={submittedTokenId}
+                                playbackRate={1}
+                                playing={true}
+                                sizePx={48}
+                              />
+                              <span>
+                                {(ownedTokenNameById[submittedTokenId.toString()] || "").trim()
+                                  ? ownedTokenNameById[submittedTokenId.toString()]
+                                  : `#${submittedTokenId.toString()}`}
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="text-lg font-semibold text-base-content/70">Enter a giraffe</div>
+                          )}
+                        </div>
+                      ) : status === "betting_open" ? (
+                        <div className="flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-base-100/90 backdrop-blur-sm shadow-lg">
+                          {myBet?.hasBet ? (
+                            <>
+                              <div className="text-3xl font-black text-primary drop-shadow">Bet placed</div>
+                              <div className="text-lg font-semibold text-base-content/80 flex items-center gap-2">
+                                <span>You bet {formatEther(myBet.amount)} ETH on</span>
+                                <GiraffeAnimated
+                                  idPrefix={`overlay-bet-${(viewingRaceId ?? 0n).toString()}-${myBet.lane}`}
+                                  tokenId={laneTokenIds[myBet.lane] ?? 0n}
+                                  playbackRate={1}
+                                  playing={true}
+                                  sizePx={48}
+                                />
+                                <LaneName tokenId={laneTokenIds[myBet.lane] ?? 0n} fallback={`Lane ${myBet.lane}`} />
+                              </div>
+                              <div className="text-lg font-semibold text-base-content/70">
+                                Payout: {estimatedPayoutWei ? `${formatEther(estimatedPayoutWei)} ETH` : "—"}
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="text-3xl font-black text-primary drop-shadow">Betting open</div>
+                              <div className="text-lg font-semibold text-base-content/70">Pick a giraffe to win</div>
+                            </>
+                          )}
+                        </div>
+                      ) : status === "betting_closed" ? (
+                        <div className="flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-base-100/90 backdrop-blur-sm shadow-lg">
+                          {myBet?.hasBet ? (
+                            <>
+                              <div className="text-3xl font-black text-primary drop-shadow">Bet placed</div>
+                              <div className="text-lg font-semibold text-base-content/80 flex items-center gap-2">
+                                <span>You bet {formatEther(myBet.amount)} ETH on</span>
+                                <GiraffeAnimated
+                                  idPrefix={`overlay-bet-closed-${(viewingRaceId ?? 0n).toString()}-${myBet.lane}`}
+                                  tokenId={laneTokenIds[myBet.lane] ?? 0n}
+                                  playbackRate={1}
+                                  playing={true}
+                                  sizePx={48}
+                                />
+                                <LaneName tokenId={laneTokenIds[myBet.lane] ?? 0n} fallback={`Lane ${myBet.lane}`} />
+                              </div>
+                              <div className="text-lg font-semibold text-base-content/70">
+                                Payout: {estimatedPayoutWei ? `${formatEther(estimatedPayoutWei)} ETH` : "—"}
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="text-3xl font-black text-primary drop-shadow">Betting closed</div>
+                              <div className="text-lg font-semibold text-base-content/70">Waiting for settlement</div>
+                            </>
+                          )}
+                        </div>
+                      ) : null}
+                    </>
+                  )}
+                </div>
 
                 {/* Fixed lane labels */}
                 <div className="absolute left-3 top-3 bottom-3 z-10 flex flex-col justify-between pointer-events-none">
@@ -1233,11 +1366,12 @@ export const RaceDashboard = () => {
                         })}
                       </div>
 
-                      {/* Giraffes (only once simulation is available) */}
-                      {simulation
+                      {/* Giraffes - show at start line when lineup is finalized, animate during replay */}
+                      {simulation || lineupFinalized
                         ? Array.from({ length: LANE_COUNT }).map((_, i) => {
-                            const d = Number(currentDistances[i] ?? 0);
-                            const prev = Number(prevDistances[i] ?? 0);
+                            // Use simulation distances if available, otherwise 0 (start line)
+                            const d = simulation ? Number(currentDistances[i] ?? 0) : 0;
+                            const prev = simulation ? Number(prevDistances[i] ?? 0) : 0;
                             const delta = Math.max(0, d - prev);
                             const isWinner = revealedWinner === i;
                             const isUserBetLane = !!myBet?.hasBet && myBet.lane === i;
@@ -1247,9 +1381,10 @@ export const RaceDashboard = () => {
                             const minDelta = 1;
                             const maxDelta = SPEED_RANGE;
                             const t = Math.max(0, Math.min(1, (delta - minDelta) / (maxDelta - minDelta)));
-                            const speedFactor =
-                              MIN_ANIMATION_SPEED_FACTOR +
-                              t * (MAX_ANIMATION_SPEED_FACTOR - MIN_ANIMATION_SPEED_FACTOR);
+                            const speedFactor = simulation
+                              ? MIN_ANIMATION_SPEED_FACTOR +
+                                t * (MAX_ANIMATION_SPEED_FACTOR - MIN_ANIMATION_SPEED_FACTOR)
+                              : 1; // Idle speed when at start line
 
                             const x =
                               worldPaddingLeftPx +
@@ -1263,8 +1398,10 @@ export const RaceDashboard = () => {
                                 className="absolute left-0 top-0"
                                 style={{
                                   transform: `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%)`,
-                                  transition: `transform ${Math.floor(120 / (playbackSpeed * BASE_REPLAY_SPEED_MULTIPLIER))}ms linear`,
-                                  willChange: "transform",
+                                  transition: simulation
+                                    ? `transform ${Math.floor(120 / (playbackSpeed * BASE_REPLAY_SPEED_MULTIPLIER))}ms linear`
+                                    : undefined,
+                                  willChange: simulation ? "transform" : undefined,
                                   filter: isWinner
                                     ? "drop-shadow(0 0 12px rgba(255, 215, 0, 0.9)) drop-shadow(0 0 24px rgba(255, 215, 0, 0.6))"
                                     : undefined,
@@ -1287,7 +1424,7 @@ export const RaceDashboard = () => {
                                     tokenId={parsedGiraffes?.tokenIds?.[i] ?? 0n}
                                     playbackRate={speedFactor}
                                     resetNonce={svgResetNonce}
-                                    playing={isPlaying && raceStarted && frame < lastFrameIndex}
+                                    playing={simulation ? isPlaying && raceStarted && frame < lastFrameIndex : false}
                                     sizePx={giraffeSizePx}
                                   />
                                 </div>
