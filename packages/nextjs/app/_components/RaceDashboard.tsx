@@ -618,7 +618,8 @@ export const RaceDashboard = () => {
   // Check if user needs to approve USDC spending
   // If we can't read allowance yet, assume approval is needed (safer default)
   const needsApproval = useMemo(() => {
-    if (!placeBetValue) return false;
+    // No bet amount yet - show Approve button (disabled) as the default starting state
+    if (!placeBetValue) return true;
     // If allowance is undefined/not loaded, assume approval needed
     if (userUsdcAllowance === undefined || userUsdcAllowance === null) return true;
     return (userUsdcAllowance as unknown as bigint) < placeBetValue;
@@ -2067,6 +2068,10 @@ export const RaceDashboard = () => {
                                   className="input input-bordered w-full pr-16"
                                   placeholder="Bet amount"
                                   value={betAmountUsdc}
+                                  disabled={
+                                    // Disable only when: approved AND has a bet amount (locked in), OR already bet
+                                    (!!placeBetValue && !needsApproval) || !!myBet?.hasBet
+                                  }
                                   onChange={e => {
                                     if (!canBet) return;
                                     setBetAmountUsdc(e.target.value);
@@ -2080,6 +2085,10 @@ export const RaceDashboard = () => {
                                 <div className="text-xs opacity-60">
                                   Balance: {formatUnits(userUsdcBalance as unknown as bigint, USDC_DECIMALS)} USDC
                                 </div>
+                              )}
+                              {/* Show hint when amount is locked after approval */}
+                              {!needsApproval && placeBetValue && !myBet?.hasBet && (
+                                <div className="text-xs text-success">✓ Approved — ready to place bet</div>
                               )}
                             </div>
                           </div>
@@ -2105,11 +2114,13 @@ export const RaceDashboard = () => {
                           userUsdcBalance !== null &&
                           !hasEnoughUsdc && <div className="text-xs text-error">Insufficient USDC balance</div>}
 
-                        {/* Approve button (shown when approval needed) */}
-                        {needsApproval && placeBetValue && hasEnoughUsdc && !myBet?.hasBet && (
+                        {/* Single action button: Approve OR Place bet (mutually exclusive) */}
+                        {needsApproval ? (
                           <button
-                            className="btn btn-secondary"
-                            disabled={isApproving || !treasuryContract}
+                            className="btn btn-primary"
+                            disabled={
+                              isApproving || !treasuryContract || !placeBetValue || !hasEnoughUsdc || !!myBet?.hasBet
+                            }
                             onClick={async () => {
                               if (!placeBetValue || !treasuryContract?.address) return;
                               setIsApproving(true);
@@ -2126,37 +2137,35 @@ export const RaceDashboard = () => {
                             {isApproving ? <span className="loading loading-spinner loading-xs" /> : null}
                             Approve USDC
                           </button>
+                        ) : (
+                          <button
+                            className="btn btn-primary"
+                            disabled={
+                              !giraffeRaceContract ||
+                              !connectedAddress ||
+                              !canBet ||
+                              betLane === null ||
+                              !placeBetValue ||
+                              !!myBet?.hasBet ||
+                              !isViewingLatest ||
+                              !hasEnoughUsdc
+                            }
+                            onClick={async () => {
+                              if (!placeBetValue) return;
+                              if (betLane === null) return;
+                              await writeGiraffeRaceAsync({
+                                functionName: "placeBet",
+                                args: [
+                                  BigInt(Math.max(0, Math.min(Number(LANE_COUNT - 1), Math.floor(betLane)))),
+                                  placeBetValue,
+                                ],
+                              } as any);
+                              setBetAmountUsdc("");
+                            }}
+                          >
+                            Place bet
+                          </button>
                         )}
-
-                        {/* Place bet button */}
-                        <button
-                          className="btn btn-primary"
-                          disabled={
-                            !giraffeRaceContract ||
-                            !connectedAddress ||
-                            !canBet ||
-                            betLane === null ||
-                            !placeBetValue ||
-                            !!myBet?.hasBet ||
-                            !isViewingLatest ||
-                            needsApproval ||
-                            !hasEnoughUsdc
-                          }
-                          onClick={async () => {
-                            if (!placeBetValue) return;
-                            if (betLane === null) return;
-                            await writeGiraffeRaceAsync({
-                              functionName: "placeBet",
-                              args: [
-                                BigInt(Math.max(0, Math.min(Number(LANE_COUNT - 1), Math.floor(betLane)))),
-                                placeBetValue,
-                              ],
-                            } as any);
-                            setBetAmountUsdc("");
-                          }}
-                        >
-                          Place bet
-                        </button>
                       </>
                     </div>
                   </div>
