@@ -1170,6 +1170,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "getActiveRaceIdOrZero",
+          inputs: [],
+          outputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "getBet",
           inputs: [
             {
@@ -1422,6 +1435,65 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "getRaceActionabilityById",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "canFinalizeNow",
+              type: "bool",
+              internalType: "bool",
+            },
+            {
+              name: "canSettleNow",
+              type: "bool",
+              internalType: "bool",
+            },
+            {
+              name: "closeBlock",
+              type: "uint64",
+              internalType: "uint64",
+            },
+            {
+              name: "submissionCloseBlock",
+              type: "uint64",
+              internalType: "uint64",
+            },
+            {
+              name: "finalizeEntropyBlock",
+              type: "uint64",
+              internalType: "uint64",
+            },
+            {
+              name: "finalizeBlockhashExpiresAt",
+              type: "uint64",
+              internalType: "uint64",
+            },
+            {
+              name: "settleBlockhashExpiresAt",
+              type: "uint64",
+              internalType: "uint64",
+            },
+            {
+              name: "blocksUntilFinalizeExpiry",
+              type: "uint64",
+              internalType: "uint64",
+            },
+            {
+              name: "blocksUntilSettleExpiry",
+              type: "uint64",
+              internalType: "uint64",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "getRaceById",
           inputs: [
             {
@@ -1460,6 +1532,35 @@ const deployedContracts = {
               name: "totalOnLane",
               type: "uint256[6]",
               internalType: "uint256[6]",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getRaceFlagsById",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "settled",
+              type: "bool",
+              internalType: "bool",
+            },
+            {
+              name: "giraffesFinalized",
+              type: "bool",
+              internalType: "bool",
+            },
+            {
+              name: "oddsSet",
+              type: "bool",
+              internalType: "bool",
             },
           ],
           stateMutability: "view",
@@ -1536,6 +1637,30 @@ const deployedContracts = {
               name: "decimalOddsBps",
               type: "uint32[6]",
               internalType: "uint32[6]",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getRaceScheduleById",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "closeBlock",
+              type: "uint64",
+              internalType: "uint64",
+            },
+            {
+              name: "submissionCloseBlock",
+              type: "uint64",
+              internalType: "uint64",
             },
           ],
           stateMutability: "view",
@@ -2192,7 +2317,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 4,
+      deployedOnBlock: 5,
     },
   },
 } as const;

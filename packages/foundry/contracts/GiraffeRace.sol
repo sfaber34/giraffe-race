@@ -545,6 +545,94 @@ contract GiraffeRace {
     // Views (for UI / replay)
     // -----------------------
 
+    /// @notice Bot/UI helper: return the key state flags for a race.
+    /// @dev For non-existent races (closeBlock == 0), returns all false.
+    function getRaceFlagsById(uint256 raceId)
+        external
+        view
+        returns (bool settled, bool giraffesFinalized, bool oddsSet)
+    {
+        Race storage r = races[raceId];
+        if (r.closeBlock == 0) return (false, false, false);
+        return (r.settled, r.giraffesFinalized, r.oddsSet);
+    }
+
+    /// @notice Bot/UI helper: return the schedule blocks for a race.
+    /// @dev For non-existent races (closeBlock == 0), returns (0, 0).
+    function getRaceScheduleById(uint256 raceId) external view returns (uint64 closeBlock, uint64 submissionCloseBlock) {
+        Race storage r = races[raceId];
+        closeBlock = r.closeBlock;
+        if (closeBlock == 0) return (0, 0);
+        submissionCloseBlock = _submissionCloseBlock(closeBlock);
+        return (closeBlock, submissionCloseBlock);
+    }
+
+    /// @notice Bot helper: return whether key permissionless ops are currently executable, plus blockhash windows.
+    /// @dev Mirrors `finalizeRaceGiraffes` and `settleRace` preconditions, including blockhash availability checks.
+    /// For non-existent races (closeBlock == 0), returns all zeros/false.
+    function getRaceActionabilityById(uint256 raceId)
+        external
+        view
+        returns (
+            bool canFinalizeNow,
+            bool canSettleNow,
+            uint64 closeBlock,
+            uint64 submissionCloseBlock,
+            uint64 finalizeEntropyBlock,
+            uint64 finalizeBlockhashExpiresAt,
+            uint64 settleBlockhashExpiresAt,
+            uint64 blocksUntilFinalizeExpiry,
+            uint64 blocksUntilSettleExpiry
+        )
+    {
+        Race storage r = races[raceId];
+        closeBlock = r.closeBlock;
+        if (closeBlock == 0) {
+            return (false, false, 0, 0, 0, 0, 0, 0, 0);
+        }
+
+        submissionCloseBlock = _submissionCloseBlock(closeBlock);
+        finalizeEntropyBlock = submissionCloseBlock > 0 ? (submissionCloseBlock - 1) : 0;
+
+        finalizeBlockhashExpiresAt = finalizeEntropyBlock == 0 ? 0 : uint64(uint256(finalizeEntropyBlock) + 256);
+        settleBlockhashExpiresAt = uint64(uint256(closeBlock) + 256);
+
+        // Clamp at 0 for convenience (bots can treat 0 as "expired or invalid").
+        if (finalizeBlockhashExpiresAt != 0 && block.number < finalizeBlockhashExpiresAt) {
+            blocksUntilFinalizeExpiry = uint64(uint256(finalizeBlockhashExpiresAt) - block.number);
+        } else {
+            blocksUntilFinalizeExpiry = 0;
+        }
+        if (block.number < settleBlockhashExpiresAt) {
+            blocksUntilSettleExpiry = uint64(uint256(settleBlockhashExpiresAt) - block.number);
+        } else {
+            blocksUntilSettleExpiry = 0;
+        }
+
+        // Finalize: same gates as finalizeRaceGiraffes + blockhash(submissionCloseBlock - 1) availability.
+        bool finalizeBlockReached = block.number >= submissionCloseBlock;
+        bool finalizeBhAvailable = finalizeEntropyBlock != 0 && blockhash(uint256(finalizeEntropyBlock)) != bytes32(0);
+        canFinalizeNow = closeBlock != 0 && !r.settled && !r.giraffesFinalized && finalizeBlockReached && finalizeBhAvailable;
+
+        // Settle: same gates as _settleRace + blockhash(closeBlock) availability.
+        // Additionally, if lineup isn't finalized yet, settlement will attempt finalization and can fail if
+        // finalize entropy blockhash is already unavailable.
+        bool settleBhAvailable = blockhash(uint256(closeBlock)) != bytes32(0);
+        bool settleTimeReached = block.number > closeBlock;
+        bool oddsOk = r.totalPot == 0 || r.oddsSet;
+        bool finalizationOk = r.giraffesFinalized || (finalizeBlockReached && finalizeBhAvailable);
+
+        canSettleNow = closeBlock != 0 && !r.settled && settleTimeReached && settleBhAvailable && oddsOk && finalizationOk;
+    }
+
+    /// @notice Bot/UI helper: returns the current active (unsettled) race id, or 0 if none exists.
+    function getActiveRaceIdOrZero() external view returns (uint256 raceId) {
+        if (nextRaceId == 0) return 0;
+        raceId = nextRaceId - 1;
+        if (races[raceId].settled) return 0;
+        return raceId;
+    }
+
     function getRace()
         external
         view
