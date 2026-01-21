@@ -3,6 +3,7 @@ pragma solidity ^0.8.19;
 
 import { DeterministicDice } from "./libraries/DeterministicDice.sol";
 import { GiraffeRaceSimulator } from "./GiraffeRaceSimulator.sol";
+import { HouseTreasury } from "./HouseTreasury.sol";
 import { IERC721 } from "../lib/openzeppelin-contracts/contracts/token/ERC721/IERC721.sol";
 
 interface IGiraffeNFT is IERC721 {
@@ -50,9 +51,11 @@ contract GiraffeRace {
     uint16 public constant MAX_TICKS = 500;
     uint8 public constant SPEED_RANGE = 10; // speeds per tick: 1-10
 
-    address public house;
+    address public house;      // Owns house NFTs (should be multisig/treasuryOwner)
+    address public oddsAdmin;  // Can set odds (can be hot wallet for operations)
     IGiraffeNFT public giraffeNft;
     GiraffeRaceSimulator public simulator;
+    HouseTreasury public treasury;
     // NOTE (testing): readiness decay after races is currently disabled in code.
     // When deploying a live version where readiness should always decay, uncomment the call in `_settleRace`.
 
@@ -152,7 +155,6 @@ contract GiraffeRace {
     error RaceNotReady();
     error NotWinner();
     error AlreadyClaimed();
-    error TransferFailed();
     error AlreadySubmitted();
     error InvalidHouseGiraffe();
     error GiraffeNotAssigned();
@@ -162,6 +164,7 @@ contract GiraffeRace {
     error GiraffesAlreadyFinalized();
     error PreviousRaceNotSettled();
     error NotHouse();
+    error NotOddsAdmin();
     error OddsNotSet();
     error OddsAlreadySet();
     error InvalidOdds();
@@ -172,17 +175,24 @@ contract GiraffeRace {
         _;
     }
 
-    receive() external payable { }
+    modifier onlyOddsAdmin() {
+        if (msg.sender != oddsAdmin) revert NotOddsAdmin();
+        _;
+    }
 
     constructor(
         address _giraffeNft,
         address _house,
+        address _oddsAdmin,
         uint256[LANE_COUNT] memory _houseGiraffeTokenIds,
-        address _simulator
+        address _simulator,
+        address _treasury
     ) {
         giraffeNft = IGiraffeNFT(_giraffeNft);
         house = _house;
+        oddsAdmin = _oddsAdmin;
         simulator = GiraffeRaceSimulator(_simulator);
+        treasury = HouseTreasury(_treasury);
         houseGiraffeTokenIds = _houseGiraffeTokenIds;
 
         // Basic sanity: prevent accidental all-zeros configuration.
@@ -262,7 +272,7 @@ contract GiraffeRace {
         emit RaceCreated(raceId, closeBlock);
     }
 
-    function placeBet(uint8 lane) external payable {
+    function placeBet(uint8 lane, uint256 amount) external {
         if (lane >= LANE_COUNT) revert InvalidLane();
 
         uint256 raceId = _activeRaceId();
@@ -270,7 +280,7 @@ contract GiraffeRace {
         if (block.number >= r.closeBlock) revert BettingClosed();
         if (block.number < _submissionCloseBlock(r.closeBlock)) revert BettingNotOpen();
 
-        if (msg.value == 0) revert ZeroBet();
+        if (amount == 0) revert ZeroBet();
 
         // Ensure the lane lineup is finalized before accepting bets (so bettors can see who is racing).
         _ensureGiraffesFinalized(raceId);
@@ -279,26 +289,28 @@ contract GiraffeRace {
         Bet storage b = bets[raceId][msg.sender];
         if (b.amount != 0) revert AlreadyBet();
 
-        // Risk control (fixed odds): ensure the contract can cover worst-case payout for this race,
+        // Risk control (fixed odds): ensure treasury can cover worst-case payout for this race,
         // while also reserving funds for already-settled liabilities.
         uint256[LANE_COUNT] memory projectedTotals = r.totalOnLane;
-        projectedTotals[lane] += msg.value;
+        projectedTotals[lane] += amount;
         uint256 maxPayout;
         for (uint8 i = 0; i < LANE_COUNT; i++) {
             uint256 payoutIfWin = (projectedTotals[i] * uint256(r.decimalOddsBps[i])) / ODDS_SCALE;
             if (payoutIfWin > maxPayout) maxPayout = payoutIfWin;
         }
-        // `address(this).balance` already includes `msg.value` during execution.
-        if (address(this).balance < settledLiability + maxPayout) revert InsufficientBankroll();
+        if (treasury.balance() < settledLiability + maxPayout) revert InsufficientBankroll();
 
-        b.amount = uint128(msg.value);
+        // Collect bet from user via treasury (user must have approved treasury)
+        treasury.collectBet(msg.sender, amount);
+
+        b.amount = uint128(amount);
         b.lane = lane;
 
-        r.totalPot += msg.value;
-        r.totalOnLane[lane] += msg.value;
+        r.totalPot += amount;
+        r.totalOnLane[lane] += amount;
 
         bettorRaceIds[msg.sender].push(raceId);
-        emit BetPlaced(raceId, msg.sender, lane, msg.value);
+        emit BetPlaced(raceId, msg.sender, lane, amount);
     }
 
     /**
@@ -310,7 +322,7 @@ contract GiraffeRace {
      * Using basis points, we enforce:
      *   sum(ODDS_SCALE^2 / O_i_bps) >= ceil(ODDS_SCALE*ODDS_SCALE / (ODDS_SCALE - HOUSE_EDGE_BPS))
      */
-    function setRaceOdds(uint256 raceId, uint32[LANE_COUNT] calldata decimalOddsBps) external onlyHouse {
+    function setRaceOdds(uint256 raceId, uint32[LANE_COUNT] calldata decimalOddsBps) external onlyOddsAdmin {
         Race storage r = races[raceId];
         if (r.closeBlock == 0) revert InvalidRace();
         if (r.settled) revert AlreadySettled();
@@ -498,10 +510,8 @@ contract GiraffeRace {
             
             if (payout != 0) {
                 settledLiability -= payout;
+                treasury.payWinner(msg.sender, payout);
             }
-
-            (bool ok,) = msg.sender.call{value: payout}("");
-            if (!ok) revert TransferFailed();
 
             emit Claimed(raceId, msg.sender, payout);
             return payout;
@@ -559,10 +569,8 @@ contract GiraffeRace {
             
             if (payout != 0) {
                 settledLiability -= payout;
+                treasury.payWinner(msg.sender, payout);
             }
-
-            (bool ok,) = msg.sender.call{value: payout}("");
-            if (!ok) revert TransferFailed();
 
             emit Claimed(raceId, msg.sender, payout);
             return payout;

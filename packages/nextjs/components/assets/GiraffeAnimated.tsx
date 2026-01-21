@@ -127,7 +127,9 @@ function applyHexReplacements(svg: string, replacements: Record<string, string>)
   for (const [from, to] of Object.entries(replacements)) {
     if (!from || !to) continue;
     if (from.toLowerCase() === to.toLowerCase()) continue;
-    out = out.replace(new RegExp(escapeRegExp(from), "gi"), to);
+    // Negative lookahead (?![0-9a-fA-F]) prevents short hex colors like #223
+    // from matching inside longer colors like #2234bf
+    out = out.replace(new RegExp(escapeRegExp(from) + "(?![0-9a-fA-F])", "gi"), to);
   }
   return out;
 }

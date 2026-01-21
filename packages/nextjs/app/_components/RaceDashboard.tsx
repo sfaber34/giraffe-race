@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Balance, EtherInput } from "@scaffold-ui/components";
-import { Hex, formatEther, isHex, parseEther, toHex } from "viem";
+import { Hex, formatUnits, isHex, parseUnits, toHex } from "viem";
 import { useAccount, useBlockNumber, usePublicClient } from "wagmi";
 import { GiraffeAnimated } from "~~/components/assets/GiraffeAnimated";
 import {
@@ -11,9 +10,11 @@ import {
   useScaffoldReadContract,
   useScaffoldWriteContract,
   useTargetNetwork,
-  useTransactor,
 } from "~~/hooks/scaffold-eth";
 import { simulateRaceFromSeed } from "~~/utils/race/simulateRace";
+
+// USDC has 6 decimals
+const USDC_DECIMALS = 6;
 
 const LANE_COUNT = 6 as const;
 // Keep in sync with `GiraffeRace.sol`
@@ -90,9 +91,10 @@ export const RaceDashboard = () => {
   const [selectedTokenId, setSelectedTokenId] = useState<bigint | null>(null);
   const [submittedTokenId, setSubmittedTokenId] = useState<bigint | null>(null);
   const [betLane, setBetLane] = useState<number | null>(null);
-  const [betAmountEth, setBetAmountEth] = useState("");
-  const [fundAmountEth, setFundAmountEth] = useState("");
+  const [betAmountUsdc, setBetAmountUsdc] = useState("");
+  const [fundAmountUsdc, setFundAmountUsdc] = useState("");
   const [isFundingRace, setIsFundingRace] = useState(false);
+  const [isApproving, setIsApproving] = useState(false);
   const [ownedTokenNameById, setOwnedTokenNameById] = useState<Record<string, string>>({});
   const [isLoadingOwnedTokenNames, setIsLoadingOwnedTokenNames] = useState(false);
 
@@ -115,8 +117,35 @@ export const RaceDashboard = () => {
     contractName: "GiraffeRace",
   });
   const { data: giraffeNftContract } = useDeployedContractInfo({ contractName: "GiraffeNFT" });
+  // Note: MockUSDC and HouseTreasury types will be available after `yarn deploy` regenerates ABIs
+  const { data: usdcContract } = useDeployedContractInfo({ contractName: "MockUSDC" as any });
+  const { data: treasuryContract } = useDeployedContractInfo({ contractName: "HouseTreasury" as any });
 
-  const tx = useTransactor();
+  // USDC write hooks (types will be available after `yarn deploy`)
+  const { writeContractAsync: writeUsdcAsync } = useScaffoldWriteContract({ contractName: "MockUSDC" as any });
+
+  // Read user's USDC balance
+  const { data: userUsdcBalance } = useScaffoldReadContract({
+    contractName: "MockUSDC" as any,
+    functionName: "balanceOf" as any,
+    args: [connectedAddress],
+    query: { enabled: !!usdcContract && !!connectedAddress },
+  } as any);
+
+  // Read user's USDC allowance for treasury
+  const { data: userUsdcAllowance } = useScaffoldReadContract({
+    contractName: "MockUSDC" as any,
+    functionName: "allowance" as any,
+    args: [connectedAddress, treasuryContract?.address],
+    query: { enabled: !!usdcContract && !!treasuryContract && !!connectedAddress },
+  } as any);
+
+  // Read treasury USDC balance (the bankroll)
+  const { data: treasuryBalance } = useScaffoldReadContract({
+    contractName: "HouseTreasury" as any,
+    functionName: "balance" as any,
+    query: { enabled: !!treasuryContract },
+  } as any);
 
   const { data: ownedTokenIdsData, isLoading: isOwnedTokensLoading } = useScaffoldReadContract({
     contractName: "GiraffeNFT",
@@ -575,16 +604,34 @@ export const RaceDashboard = () => {
   };
 
   const placeBetValue = useMemo(() => {
-    const v = betAmountEth.trim();
+    const v = betAmountUsdc.trim();
     if (!v) return null;
     try {
-      const wei = parseEther(v as `${number}`);
-      if (wei <= 0n) return null;
-      return wei;
+      const usdcAmount = parseUnits(v as `${number}`, USDC_DECIMALS);
+      if (usdcAmount <= 0n) return null;
+      return usdcAmount;
     } catch {
       return null;
     }
-  }, [betAmountEth]);
+  }, [betAmountUsdc]);
+
+  // Check if user needs to approve USDC spending
+  // If we can't read allowance yet, assume approval is needed (safer default)
+  const needsApproval = useMemo(() => {
+    if (!placeBetValue) return false;
+    // If allowance is undefined/not loaded, assume approval needed
+    if (userUsdcAllowance === undefined || userUsdcAllowance === null) return true;
+    return (userUsdcAllowance as unknown as bigint) < placeBetValue;
+  }, [placeBetValue, userUsdcAllowance]);
+
+  // Check if user has enough USDC balance
+  // If balance is unknown, assume they have enough (let the tx fail gracefully if not)
+  const hasEnoughUsdc = useMemo(() => {
+    if (!placeBetValue) return false;
+    // If balance is undefined/not loaded, assume they have enough to show approve button
+    if (userUsdcBalance === undefined || userUsdcBalance === null) return true;
+    return (userUsdcBalance as unknown as bigint) >= placeBetValue;
+  }, [placeBetValue, userUsdcBalance]);
 
   const { data: myBetData } = useScaffoldReadContract({
     contractName: "GiraffeRace",
@@ -1190,7 +1237,7 @@ export const RaceDashboard = () => {
                               <div className="text-xl font-semibold text-success/80">
                                 {myBet.claimed
                                   ? "Payout claimed"
-                                  : `Claim your ${estimatedPayoutWei ? formatEther(estimatedPayoutWei) : "—"} ETH payout`}
+                                  : `Claim your ${estimatedPayoutWei ? formatUnits(estimatedPayoutWei, USDC_DECIMALS) : "—"} USDC payout`}
                               </div>
                             </>
                           ) : (
@@ -1234,7 +1281,7 @@ export const RaceDashboard = () => {
                             <>
                               <div className="text-3xl font-black text-primary drop-shadow">Bet placed</div>
                               <div className="text-lg font-semibold text-base-content/80 flex items-center gap-2">
-                                <span>You bet {formatEther(myBet.amount)} ETH on</span>
+                                <span>You bet {formatUnits(myBet.amount, USDC_DECIMALS)} USDC on</span>
                                 <GiraffeAnimated
                                   idPrefix={`overlay-bet-${(viewingRaceId ?? 0n).toString()}-${myBet.lane}`}
                                   tokenId={laneTokenIds[myBet.lane] ?? 0n}
@@ -1245,7 +1292,8 @@ export const RaceDashboard = () => {
                                 <LaneName tokenId={laneTokenIds[myBet.lane] ?? 0n} fallback={`Lane ${myBet.lane}`} />
                               </div>
                               <div className="text-lg font-semibold text-base-content/70">
-                                Payout: {estimatedPayoutWei ? `${formatEther(estimatedPayoutWei)} ETH` : "—"}
+                                Payout:{" "}
+                                {estimatedPayoutWei ? `${formatUnits(estimatedPayoutWei, USDC_DECIMALS)} USDC` : "—"}
                               </div>
                             </>
                           ) : (
@@ -1261,7 +1309,7 @@ export const RaceDashboard = () => {
                             <>
                               <div className="text-3xl font-black text-primary drop-shadow">Bet placed</div>
                               <div className="text-lg font-semibold text-base-content/80 flex items-center gap-2">
-                                <span>You bet {formatEther(myBet.amount)} ETH on</span>
+                                <span>You bet {formatUnits(myBet.amount, USDC_DECIMALS)} USDC on</span>
                                 <GiraffeAnimated
                                   idPrefix={`overlay-bet-closed-${(viewingRaceId ?? 0n).toString()}-${myBet.lane}`}
                                   tokenId={laneTokenIds[myBet.lane] ?? 0n}
@@ -1272,7 +1320,8 @@ export const RaceDashboard = () => {
                                 <LaneName tokenId={laneTokenIds[myBet.lane] ?? 0n} fallback={`Lane ${myBet.lane}`} />
                               </div>
                               <div className="text-lg font-semibold text-base-content/70">
-                                Payout: {estimatedPayoutWei ? `${formatEther(estimatedPayoutWei)} ETH` : "—"}
+                                Payout:{" "}
+                                {estimatedPayoutWei ? `${formatUnits(estimatedPayoutWei, USDC_DECIMALS)} USDC` : "—"}
                               </div>
                             </>
                           ) : (
@@ -1511,7 +1560,7 @@ export const RaceDashboard = () => {
                   </div>
                   <div className="flex justify-between">
                     <span className="opacity-70">Pot</span>
-                    <span>{parsed ? `${formatEther(parsed.totalPot)} ETH` : "-"}</span>
+                    <span>{parsed ? `${formatUnits(parsed.totalPot, USDC_DECIMALS)} USDC` : "-"}</span>
                   </div>
                 </div>
               )}
@@ -1600,58 +1649,89 @@ export const RaceDashboard = () => {
 
               <div className="flex flex-col gap-2">
                 <div className="text-sm font-medium">Fund bankroll</div>
-                {!giraffeRaceContract ? (
-                  <div className="text-xs opacity-70">Deploy the contracts first to get the GiraffeRace address.</div>
+                {!treasuryContract ? (
+                  <div className="text-xs opacity-70">Deploy the contracts first to get the Treasury address.</div>
                 ) : (
                   <>
                     <div className="text-xs">
                       <div className="flex justify-between">
-                        <span className="opacity-70">GiraffeRace balance</span>
+                        <span className="opacity-70">Treasury balance</span>
                         <span className="font-mono">
-                          <Balance address={giraffeRaceContract.address as `0x${string}`} />
+                          {treasuryBalance !== undefined
+                            ? `${formatUnits(treasuryBalance as unknown as bigint, USDC_DECIMALS)} USDC`
+                            : "-"}
                         </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="opacity-70">Unpaid liability</span>
                         <span className="font-mono">
-                          {settledLiability === null ? "-" : `${formatEther(settledLiability)} ETH`}
+                          {settledLiability === null ? "-" : `${formatUnits(settledLiability, USDC_DECIMALS)} USDC`}
                         </span>
                       </div>
+                      {connectedAddress && userUsdcBalance !== undefined && (
+                        <div className="flex justify-between">
+                          <span className="opacity-70">Your USDC</span>
+                          <span className="font-mono">
+                            {formatUnits(userUsdcBalance as unknown as bigint, USDC_DECIMALS)} USDC
+                          </span>
+                        </div>
+                      )}
                     </div>
-                    <EtherInput
-                      placeholder="Amount to send (ETH)"
-                      onValueChange={({ valueInEth }) => setFundAmountEth(valueInEth)}
-                      style={{ width: "100%" }}
-                    />
+                    <div className="relative">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        className="input input-bordered input-sm w-full pr-16"
+                        placeholder="Amount to send"
+                        value={fundAmountUsdc}
+                        onChange={e => setFundAmountUsdc(e.target.value)}
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm opacity-70">USDC</span>
+                    </div>
                     <button
                       className="btn btn-sm btn-outline"
                       disabled={
-                        !connectedAddress || !giraffeRaceContract?.address || isFundingRace || !fundAmountEth.trim()
+                        !connectedAddress ||
+                        !treasuryContract?.address ||
+                        !usdcContract?.address ||
+                        isFundingRace ||
+                        !fundAmountUsdc.trim()
                       }
                       onClick={async () => {
-                        if (!giraffeRaceContract?.address) return;
-                        const v = fundAmountEth.trim();
+                        if (!treasuryContract?.address) return;
+                        const v = fundAmountUsdc.trim();
                         if (!v) return;
-                        let value: bigint;
+                        let amount: bigint;
                         try {
-                          value = parseEther(v as `${number}`);
+                          amount = parseUnits(v as `${number}`, USDC_DECIMALS);
                         } catch {
                           return;
                         }
-                        if (value <= 0n) return;
+                        if (amount <= 0n) return;
                         try {
                           setIsFundingRace(true);
-                          await tx({ to: giraffeRaceContract.address as `0x${string}`, value });
+                          // First approve USDC to treasury
+                          await (writeUsdcAsync as any)({
+                            functionName: "approve",
+                            args: [treasuryContract.address, amount],
+                          });
+                          // Then transfer USDC to treasury
+                          await (writeUsdcAsync as any)({
+                            functionName: "transfer",
+                            args: [treasuryContract.address, amount],
+                          });
+                          setFundAmountUsdc("");
                         } finally {
                           setIsFundingRace(false);
                         }
                       }}
                     >
                       {isFundingRace ? <span className="loading loading-spinner loading-xs" /> : null}
-                      <span>{isFundingRace ? "Funding…" : "Send ETH to GiraffeRace"}</span>
+                      <span>{isFundingRace ? "Funding…" : "Send USDC to Treasury"}</span>
                     </button>
                     <div className="text-xs opacity-70">
-                      This is just a plain ETH transfer to the contract (used to cover fixed-odds payouts).
+                      USDC is transferred to the Treasury contract (used to cover fixed-odds payouts).
                     </div>
                   </>
                 )}
@@ -1704,7 +1784,7 @@ export const RaceDashboard = () => {
                         ) : (
                           `Lane ${displayedNextWinningClaim.betLane}`
                         )}{" "}
-                        · {formatEther(displayedNextWinningClaim.betAmount)} ETH
+                        · {formatUnits(displayedNextWinningClaim.betAmount, USDC_DECIMALS)} USDC
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -1713,7 +1793,9 @@ export const RaceDashboard = () => {
                     </div>
                     <div className="flex justify-between">
                       <span className="opacity-70">Estimated payout</span>
-                      <span className="font-mono">{formatEther(displayedNextWinningClaim.payout)} ETH</span>
+                      <span className="font-mono">
+                        {formatUnits(displayedNextWinningClaim.payout, USDC_DECIMALS)} USDC
+                      </span>
                     </div>
                   </div>
                 )}
@@ -1972,22 +2054,39 @@ export const RaceDashboard = () => {
                         ) : null}
 
                         {isBetLocked ? (
-                          <EtherInput
-                            placeholder="Bet amount (ETH)"
-                            defaultValue={myBet?.amount ? formatEther(myBet.amount) : ""}
+                          <input
+                            type="text"
+                            className="input input-bordered w-full"
+                            placeholder="Bet amount (USDC)"
+                            value={myBet?.amount ? formatUnits(myBet.amount, USDC_DECIMALS) : ""}
                             disabled
-                            style={{ width: "100%" }}
                           />
                         ) : (
                           <div className={!canBet ? "opacity-50 pointer-events-none" : ""}>
-                            <EtherInput
-                              placeholder="Bet amount (ETH)"
-                              onValueChange={({ valueInEth }) => {
-                                if (!canBet) return;
-                                setBetAmountEth(valueInEth);
-                              }}
-                              style={{ width: "100%" }}
-                            />
+                            <div className="flex flex-col gap-1">
+                              <div className="relative">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  className="input input-bordered w-full pr-16"
+                                  placeholder="Bet amount"
+                                  value={betAmountUsdc}
+                                  onChange={e => {
+                                    if (!canBet) return;
+                                    setBetAmountUsdc(e.target.value);
+                                  }}
+                                />
+                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm opacity-70">
+                                  USDC
+                                </span>
+                              </div>
+                              {connectedAddress && userUsdcBalance !== undefined && (
+                                <div className="text-xs opacity-60">
+                                  Balance: {formatUnits(userUsdcBalance as unknown as bigint, USDC_DECIMALS)} USDC
+                                </div>
+                              )}
+                            </div>
                           </div>
                         )}
 
@@ -1995,7 +2094,9 @@ export const RaceDashboard = () => {
                           <div className="flex justify-between">
                             <span className="opacity-70">Estimated payout</span>
                             <span className="font-mono">
-                              {estimatedPayoutWei === null ? "—" : `${formatEther(estimatedPayoutWei)} ETH`}
+                              {estimatedPayoutWei === null
+                                ? "—"
+                                : `${formatUnits(estimatedPayoutWei, USDC_DECIMALS)} USDC`}
                             </span>
                           </div>
                           <div className="text-xs opacity-60">
@@ -2003,6 +2104,36 @@ export const RaceDashboard = () => {
                           </div>
                         </div>
 
+                        {/* Show warning if insufficient balance (only when we know the balance) */}
+                        {placeBetValue &&
+                          userUsdcBalance !== undefined &&
+                          userUsdcBalance !== null &&
+                          !hasEnoughUsdc && <div className="text-xs text-error">Insufficient USDC balance</div>}
+
+                        {/* Approve button (shown when approval needed) */}
+                        {needsApproval && placeBetValue && hasEnoughUsdc && !myBet?.hasBet && (
+                          <button
+                            className="btn btn-secondary"
+                            disabled={isApproving || !treasuryContract}
+                            onClick={async () => {
+                              if (!placeBetValue || !treasuryContract?.address) return;
+                              setIsApproving(true);
+                              try {
+                                await (writeUsdcAsync as any)({
+                                  functionName: "approve",
+                                  args: [treasuryContract.address, placeBetValue],
+                                });
+                              } finally {
+                                setIsApproving(false);
+                              }
+                            }}
+                          >
+                            {isApproving ? <span className="loading loading-spinner loading-xs" /> : null}
+                            Approve USDC
+                          </button>
+                        )}
+
+                        {/* Place bet button */}
                         <button
                           className="btn btn-primary"
                           disabled={
@@ -2012,17 +2143,21 @@ export const RaceDashboard = () => {
                             betLane === null ||
                             !placeBetValue ||
                             !!myBet?.hasBet ||
-                            !isViewingLatest
+                            !isViewingLatest ||
+                            needsApproval ||
+                            !hasEnoughUsdc
                           }
                           onClick={async () => {
                             if (!placeBetValue) return;
                             if (betLane === null) return;
                             await writeGiraffeRaceAsync({
                               functionName: "placeBet",
-                              args: [BigInt(Math.max(0, Math.min(Number(LANE_COUNT - 1), Math.floor(betLane))))],
-                              value: placeBetValue,
+                              args: [
+                                BigInt(Math.max(0, Math.min(Number(LANE_COUNT - 1), Math.floor(betLane)))),
+                                placeBetValue,
+                              ],
                             } as any);
-                            setBetAmountEth("");
+                            setBetAmountUsdc("");
                           }}
                         >
                           Place bet

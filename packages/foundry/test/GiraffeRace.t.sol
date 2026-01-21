@@ -7,6 +7,8 @@ import "forge-std/StdJson.sol";
 import "../contracts/GiraffeRace.sol";
 import "../contracts/GiraffeRaceSimulator.sol";
 import "../contracts/GiraffeNFT.sol";
+import "../contracts/HouseTreasury.sol";
+import "../contracts/MockUSDC.sol";
 import { DeterministicDice } from "../contracts/libraries/DeterministicDice.sol";
 
 contract GiraffeRaceTest is Test {
@@ -15,7 +17,11 @@ contract GiraffeRaceTest is Test {
 
     GiraffeRace public race;
     GiraffeNFT public giraffeNft;
-    address public owner = address(0xBEEF);
+    HouseTreasury public treasury;
+    MockUSDC public usdc;
+    
+    address public owner = address(0xBEEF);      // Treasury owner + house NFT owner
+    address public oddsAdmin = address(0x0DD5);  // Odds admin (hot wallet)
     address public alice = address(0xA11CE);
     address public bob = address(0xB0B);
     uint256[6] internal houseTokenIds;
@@ -30,22 +36,44 @@ contract GiraffeRaceTest is Test {
     uint256 internal constant STATS_BATCHES = 10; // 10 * 50 = 500 races total (expected)
     string internal constant STATS_DIR = "./tmp/win-stats";
 
+    // Test amounts in USDC (6 decimals)
+    uint256 internal constant ONE_USDC = 1e6;
+    uint256 internal constant INITIAL_BANKROLL = 100_000 * ONE_USDC;
+    uint256 internal constant USER_BALANCE = 10_000 * ONE_USDC;
+
     function setUp() public {
+        // Deploy MockUSDC
+        usdc = new MockUSDC();
+        
+        // Deploy treasury with owner as multisig
+        treasury = new HouseTreasury(address(usdc), owner);
+        
+        // Fund treasury with initial bankroll
+        usdc.mint(address(treasury), INITIAL_BANKROLL);
+        
+        // Deploy NFT
         giraffeNft = new GiraffeNFT();
         for (uint256 i = 0; i < LANE_COUNT; i++) {
             houseTokenIds[i] = giraffeNft.mintTo(owner, string(abi.encodePacked("house-", vm.toString(i))));
         }
 
+        // Deploy race contract
         GiraffeRaceSimulator simulator = new GiraffeRaceSimulator();
-        race = new GiraffeRace(address(giraffeNft), owner, houseTokenIds, address(simulator));
+        race = new GiraffeRace(address(giraffeNft), owner, oddsAdmin, houseTokenIds, address(simulator), address(treasury));
         giraffeNft.setRaceContract(address(race));
-        vm.deal(alice, 10 ether);
-        vm.deal(bob, 10 ether);
-        vm.deal(owner, 200 ether);
+        
+        // Authorize race contract in treasury
         vm.prank(owner);
-        (bool ok, bytes memory returndata) = address(race).call{value: 150 ether}("");
-        returndata; // silence unused warning
-        require(ok, "fund race bankroll failed");
+        treasury.authorize(address(race));
+        
+        // Give users USDC and approve treasury
+        usdc.mint(alice, USER_BALANCE);
+        usdc.mint(bob, USER_BALANCE);
+        
+        vm.prank(alice);
+        usdc.approve(address(treasury), type(uint256).max);
+        vm.prank(bob);
+        usdc.approve(address(treasury), type(uint256).max);
     }
 
     function _finalize(uint256 raceId, uint64 closeBlock, bytes32 forcedLineupBh) internal {
@@ -167,11 +195,11 @@ contract GiraffeRaceTest is Test {
         return leaders[uint8(pick)];
     }
 
-    function _placeBet(address bettor, uint256 raceId, uint8 giraffe, uint256 value) internal {
+    function _placeBet(address bettor, uint256 raceId, uint8 giraffe, uint256 amount) internal {
         // raceId arg kept only for call sites; contract uses the current race internally.
         raceId; // silence unused warning
         vm.prank(bettor);
-        race.placeBet{value: value}(giraffe);
+        race.placeBet(giraffe, amount);
     }
 
     function testSettleIsDeterministicFromSeed() public {
@@ -184,8 +212,8 @@ contract GiraffeRaceTest is Test {
         bytes32 forcedLineupBh = keccak256("forced lineup blockhash");
         _finalize(raceId, closeBlock, forcedLineupBh);
 
-        _placeBet(alice, raceId, 0, 1 ether);
-        _placeBet(bob, raceId, 1, 2 ether);
+        _placeBet(alice, raceId, 0, 100 * ONE_USDC);
+        _placeBet(bob, raceId, 1, 200 * ONE_USDC);
 
         bytes32 forcedBh = keccak256("forced blockhash");
         vm.roll(uint256(closeBlock));
@@ -212,10 +240,10 @@ contract GiraffeRaceTest is Test {
         bytes32 forcedLineupBh = keccak256("forced lineup blockhash 2");
         _finalize(raceId, closeBlock, forcedLineupBh);
 
-        _placeBet(alice, raceId, 2, 1 ether);
+        _placeBet(alice, raceId, 2, 100 * ONE_USDC);
 
         vm.expectRevert(GiraffeRace.AlreadyBet.selector);
-        _placeBet(alice, raceId, 3, 1 ether);
+        _placeBet(alice, raceId, 3, 100 * ONE_USDC);
     }
 
     function testClaimPayout_FixedOdds() public {
@@ -228,8 +256,8 @@ contract GiraffeRaceTest is Test {
         _finalize(raceId, closeBlock, forcedLineupBh);
 
         // Alice and Bob both bet on giraffe 0, different amounts
-        _placeBet(alice, raceId, 0, 1 ether);
-        _placeBet(bob, raceId, 0, 3 ether);
+        _placeBet(alice, raceId, 0, 100 * ONE_USDC);
+        _placeBet(bob, raceId, 0, 300 * ONE_USDC);
 
         // Force winner = 0 by forcing a seed that yields winner 0.
         // We'll brute-force by trying a few forced blockhashes (small loop acceptable in test).
@@ -249,8 +277,8 @@ contract GiraffeRaceTest is Test {
         vm.roll(uint256(closeBlock) + 1);
         race.settleRace();
 
-        uint256 aliceBalBefore = alice.balance;
-        uint256 bobBalBefore = bob.balance;
+        uint256 aliceBalBefore = usdc.balanceOf(alice);
+        uint256 bobBalBefore = usdc.balanceOf(bob);
 
         vm.prank(alice);
         uint256 alicePayout = race.claim();
@@ -260,12 +288,12 @@ contract GiraffeRaceTest is Test {
         // Fixed odds are auto-quoted from the effective score snapshot using the lookup table.
         (bool oddsSet, uint32[LANE_COUNT] memory oddsBps) = race.getRaceOddsById(raceId);
         assertTrue(oddsSet);
-        uint256 expectedAlice = (1 ether * uint256(oddsBps[0])) / 10_000;
-        uint256 expectedBob = (3 ether * uint256(oddsBps[0])) / 10_000;
+        uint256 expectedAlice = (100 * ONE_USDC * uint256(oddsBps[0])) / 10_000;
+        uint256 expectedBob = (300 * ONE_USDC * uint256(oddsBps[0])) / 10_000;
         assertEq(alicePayout, expectedAlice);
         assertEq(bobPayout, expectedBob);
-        assertEq(alice.balance, aliceBalBefore + expectedAlice);
-        assertEq(bob.balance, bobBalBefore + expectedBob);
+        assertEq(usdc.balanceOf(alice), aliceBalBefore + expectedAlice);
+        assertEq(usdc.balanceOf(bob), bobBalBefore + expectedBob);
     }
 
     function testSettleRevertsIfBlockhashUnavailable() public {
@@ -310,7 +338,7 @@ contract GiraffeRaceTest is Test {
         vm.roll(uint256(submissionCloseBlock - 1));
         vm.expectRevert(GiraffeRace.BettingNotOpen.selector);
         vm.prank(alice);
-        race.placeBet{value: 1 ether}(0);
+        race.placeBet(0, 100 * ONE_USDC);
     }
 
     function testCannotCreateNewRaceUntilPreviousSettled() public {
@@ -532,4 +560,3 @@ contract GiraffeRaceTest is Test {
         }
     }
 }
-

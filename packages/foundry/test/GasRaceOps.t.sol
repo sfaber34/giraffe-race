@@ -6,6 +6,8 @@ import "forge-std/console2.sol";
 import "../contracts/GiraffeRace.sol";
 import "../contracts/GiraffeRaceSimulator.sol";
 import "../contracts/GiraffeNFT.sol";
+import "../contracts/HouseTreasury.sol";
+import "../contracts/MockUSDC.sol";
 
 /// @notice Gas measurement harness for core race operations.
 /// @dev This measures EVM gas used by the calls inside Foundry tests (good for relative comparisons).
@@ -13,27 +15,34 @@ contract GasRaceOpsTest is Test {
     GiraffeRace internal race;
     GiraffeNFT internal giraffeNft;
     GiraffeRaceSimulator internal simulator;
+    HouseTreasury internal treasury;
+    MockUSDC internal usdc;
 
-    address internal house = address(0xBEEF);
+    address internal house = address(0xBEEF);       // Treasury owner + house NFT owner  
+    address internal oddsAdmin = address(0x0DD5);   // Odds admin
     address internal alice = address(0xA11CE);
     uint256[6] internal houseTokenIds;
 
+    uint256 internal constant INITIAL_BANKROLL = 100_000 * 1e6; // 100k USDC
+
     function setUp() public {
+        // Deploy MockUSDC and Treasury
+        usdc = new MockUSDC();
+        treasury = new HouseTreasury(address(usdc), house);
+        usdc.mint(address(treasury), INITIAL_BANKROLL);
+
         giraffeNft = new GiraffeNFT();
         for (uint256 i = 0; i < 6; i++) {
             houseTokenIds[i] = giraffeNft.mintTo(house, string(abi.encodePacked("house-", vm.toString(i))));
         }
 
         simulator = new GiraffeRaceSimulator();
-        race = new GiraffeRace(address(giraffeNft), house, houseTokenIds, address(simulator));
+        race = new GiraffeRace(address(giraffeNft), house, oddsAdmin, houseTokenIds, address(simulator), address(treasury));
         giraffeNft.setRaceContract(address(race));
 
-        vm.deal(house, 200 ether);
+        // Authorize race contract in treasury
         vm.prank(house);
-        (bool ok,) = address(race).call{ value: 150 ether }("");
-        require(ok, "fund race bankroll failed");
-
-        vm.deal(alice, 10 ether);
+        treasury.authorize(address(race));
     }
 
     function _prepFinalize(uint64 closeBlock, bytes32 forcedLineupBh) internal {
@@ -166,4 +175,3 @@ contract GasRaceOpsTest is Test {
         console2.log("Simulator.winnerWithScore:", gSimWinner);
     }
 }
-
