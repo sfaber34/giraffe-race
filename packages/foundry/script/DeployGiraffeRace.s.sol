@@ -23,12 +23,12 @@ contract DeployGiraffeRace is ScaffoldETHDeploy {
         GiraffeRaceSimulator simulator = new GiraffeRaceSimulator();
 
         uint256[6] memory houseTokenIds;
-        houseTokenIds[0] = giraffeNft.mint(houseForGame, "house-1");
-        houseTokenIds[1] = giraffeNft.mint(houseForGame, "house-2");
-        houseTokenIds[2] = giraffeNft.mint(houseForGame, "house-3");
-        houseTokenIds[3] = giraffeNft.mint(houseForGame, "house-4");
-        houseTokenIds[4] = giraffeNft.mint(houseForGame, "house-5");
-        houseTokenIds[5] = giraffeNft.mint(houseForGame, "house-6");
+        houseTokenIds[0] = giraffeNft.mintTo(houseForGame, "house-1");
+        houseTokenIds[1] = giraffeNft.mintTo(houseForGame, "house-2");
+        houseTokenIds[2] = giraffeNft.mintTo(houseForGame, "house-3");
+        houseTokenIds[3] = giraffeNft.mintTo(houseForGame, "house-4");
+        houseTokenIds[4] = giraffeNft.mintTo(houseForGame, "house-5");
+        houseTokenIds[5] = giraffeNft.mintTo(houseForGame, "house-6");
 
         // Deploy the race contract with the NFT + house configuration.
         GiraffeRace race = new GiraffeRace(address(giraffeNft), houseForGame, houseTokenIds, address(simulator));

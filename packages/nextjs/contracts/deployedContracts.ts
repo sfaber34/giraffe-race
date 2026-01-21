@@ -141,32 +141,27 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "mint",
+          name: "isNameAvailable",
           inputs: [
             {
-              name: "to",
-              type: "address",
-              internalType: "address",
+              name: "name",
+              type: "string",
+              internalType: "string",
             },
           ],
           outputs: [
             {
-              name: "tokenId",
-              type: "uint256",
-              internalType: "uint256",
+              name: "available",
+              type: "bool",
+              internalType: "bool",
             },
           ],
-          stateMutability: "nonpayable",
+          stateMutability: "view",
         },
         {
           type: "function",
           name: "mint",
           inputs: [
-            {
-              name: "to",
-              type: "address",
-              internalType: "address",
-            },
             {
               name: "giraffeName",
               type: "string",
@@ -184,8 +179,13 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "mint",
+          name: "mintTo",
           inputs: [
+            {
+              name: "to",
+              type: "address",
+              internalType: "address",
+            },
             {
               name: "giraffeName",
               type: "string",
@@ -896,6 +896,38 @@ const deployedContracts = {
           inputs: [
             {
               name: "tokenId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+        },
+        {
+          type: "error",
+          name: "EmptyName",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "NameAlreadyTaken",
+          inputs: [
+            {
+              name: "name",
+              type: "string",
+              internalType: "string",
+            },
+          ],
+        },
+        {
+          type: "error",
+          name: "NameIsAllWhitespace",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "NameTooLong",
+          inputs: [
+            {
+              name: "length",
               type: "uint256",
               internalType: "uint256",
             },
@@ -2317,7 +2349,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 5,
+      deployedOnBlock: 4,
     },
   },
 } as const;

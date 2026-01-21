@@ -33,7 +33,7 @@ contract GiraffeRaceTest is Test {
     function setUp() public {
         giraffeNft = new GiraffeNFT();
         for (uint256 i = 0; i < LANE_COUNT; i++) {
-            houseTokenIds[i] = giraffeNft.mint(owner, string(abi.encodePacked("house-", vm.toString(i))));
+            houseTokenIds[i] = giraffeNft.mintTo(owner, string(abi.encodePacked("house-", vm.toString(i))));
         }
 
         GiraffeRaceSimulator simulator = new GiraffeRaceSimulator();
@@ -291,7 +291,7 @@ contract GiraffeRaceTest is Test {
         uint64 submissionCloseBlock = closeBlock - 10;
 
         vm.prank(alice);
-        uint256 aliceTokenId = giraffeNft.mint(alice, "alice");
+        uint256 aliceTokenId = giraffeNft.mint("alice");
 
         vm.roll(uint256(submissionCloseBlock));
         vm.prank(alice);
@@ -337,11 +337,10 @@ contract GiraffeRaceTest is Test {
         // 50 unique entrants submit one token each.
         for (uint256 i = 0; i < 50; i++) {
             address entrant = address(uint160(0x1000 + i));
-            vm.prank(entrant);
-            uint256 tokenId = giraffeNft.mint(entrant, string(abi.encodePacked("entrant-", vm.toString(i))));
-
-            vm.prank(entrant);
+            vm.startPrank(entrant);
+            uint256 tokenId = giraffeNft.mint(string(abi.encodePacked("entrant-", vm.toString(i))));
             race.submitGiraffe(tokenId);
+            vm.stopPrank();
         }
 
         // Betting opens after submissions close, so finalize at submissionCloseBlock.

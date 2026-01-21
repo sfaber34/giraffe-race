@@ -53,7 +53,7 @@ function getDeploymentHistory(broadcastPath) {
   const deploymentHistory = new Map();
 
   // Sort files to process them in chronological order
-  const runFiles = files
+  let runFiles = files
     .filter(
       (file) =>
         file.startsWith("run-") &&
@@ -66,6 +66,11 @@ function getDeploymentHistory(broadcastPath) {
       const runB = parseInt(b.match(/run-(\d+)/)?.[1] || "0");
       return runA - runB;
     });
+
+  // Fallback to run-latest.json if no other run files exist
+  if (runFiles.length === 0 && files.includes("run-latest.json")) {
+    runFiles = ["run-latest.json"];
+  }
 
   for (const file of runFiles) {
     const { transactions, receipts } = parseTransactionAndReceiptRun(

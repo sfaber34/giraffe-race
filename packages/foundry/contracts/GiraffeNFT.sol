@@ -17,6 +17,8 @@ contract GiraffeNFT is ERC721, Ownable {
 
     mapping(uint256 => string) private _giraffeNames;
     mapping(uint256 => bytes32) private _seeds;
+    // Name collision protection: track which name hashes are used
+    mapping(bytes32 => bool) private _usedNames; // nameHash => isUsed
     // Readiness is a simple 1-10 attribute that affects race performance.
     // New mints start at 10 and decrease by 1 (floored at 1) after running a race.
     mapping(uint256 => uint8) private _readiness; // 0 = legacy/uninitialized (treated as 10)
@@ -35,6 +37,11 @@ contract GiraffeNFT is ERC721, Ownable {
 
     event BaseTokenURISet(string baseTokenURI);
     event GiraffeMinted(uint256 indexed tokenId, address indexed to, bytes32 seed, string name);
+
+    error NameAlreadyTaken(string name);
+    error NameTooLong(uint256 length);
+    error EmptyName();
+    error NameIsAllWhitespace();
 
     constructor() ERC721("Giraffe", "GRF") Ownable(msg.sender) {}
 
@@ -76,6 +83,56 @@ contract GiraffeNFT is ERC721, Ownable {
         return s;
     }
 
+    /// @notice Convert a string to lowercase for case-insensitive name comparison.
+    /// @dev Only handles ASCII characters (A-Z -> a-z). Non-ASCII characters are left unchanged.
+    function _toLowerCase(string memory str) internal pure returns (string memory) {
+        bytes memory bStr = bytes(str);
+        bytes memory bLower = new bytes(bStr.length);
+        for (uint256 i = 0; i < bStr.length; i++) {
+            // If uppercase letter (A-Z is 65-90 in ASCII)
+            if (bStr[i] >= 0x41 && bStr[i] <= 0x5A) {
+                // Convert to lowercase by adding 32
+                bLower[i] = bytes1(uint8(bStr[i]) + 32);
+            } else {
+                bLower[i] = bStr[i];
+            }
+        }
+        return string(bLower);
+    }
+
+    /// @notice Check if a string is all whitespace (spaces, tabs, newlines, etc.)
+    function _isAllWhitespace(bytes memory nameBytes) internal pure returns (bool) {
+        for (uint256 i = 0; i < nameBytes.length; i++) {
+            bytes1 char = nameBytes[i];
+            // Check for common whitespace characters: space (0x20), tab (0x09), newline (0x0A), carriage return (0x0D)
+            if (char != 0x20 && char != 0x09 && char != 0x0A && char != 0x0D) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// @notice Hash a name for collision checking (case-insensitive).
+    /// @dev Converts name to lowercase before hashing to ensure case-insensitivity.
+    ///      Rejects empty names and names that are all whitespace.
+    function _hashName(string memory name) internal pure returns (bytes32) {
+        bytes memory nameBytes = bytes(name);
+        
+        if (nameBytes.length == 0) {
+            revert EmptyName();
+        }
+        if (nameBytes.length > 32) {
+            revert NameTooLong(nameBytes.length);
+        }
+        if (_isAllWhitespace(nameBytes)) {
+            revert NameIsAllWhitespace();
+        }
+        
+        // Convert to lowercase for case-insensitive comparison
+        string memory lowerName = _toLowerCase(name);
+        return keccak256(bytes(lowerName));
+    }
+
     function readinessOf(uint256 tokenId) external view returns (uint8) {
         require(_ownerOf(tokenId) != address(0), "GiraffeNFT: nonexistent token");
         return _clampStat(_readiness[tokenId]);
@@ -113,9 +170,18 @@ contract GiraffeNFT is ERC721, Ownable {
 
     function _mintGiraffe(address to, string memory giraffeName, uint8 readiness) internal returns (uint256 tokenId) {
         tokenId = nextTokenId++;
-        if (bytes(giraffeName).length != 0) {
-            _giraffeNames[tokenId] = giraffeName;
+        
+        // Name is required - validate and check for collisions
+        bytes32 nameHash = _hashName(giraffeName); // Will revert if empty or all whitespace
+        
+        // Revert if name is already taken (case-insensitive check)
+        if (_usedNames[nameHash]) {
+            revert NameAlreadyTaken(giraffeName);
         }
+        
+        _giraffeNames[tokenId] = giraffeName;
+        _usedNames[nameHash] = true;
+        
         // On-chain entropy seed (gameable, but deterministic and reproducible).
         // Uses previous blockhash so it's always available.
         bytes32 bh = block.number > 0 ? blockhash(block.number - 1) : bytes32(0);
@@ -130,19 +196,17 @@ contract GiraffeNFT is ERC721, Ownable {
         emit GiraffeMinted(tokenId, to, seed, giraffeName);
     }
 
-    /// @notice Mint an GiraffeNFT to an arbitrary address (permissionless).
-    function mint(address to) external returns (uint256 tokenId) {
-        return _mintGiraffe(to, "", 10);
-    }
-
-    /// @notice Mint an GiraffeNFT with a name to an arbitrary address (permissionless).
-    function mint(address to, string calldata giraffeName) external returns (uint256 tokenId) {
-        return _mintGiraffe(to, giraffeName, 10);
-    }
-
-    /// @notice Convenience: mint to yourself with a name.
+    /// @notice Mint a GiraffeNFT with a name to yourself (permissionless).
+    /// @dev Name is required and must not be empty or all whitespace.
+    ///      Users can only mint to themselves.
     function mint(string calldata giraffeName) external returns (uint256 tokenId) {
         return _mintGiraffe(msg.sender, giraffeName, 10);
+    }
+
+    /// @notice Owner-only mint to a specific address (for deployment/house giraffes).
+    /// @dev Only the contract owner can mint to arbitrary addresses.
+    function mintTo(address to, string calldata giraffeName) external onlyOwner returns (uint256 tokenId) {
+        return _mintGiraffe(to, giraffeName, 10);
     }
 
     /// @notice Mint an GiraffeNFT with an explicit readiness (testing helper).
@@ -171,6 +235,27 @@ contract GiraffeNFT is ERC721, Ownable {
 
     function nameOf(uint256 tokenId) external view returns (string memory) {
         return _giraffeNames[tokenId];
+    }
+
+    /// @notice Check if a name is available for minting (case-insensitive check).
+    /// @param name The name to check.
+    /// @return available True if the name is available, false if taken or invalid.
+    function isNameAvailable(string calldata name) external view returns (bool available) {
+        bytes memory nameBytes = bytes(name);
+        
+        // Check length constraints
+        if (nameBytes.length == 0 || nameBytes.length > 32) {
+            return false;
+        }
+        
+        // Check for all-whitespace names
+        if (_isAllWhitespace(nameBytes)) {
+            return false;
+        }
+        
+        // Check if name hash is already used (case-insensitive)
+        bytes32 nameHash = keccak256(bytes(_toLowerCase(name)));
+        return !_usedNames[nameHash];
     }
 
     function tokensOfOwner(address owner) external view returns (uint256[] memory) {
