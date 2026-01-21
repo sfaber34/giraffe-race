@@ -1131,18 +1131,13 @@ export const RaceDashboard = () => {
                 <div className="absolute left-3 top-3 bottom-3 z-10 flex flex-col justify-between pointer-events-none">
                   {Array.from({ length: LANE_COUNT }).map((_, i) => {
                     const d = Number(currentDistances[i] ?? 0);
-                    const isWinner = revealedWinner === i;
                     return (
                       <div
                         key={i}
                         className="flex items-center gap-2 text-xs opacity-80"
                         style={{ height: `${laneHeightPx}px` }}
                       >
-                        <span className="font-medium whitespace-nowrap">
-                          Lane {i}
-                          {isWinner ? " (winner)" : ""}
-                        </span>
-                        <span className="opacity-60 tabular-nums">· {d}</span>
+                        <span className="opacity-60 tabular-nums"> {d}</span>
                         <span className="opacity-60">
                           {parsedGiraffes ? (
                             <LaneName tokenId={parsedGiraffes.tokenIds[i] ?? 0n} fallback={`Lane ${i}`} />
