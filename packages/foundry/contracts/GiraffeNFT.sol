@@ -6,8 +6,9 @@ import { Ownable } from "../lib/openzeppelin-contracts/contracts/access/Ownable.
 
 /**
  * @title GiraffeNFT
- * @notice Minimal ERC-721 for race giraffes.
+ * @notice Minimal ERC-721 for race giraffes with commit-reveal minting.
  * @dev Token IDs are sequential starting at 1.
+ *      Uses commit-reveal pattern to prevent seed gaming.
  */
 contract GiraffeNFT is ERC721, Ownable {
     uint256 public nextTokenId = 1;
@@ -35,13 +36,53 @@ contract GiraffeNFT is ERC721, Ownable {
     mapping(address => uint256[]) private _ownedTokens;
     mapping(uint256 => uint256) private _ownedTokensIndex; // tokenId => index in _ownedTokens[owner]
 
+    // ============ Commit-Reveal Minting ============
+    
+    /// @notice Commit status for mint commits
+    enum CommitStatus { 
+        Pending,   // Awaiting reveal
+        Revealed,  // Successfully revealed and minted
+        Cancelled  // Cancelled by user or expired
+    }
+    
+    /// @notice Commit data for commit-reveal minting
+    struct MintCommit {
+        address minter;
+        string name;
+        bytes32 commitment; // keccak256(abi.encodePacked(secret))
+        uint256 blockNumber;
+        CommitStatus status;
+    }
+    
+    /// @notice Mapping of commitId to commit data
+    mapping(bytes32 => MintCommit) public mintCommits;
+    
+    /// @notice Track pending commits per user (for UI listing)
+    mapping(address => bytes32[]) private _userCommits;
+    
+    /// @notice Minimum blocks to wait before revealing (allows blockhash of commit block + 1 to be set)
+    uint256 public constant MIN_REVEAL_BLOCKS = 2;
+    
+    /// @notice Maximum blocks before a commit expires (blockhash only available for 256 blocks)
+    uint256 public constant MAX_REVEAL_BLOCKS = 250; // A bit less than 256 to be safe
+
     event BaseTokenURISet(string baseTokenURI);
     event GiraffeMinted(uint256 indexed tokenId, address indexed to, bytes32 seed, string name);
+    event MintCommitted(bytes32 indexed commitId, address indexed minter, string name, uint256 blockNumber);
+    event MintRevealed(bytes32 indexed commitId, uint256 indexed tokenId, address indexed minter);
+    event MintCommitCancelled(bytes32 indexed commitId, address indexed minter);
 
     error NameAlreadyTaken(string name);
     error NameTooLong(uint256 length);
     error EmptyName();
     error NameIsAllWhitespace();
+    error CommitNotFound();
+    error NotYourCommit();
+    error CommitNotPending();
+    error TooEarlyToReveal(uint256 currentBlock, uint256 minRevealBlock);
+    error CommitExpired(uint256 currentBlock, uint256 expiryBlock);
+    error InvalidSecret();
+    error BlockhashUnavailable();
 
     constructor() ERC721("Giraffe", "GRF") Ownable(msg.sender) {}
 
@@ -196,15 +237,15 @@ contract GiraffeNFT is ERC721, Ownable {
         emit GiraffeMinted(tokenId, to, seed, giraffeName);
     }
 
-    /// @notice Mint a GiraffeNFT with a name to yourself (permissionless).
-    /// @dev Name is required and must not be empty or all whitespace.
-    ///      Users can only mint to themselves.
-    function mint(string calldata giraffeName) external returns (uint256 tokenId) {
+    /// @notice Direct mint for local testing only (bypasses commit-reveal).
+    /// @dev On production networks, use commitMint + revealMint instead.
+    function mint(string calldata giraffeName) external onlyLocalTesting returns (uint256 tokenId) {
         return _mintGiraffe(msg.sender, giraffeName, 10);
     }
 
     /// @notice Owner-only mint to a specific address (for deployment/house giraffes).
     /// @dev Only the contract owner can mint to arbitrary addresses.
+    ///      This bypasses commit-reveal since owner is trusted.
     function mintTo(address to, string calldata giraffeName) external onlyOwner returns (uint256 tokenId) {
         return _mintGiraffe(to, giraffeName, 10);
     }
@@ -235,6 +276,172 @@ contract GiraffeNFT is ERC721, Ownable {
 
     function nameOf(uint256 tokenId) external view returns (string memory) {
         return _giraffeNames[tokenId];
+    }
+
+    // ============ Commit-Reveal Minting Functions ============
+
+    /// @notice Commit to mint a giraffe with a specific name.
+    /// @dev Reserves the name immediately. User must call revealMint within MAX_REVEAL_BLOCKS.
+    /// @param name The name for the giraffe (1-32 characters, case-insensitive uniqueness).
+    /// @param commitment keccak256(abi.encodePacked(secret)) where secret is a random bytes32.
+    /// @return commitId The unique identifier for this commit.
+    function commitMint(string calldata name, bytes32 commitment) external returns (bytes32 commitId) {
+        // Validate and reserve name
+        bytes32 nameHash = _hashName(name);
+        if (_usedNames[nameHash]) {
+            revert NameAlreadyTaken(name);
+        }
+        _usedNames[nameHash] = true;
+        
+        // Generate unique commitId
+        commitId = keccak256(abi.encodePacked(msg.sender, name, commitment, block.number, block.timestamp));
+        
+        mintCommits[commitId] = MintCommit({
+            minter: msg.sender,
+            name: name,
+            commitment: commitment,
+            blockNumber: block.number,
+            status: CommitStatus.Pending
+        });
+        
+        _userCommits[msg.sender].push(commitId);
+        
+        emit MintCommitted(commitId, msg.sender, name, block.number);
+    }
+    
+    /// @notice Reveal the secret and mint the giraffe.
+    /// @param commitId The commit ID from commitMint.
+    /// @param secret The secret that was hashed to create the commitment.
+    /// @return tokenId The minted token ID.
+    function revealMint(bytes32 commitId, bytes32 secret) external returns (uint256 tokenId) {
+        MintCommit storage commit = mintCommits[commitId];
+        
+        if (commit.minter == address(0)) revert CommitNotFound();
+        if (commit.minter != msg.sender) revert NotYourCommit();
+        if (commit.status != CommitStatus.Pending) revert CommitNotPending();
+        
+        uint256 minRevealBlock = commit.blockNumber + MIN_REVEAL_BLOCKS;
+        uint256 maxRevealBlock = commit.blockNumber + MAX_REVEAL_BLOCKS;
+        
+        if (block.number < minRevealBlock) {
+            revert TooEarlyToReveal(block.number, minRevealBlock);
+        }
+        if (block.number > maxRevealBlock) {
+            revert CommitExpired(block.number, maxRevealBlock);
+        }
+        
+        if (keccak256(abi.encodePacked(secret)) != commit.commitment) {
+            revert InvalidSecret();
+        }
+        
+        // Use blockhash from block after commit (wasn't known at commit time)
+        bytes32 bh = blockhash(commit.blockNumber + 1);
+        if (bh == bytes32(0)) revert BlockhashUnavailable();
+        
+        commit.status = CommitStatus.Revealed;
+        
+        tokenId = nextTokenId++;
+        bytes32 seed = keccak256(abi.encodePacked(bh, address(this), tokenId, msg.sender, secret, "GIRAFFE_SEED_V2"));
+        _seeds[tokenId] = seed;
+        
+        _giraffeNames[tokenId] = commit.name;
+        _readiness[tokenId] = 10;
+        _conditioning[tokenId] = 10;
+        _speed[tokenId] = 10;
+        
+        _safeMint(msg.sender, tokenId);
+        
+        emit GiraffeMinted(tokenId, msg.sender, seed, commit.name);
+        emit MintRevealed(commitId, tokenId, msg.sender);
+    }
+    
+    /// @notice Cancel a pending commit and release the reserved name.
+    /// @param commitId The commit ID to cancel.
+    function cancelCommit(bytes32 commitId) external {
+        MintCommit storage commit = mintCommits[commitId];
+        
+        if (commit.minter == address(0)) revert CommitNotFound();
+        if (commit.minter != msg.sender) revert NotYourCommit();
+        if (commit.status != CommitStatus.Pending) revert CommitNotPending();
+        
+        commit.status = CommitStatus.Cancelled;
+        
+        // Release the reserved name
+        bytes32 nameHash = keccak256(bytes(_toLowerCase(commit.name)));
+        _usedNames[nameHash] = false;
+        
+        emit MintCommitCancelled(commitId, msg.sender);
+    }
+    
+    /// @notice Release an expired commit's reserved name. Anyone can call this.
+    /// @param commitId The commit ID that has expired.
+    function releaseExpiredCommit(bytes32 commitId) external {
+        MintCommit storage commit = mintCommits[commitId];
+        
+        if (commit.minter == address(0)) revert CommitNotFound();
+        if (commit.status != CommitStatus.Pending) revert CommitNotPending();
+        
+        uint256 maxRevealBlock = commit.blockNumber + MAX_REVEAL_BLOCKS;
+        if (block.number <= maxRevealBlock) {
+            revert TooEarlyToReveal(block.number, maxRevealBlock + 1);
+        }
+        
+        commit.status = CommitStatus.Cancelled;
+        
+        // Release the reserved name
+        bytes32 nameHash = keccak256(bytes(_toLowerCase(commit.name)));
+        _usedNames[nameHash] = false;
+        
+        emit MintCommitCancelled(commitId, commit.minter);
+    }
+    
+    /// @notice Get commit info.
+    function getCommit(bytes32 commitId) external view returns (
+        address minter,
+        string memory name,
+        uint256 blockNumber,
+        CommitStatus status,
+        uint256 minRevealBlock,
+        uint256 maxRevealBlock
+    ) {
+        MintCommit storage commit = mintCommits[commitId];
+        return (
+            commit.minter,
+            commit.name,
+            commit.blockNumber,
+            commit.status,
+            commit.blockNumber + MIN_REVEAL_BLOCKS,
+            commit.blockNumber + MAX_REVEAL_BLOCKS
+        );
+    }
+    
+    /// @notice Get all commit IDs for a user.
+    function getUserCommits(address user) external view returns (bytes32[] memory) {
+        return _userCommits[user];
+    }
+    
+    /// @notice Get pending commits for a user (filters out revealed/cancelled).
+    function getPendingCommits(address user) external view returns (bytes32[] memory) {
+        bytes32[] storage allCommits = _userCommits[user];
+        uint256 pendingCount = 0;
+        
+        // Count pending
+        for (uint256 i = 0; i < allCommits.length; i++) {
+            if (mintCommits[allCommits[i]].status == CommitStatus.Pending) {
+                pendingCount++;
+            }
+        }
+        
+        // Build array
+        bytes32[] memory pending = new bytes32[](pendingCount);
+        uint256 j = 0;
+        for (uint256 i = 0; i < allCommits.length; i++) {
+            if (mintCommits[allCommits[i]].status == CommitStatus.Pending) {
+                pending[j++] = allCommits[i];
+            }
+        }
+        
+        return pending;
     }
 
     /// @notice Check if a name is available for minting (case-insensitive check).

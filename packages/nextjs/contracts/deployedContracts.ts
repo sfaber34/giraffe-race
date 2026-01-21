@@ -16,6 +16,32 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "MAX_REVEAL_BLOCKS",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "MIN_REVEAL_BLOCKS",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "approve",
           inputs: [
             {
@@ -66,6 +92,43 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "cancelCommit",
+          inputs: [
+            {
+              name: "commitId",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "commitMint",
+          inputs: [
+            {
+              name: "name",
+              type: "string",
+              internalType: "string",
+            },
+            {
+              name: "commitment",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+          ],
+          outputs: [
+            {
+              name: "commitId",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+          ],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
           name: "conditioningOf",
           inputs: [
             {
@@ -111,6 +174,88 @@ const deployedContracts = {
               name: "",
               type: "address",
               internalType: "address",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getCommit",
+          inputs: [
+            {
+              name: "commitId",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+          ],
+          outputs: [
+            {
+              name: "minter",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "name",
+              type: "string",
+              internalType: "string",
+            },
+            {
+              name: "blockNumber",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "status",
+              type: "uint8",
+              internalType: "enum GiraffeNFT.CommitStatus",
+            },
+            {
+              name: "minRevealBlock",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "maxRevealBlock",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getPendingCommits",
+          inputs: [
+            {
+              name: "user",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "bytes32[]",
+              internalType: "bytes32[]",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getUserCommits",
+          inputs: [
+            {
+              name: "user",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "bytes32[]",
+              internalType: "bytes32[]",
             },
           ],
           stateMutability: "view",
@@ -176,6 +321,45 @@ const deployedContracts = {
             },
           ],
           stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "mintCommits",
+          inputs: [
+            {
+              name: "",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+          ],
+          outputs: [
+            {
+              name: "minter",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "name",
+              type: "string",
+              internalType: "string",
+            },
+            {
+              name: "commitment",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+            {
+              name: "blockNumber",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "status",
+              type: "uint8",
+              internalType: "enum GiraffeNFT.CommitStatus",
+            },
+          ],
+          stateMutability: "view",
         },
         {
           type: "function",
@@ -341,9 +525,46 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "releaseExpiredCommit",
+          inputs: [
+            {
+              name: "commitId",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
           name: "renounceOwnership",
           inputs: [],
           outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "revealMint",
+          inputs: [
+            {
+              name: "commitId",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+            {
+              name: "secret",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+          ],
+          outputs: [
+            {
+              name: "tokenId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
           stateMutability: "nonpayable",
         },
         {
@@ -756,6 +977,81 @@ const deployedContracts = {
         },
         {
           type: "event",
+          name: "MintCommitCancelled",
+          inputs: [
+            {
+              name: "commitId",
+              type: "bytes32",
+              indexed: true,
+              internalType: "bytes32",
+            },
+            {
+              name: "minter",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "MintCommitted",
+          inputs: [
+            {
+              name: "commitId",
+              type: "bytes32",
+              indexed: true,
+              internalType: "bytes32",
+            },
+            {
+              name: "minter",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "name",
+              type: "string",
+              indexed: false,
+              internalType: "string",
+            },
+            {
+              name: "blockNumber",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "MintRevealed",
+          inputs: [
+            {
+              name: "commitId",
+              type: "bytes32",
+              indexed: true,
+              internalType: "bytes32",
+            },
+            {
+              name: "tokenId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "minter",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
           name: "OwnershipTransferred",
           inputs: [
             {
@@ -797,6 +1093,37 @@ const deployedContracts = {
             },
           ],
           anonymous: false,
+        },
+        {
+          type: "error",
+          name: "BlockhashUnavailable",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "CommitExpired",
+          inputs: [
+            {
+              name: "currentBlock",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "expiryBlock",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+        },
+        {
+          type: "error",
+          name: "CommitNotFound",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "CommitNotPending",
+          inputs: [],
         },
         {
           type: "error",
@@ -908,6 +1235,11 @@ const deployedContracts = {
         },
         {
           type: "error",
+          name: "InvalidSecret",
+          inputs: [],
+        },
+        {
+          type: "error",
           name: "NameAlreadyTaken",
           inputs: [
             {
@@ -935,6 +1267,11 @@ const deployedContracts = {
         },
         {
           type: "error",
+          name: "NotYourCommit",
+          inputs: [],
+        },
+        {
+          type: "error",
           name: "OwnableInvalidOwner",
           inputs: [
             {
@@ -952,6 +1289,22 @@ const deployedContracts = {
               name: "account",
               type: "address",
               internalType: "address",
+            },
+          ],
+        },
+        {
+          type: "error",
+          name: "TooEarlyToReveal",
+          inputs: [
+            {
+              name: "currentBlock",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "minRevealBlock",
+              type: "uint256",
+              internalType: "uint256",
             },
           ],
         },
