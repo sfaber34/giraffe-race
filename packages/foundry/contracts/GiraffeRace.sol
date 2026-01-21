@@ -64,11 +64,13 @@ contract GiraffeRace {
         // Fixed odds quoted for lanes (locked once set; required before betting).
         bool oddsSet;
         bool settled;
-        uint8 winner; // 0-(LANE_COUNT-1), valid only if settled
+        uint8 winner; // Primary winner (first in tie order), 0-(LANE_COUNT-1), valid only if settled
+        uint8 deadHeatCount; // 1 = normal win, 2+ = dead heat (multiple winners)
         bytes32 seed; // stored on settlement for later verification
         uint256 totalPot;
         uint256[LANE_COUNT] totalOnLane;
         uint32[LANE_COUNT] decimalOddsBps; // per lane, scaled by ODDS_SCALE
+        uint8[LANE_COUNT] winners; // All winners (for dead heat support); valid indices are 0..(deadHeatCount-1)
     }
 
     struct RaceGiraffes {
@@ -130,6 +132,7 @@ contract GiraffeRace {
     event RaceOddsSet(uint256 indexed raceId, uint32[LANE_COUNT] decimalOddsBps);
     event BetPlaced(uint256 indexed raceId, address indexed bettor, uint8 indexed lane, uint256 amount);
     event RaceSettled(uint256 indexed raceId, bytes32 seed, uint8 winner);
+    event RaceSettledDeadHeat(uint256 indexed raceId, bytes32 seed, uint8 deadHeatCount, uint8[6] winners);
     event Claimed(uint256 indexed raceId, address indexed bettor, uint256 payout);
     event GiraffeSubmitted(uint256 indexed raceId, address indexed owner, uint256 indexed tokenId, uint8 lane);
     event GiraffeAssigned(uint256 indexed raceId, uint256 indexed tokenId, address indexed originalOwner, uint8 lane);
@@ -418,27 +421,44 @@ contract GiraffeRace {
         // Make sure lineup is finalized (it should have been finalized during betting window,
         // but keep settlement robust).
         _ensureGiraffesFinalized(raceId);
-        uint8 w = simulator.winnerWithScore(simSeed, raceScore[raceId]);
+        
+        // Get ALL winners (supports dead heat)
+        (uint8[LANE_COUNT] memory winners, uint8 winnerCount,) = simulator.winnersWithScore(simSeed, raceScore[raceId]);
 
         r.settled = true;
-        r.winner = w;
+        r.winner = winners[0]; // Primary winner (backwards compatible)
+        r.deadHeatCount = winnerCount;
+        r.winners = winners;
         // Store the simulation seed so the race can be replayed off-chain.
         r.seed = simSeed;
 
         // Record the total liability for this race (winners will claim fixed payouts).
+        // For dead heat: each winner's payout is divided by deadHeatCount, so total liability
+        // is the sum of (betAmount * odds / deadHeatCount) for all winning lanes.
         if (r.totalPot != 0) {
-            uint256 raceLiability = (r.totalOnLane[w] * uint256(r.decimalOddsBps[w])) / ODDS_SCALE;
+            uint256 raceLiability = 0;
+            for (uint8 i = 0; i < winnerCount; i++) {
+                uint8 w = winners[i];
+                // Each winner gets (betAmount * odds) / deadHeatCount
+                uint256 lanePayout = (r.totalOnLane[w] * uint256(r.decimalOddsBps[w])) / ODDS_SCALE;
+                raceLiability += lanePayout / uint256(winnerCount);
+            }
             settledLiability += raceLiability;
         }
 
         // TEMP (testing): disable readiness decay after races.
         // _decreaseReadinessAfterRace(raceId);
 
-        emit RaceSettled(raceId, simSeed, r.winner);
+        if (winnerCount > 1) {
+            emit RaceSettledDeadHeat(raceId, simSeed, winnerCount, winners);
+        } else {
+            emit RaceSettled(raceId, simSeed, r.winner);
+        }
     }
 
     /// @notice Resolve the caller's next unsettled bet (winner pays out, loser resolves to 0).
     /// @dev This avoids needing a `raceId` parameter while still supporting claims from older races.
+    ///      For dead heats, winners receive (betAmount * odds) / deadHeatCount.
     function claim() external returns (uint256 payout) {
         uint256[] storage ids = bettorRaceIds[msg.sender];
         uint256 idx = nextClaimIndex[msg.sender];
@@ -464,12 +484,18 @@ contract GiraffeRace {
             nextClaimIndex[msg.sender] = idx + 1;
 
             // Losers resolve to 0 to allow advancing through history.
-            if (b.lane != r.winner) {
+            // Use _isWinner to support dead heat (multiple winners).
+            if (!_isWinner(r, b.lane)) {
                 emit Claimed(raceId, msg.sender, 0);
                 return 0;
             }
 
+            // Winner payout: (betAmount * odds) / deadHeatCount
+            // For normal wins (deadHeatCount = 1), this is just (betAmount * odds).
+            // For dead heats (deadHeatCount > 1), payout is split proportionally.
             payout = (uint256(b.amount) * uint256(r.decimalOddsBps[b.lane])) / ODDS_SCALE;
+            payout = payout / uint256(r.deadHeatCount);
+            
             if (payout != 0) {
                 settledLiability -= payout;
             }
@@ -489,6 +515,7 @@ contract GiraffeRace {
      * @notice Claim the caller's next *winning* payout.
      * @dev This function will advance through (and mark as resolved) any losses so users only ever "claim" money.
      * It may also settle races on-demand (same as `claim()`), so gas can be higher.
+     * For dead heats, winners receive (betAmount * odds) / deadHeatCount.
      *
      * Reverts with `NoClaimableBets()` if there is no winning payout remaining for the caller.
      */
@@ -514,7 +541,8 @@ contract GiraffeRace {
             }
 
             // Resolve losses silently (advance the queue without "claiming" money).
-            if (b.lane != r.winner) {
+            // Use _isWinner to support dead heat (multiple winners).
+            if (!_isWinner(r, b.lane)) {
                 b.claimed = true;
                 idx++;
                 nextClaimIndex[msg.sender] = idx;
@@ -525,7 +553,10 @@ contract GiraffeRace {
             b.claimed = true;
             nextClaimIndex[msg.sender] = idx + 1;
 
+            // Winner payout: (betAmount * odds) / deadHeatCount
             payout = (uint256(b.amount) * uint256(r.decimalOddsBps[b.lane])) / ODDS_SCALE;
+            payout = payout / uint256(r.deadHeatCount);
+            
             if (payout != 0) {
                 settledLiability -= payout;
             }
@@ -672,6 +703,14 @@ contract GiraffeRace {
         return (r.oddsSet, r.decimalOddsBps);
     }
 
+    /// @notice Get dead heat information for a settled race.
+    /// @return deadHeatCount 1 = normal win, 2+ = dead heat (multiple winners)
+    /// @return winners Array of winning lane indices (only first `deadHeatCount` entries are valid)
+    function getRaceDeadHeatById(uint256 raceId) external view returns (uint8 deadHeatCount, uint8[LANE_COUNT] memory winners) {
+        Race storage r = races[raceId];
+        return (r.deadHeatCount, r.winners);
+    }
+
     function getBet(address bettor) external view returns (uint128 amount, uint8 lane, bool claimed) {
         uint256 raceId = latestRaceId();
         Bet storage b = bets[raceId][bettor];
@@ -733,6 +772,7 @@ contract GiraffeRace {
     }
 
     /// @notice How many *winning payouts* remain for the caller (settled, unclaimed, winning bets only).
+    /// @dev Includes dead heat winners.
     function getWinningClaimRemaining(address bettor) external view returns (uint256 remaining) {
         uint256[] storage ids = bettorRaceIds[bettor];
         uint256 idx = nextClaimIndex[bettor];
@@ -745,13 +785,14 @@ contract GiraffeRace {
 
             Race storage r = races[rid];
             if (!r.settled) continue;
-            if (b.lane != r.winner) continue;
+            if (!_isWinner(r, b.lane)) continue;
 
             remaining++;
         }
     }
 
     /// @notice UI helper: preview the caller's next *winning payout* (settled wins only).
+    /// @dev For dead heats, payout is divided by deadHeatCount.
     function getNextWinningClaim(address bettor) external view returns (NextClaimView memory out) {
         uint256[] storage ids = bettorRaceIds[bettor];
         uint256 idx = nextClaimIndex[bettor];
@@ -764,9 +805,11 @@ contract GiraffeRace {
 
             Race storage r = races[rid];
             if (!r.settled) continue;
-            if (b.lane != r.winner) continue;
+            if (!_isWinner(r, b.lane)) continue;
 
+            // Payout with dead heat division
             uint256 p = (uint256(b.amount) * uint256(r.decimalOddsBps[b.lane])) / ODDS_SCALE;
+            p = p / uint256(r.deadHeatCount);
 
             out.hasClaim = true;
             out.raceId = rid;
@@ -787,7 +830,7 @@ contract GiraffeRace {
      * 0 = next bet exists but would revert if claimed now (race not ready OR blockhash unavailable)
      * 1 = next bet exists and `claim()` would first settle the race (high gas), then resolve this bet
      * 2 = next bet exists, race is settled, bet lost (claim would resolve to 0)
-     * 3 = next bet exists, race is settled, bet won (payout shown)
+     * 3 = next bet exists, race is settled, bet won (payout shown; for dead heats, payout is divided)
      */
     function getNextClaim(address bettor)
         external
@@ -827,7 +870,8 @@ contract GiraffeRace {
             }
 
             uint8 w = r.winner;
-            if (b.lane != w) {
+            // Use _isWinner to support dead heat (multiple winners)
+            if (!_isWinner(r, b.lane)) {
                 out.hasClaim = true;
                 out.raceId = rid;
                 out.status = 2;
@@ -840,7 +884,10 @@ contract GiraffeRace {
                 return out;
             }
 
+            // Winner payout with dead heat division
             uint256 p = (uint256(b.amount) * uint256(r.decimalOddsBps[b.lane])) / ODDS_SCALE;
+            p = p / uint256(r.deadHeatCount);
+            
             out.hasClaim = true;
             out.raceId = rid;
             out.status = 3;
@@ -859,6 +906,14 @@ contract GiraffeRace {
     function _submissionCloseBlock(uint64 bettingCloseBlock) internal pure returns (uint64) {
         // bettingCloseBlock is validated at creation to be >= SUBMISSION_CLOSE_OFFSET_BLOCKS.
         return bettingCloseBlock - SUBMISSION_CLOSE_OFFSET_BLOCKS;
+    }
+
+    /// @dev Check if a lane is among the winners (supports dead heat).
+    function _isWinner(Race storage r, uint8 lane) internal view returns (bool) {
+        for (uint8 i = 0; i < r.deadHeatCount; i++) {
+            if (r.winners[i] == lane) return true;
+        }
+        return false;
     }
 
     function _ensureGiraffesFinalized(uint256 raceId) internal {

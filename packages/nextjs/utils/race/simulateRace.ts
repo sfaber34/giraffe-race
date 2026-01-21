@@ -2,7 +2,9 @@ import { DeterministicDice } from "./deterministicDice";
 import { Hex } from "viem";
 
 export type RaceSimulation = {
-  winner: number;
+  winner: number; // Primary winner (first in tie order, for backwards compatibility)
+  winners: number[]; // All winners (length 1 = normal, length 2+ = dead heat)
+  deadHeatCount: number; // 1 = normal win, 2+ = dead heat
   distances: number[];
   frames: number[][];
   ticks: number;
@@ -76,18 +78,14 @@ export function simulateRaceFromSeed({
   }
 
   const best = Math.max(...distances);
-  const leaders = distances
+  const winners = distances
     .map((d, i) => ({ d, i }))
     .filter(x => x.d === best)
     .map(x => x.i);
 
-  let winner: number;
-  if (leaders.length === 1) {
-    winner = leaders[0];
-  } else {
-    const pick = Number(dice.roll(BigInt(leaders.length)));
-    winner = leaders[pick]!;
-  }
+  // Dead heat: return ALL winners, no random selection (matches Solidity)
+  const winner = winners[0]!; // Primary winner for backwards compatibility
+  const deadHeatCount = winners.length;
 
-  return { winner, distances, frames, ticks };
+  return { winner, winners, deadHeatCount, distances, frames, ticks };
 }

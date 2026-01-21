@@ -1039,6 +1039,40 @@ const deployedContracts = {
           ],
           stateMutability: "pure",
         },
+        {
+          type: "function",
+          name: "winnersWithScore",
+          inputs: [
+            {
+              name: "seed",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+            {
+              name: "scores",
+              type: "uint8[6]",
+              internalType: "uint8[6]",
+            },
+          ],
+          outputs: [
+            {
+              name: "winners",
+              type: "uint8[6]",
+              internalType: "uint8[6]",
+            },
+            {
+              name: "winnerCount",
+              type: "uint8",
+              internalType: "uint8",
+            },
+            {
+              name: "distances",
+              type: "uint16[6]",
+              internalType: "uint16[6]",
+            },
+          ],
+          stateMutability: "pure",
+        },
       ],
       inheritedFunctions: {},
       deployedOnBlock: 2,
@@ -1564,6 +1598,30 @@ const deployedContracts = {
               name: "totalOnLane",
               type: "uint256[6]",
               internalType: "uint256[6]",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getRaceDeadHeatById",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "deadHeatCount",
+              type: "uint8",
+              internalType: "uint8",
+            },
+            {
+              name: "winners",
+              type: "uint8[6]",
+              internalType: "uint8[6]",
             },
           ],
           stateMutability: "view",
@@ -2208,6 +2266,37 @@ const deployedContracts = {
           anonymous: false,
         },
         {
+          type: "event",
+          name: "RaceSettledDeadHeat",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "seed",
+              type: "bytes32",
+              indexed: false,
+              internalType: "bytes32",
+            },
+            {
+              name: "deadHeatCount",
+              type: "uint8",
+              indexed: false,
+              internalType: "uint8",
+            },
+            {
+              name: "winners",
+              type: "uint8[6]",
+              indexed: false,
+              internalType: "uint8[6]",
+            },
+          ],
+          anonymous: false,
+        },
+        {
           type: "error",
           name: "AlreadyBet",
           inputs: [],
@@ -2349,7 +2438,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 4,
+      deployedOnBlock: 5,
     },
   },
 } as const;

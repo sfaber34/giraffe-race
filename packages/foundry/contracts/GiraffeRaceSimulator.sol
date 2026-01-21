@@ -16,17 +16,41 @@ contract GiraffeRaceSimulator {
 
     /// @notice Deterministically choose a winner given a seed + lane effective score snapshot.
     /// @dev `scores` is a 1-10 value per lane (typically the rounded average of readiness/conditioning/speed).
+    /// @return winner The primary winner (first in tie order). For dead heats, use `winnersWithScore`.
     function winnerWithScore(bytes32 seed, uint8[LANE_COUNT] memory scores)
         external
         pure
         returns (uint8 winner)
     {
-        (winner,) = _simulateWithScore(seed, scores);
+        (uint8[LANE_COUNT] memory winners,,) = _simulateWithScore(seed, scores);
+        winner = winners[0];
+    }
+
+    /// @notice Deterministically simulate a race and return ALL winners (for dead heat support).
+    /// @dev `scores` is a 1-10 value per lane (typically the rounded average of readiness/conditioning/speed).
+    /// @return winners Array of winning lane indices (length 1 = normal win, length 2+ = dead heat).
+    /// @return winnerCount Number of winners (1 = normal, 2+ = dead heat).
+    /// @return distances Final distances after all ticks.
+    function winnersWithScore(bytes32 seed, uint8[LANE_COUNT] memory scores)
+        external
+        pure
+        returns (uint8[LANE_COUNT] memory winners, uint8 winnerCount, uint16[LANE_COUNT] memory distances)
+    {
+        return _simulateWithScore(seed, scores);
     }
 
     function simulate(bytes32 seed) external pure returns (uint8 winner, uint16[LANE_COUNT] memory distances) {
         uint8[LANE_COUNT] memory score = [uint8(10), 10, 10, 10, 10, 10];
-        return _simulateWithScore(seed, score);
+        (,, distances) = _simulateWithScore(seed, score);
+        // For backwards compatibility, return first winner
+        uint16 best = distances[0];
+        winner = 0;
+        for (uint8 i = 1; i < LANE_COUNT; i++) {
+            if (distances[i] > best) {
+                best = distances[i];
+                winner = i;
+            }
+        }
     }
 
     /// @notice Deterministically simulate a race given a seed + lane effective score snapshot.
@@ -36,7 +60,9 @@ contract GiraffeRaceSimulator {
         pure
         returns (uint8 winner, uint16[LANE_COUNT] memory distances)
     {
-        return _simulateWithScore(seed, scores);
+        uint8[LANE_COUNT] memory winners;
+        (winners,, distances) = _simulateWithScore(seed, scores);
+        winner = winners[0]; // Return first winner for backwards compatibility
     }
 
     function _scoreBps(uint8 score) internal pure returns (uint16) {
@@ -53,7 +79,7 @@ contract GiraffeRaceSimulator {
     function _simulateWithScore(bytes32 seed, uint8[LANE_COUNT] memory scores)
         internal
         pure
-        returns (uint8 winner, uint16[LANE_COUNT] memory distances)
+        returns (uint8[LANE_COUNT] memory winners, uint8 winnerCount, uint16[LANE_COUNT] memory distances)
     {
         DeterministicDice.Dice memory dice = DeterministicDice.create(seed);
 
@@ -94,29 +120,23 @@ contract GiraffeRaceSimulator {
         require(finished, "GiraffeRace: race did not finish");
 
         uint16 best = distances[0];
-        uint8 leaderCount = 1;
-        uint8[LANE_COUNT] memory leaders;
-        leaders[0] = 0;
+        winnerCount = 1;
+        winners[0] = 0;
 
         for (uint8 i = 1; i < LANE_COUNT; i++) {
             uint16 d = distances[i];
             if (d > best) {
                 best = d;
-                leaderCount = 1;
-                leaders[0] = i;
+                winnerCount = 1;
+                winners[0] = i;
             } else if (d == best) {
-                leaders[leaderCount] = i;
-                leaderCount++;
+                winners[winnerCount] = i;
+                winnerCount++;
             }
         }
 
-        if (leaderCount == 1) {
-            return (leaders[0], distances);
-        }
-
-        uint256 pick;
-        (pick, dice) = dice.roll(leaderCount);
-        return (leaders[uint8(pick)], distances);
+        // Dead heat: return ALL winners, no random selection
+        // winnerCount > 1 means dead heat
     }
 }
 
