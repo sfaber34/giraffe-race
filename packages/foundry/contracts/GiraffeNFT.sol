@@ -3,18 +3,27 @@ pragma solidity ^0.8.19;
 
 import { ERC721 } from "../lib/openzeppelin-contracts/contracts/token/ERC721/ERC721.sol";
 import { Ownable } from "../lib/openzeppelin-contracts/contracts/access/Ownable.sol";
+import { IERC20 } from "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 /**
  * @title GiraffeNFT
  * @notice Minimal ERC-721 for race giraffes with commit-reveal minting.
  * @dev Token IDs are sequential starting at 1.
  *      Uses commit-reveal pattern to prevent seed gaming.
+ *      Minting costs 1 USDC which goes to the treasury.
  */
 contract GiraffeNFT is ERC721, Ownable {
     uint256 public nextTokenId = 1;
     /// @notice Base token URI used by OZ's ERC721 `tokenURI`.
     /// @dev Set this to your Next.js route, e.g. "https://yourdomain.com/api/nft/".
     string public baseTokenURI;
+
+    /// @notice USDC token address for mint fees.
+    IERC20 public usdc;
+    /// @notice Treasury address where mint fees are sent.
+    address public treasury;
+    /// @notice Mint fee in USDC (1 USDC = 1e6 with 6 decimals).
+    uint256 public constant MINT_FEE = 1e6;
 
     mapping(uint256 => string) private _giraffeNames;
     mapping(uint256 => bytes32) private _seeds;
@@ -71,6 +80,7 @@ contract GiraffeNFT is ERC721, Ownable {
     event MintCommitted(bytes32 indexed commitId, address indexed minter, string name, uint256 blockNumber);
     event MintRevealed(bytes32 indexed commitId, uint256 indexed tokenId, address indexed minter);
     event MintCommitCancelled(bytes32 indexed commitId, address indexed minter);
+    event TreasurySet(address indexed usdc, address indexed treasury);
 
     error NameAlreadyTaken(string name);
     error NameTooLong(uint256 length);
@@ -83,6 +93,8 @@ contract GiraffeNFT is ERC721, Ownable {
     error CommitExpired(uint256 currentBlock, uint256 expiryBlock);
     error InvalidSecret();
     error BlockhashUnavailable();
+    error TreasuryNotSet();
+    error MintFeeTransferFailed();
 
     constructor() ERC721("Giraffe", "GRF") Ownable(msg.sender) {}
 
@@ -104,6 +116,14 @@ contract GiraffeNFT is ERC721, Ownable {
     function setBaseTokenURI(string calldata newBaseTokenURI) external onlyOwner {
         baseTokenURI = newBaseTokenURI;
         emit BaseTokenURISet(newBaseTokenURI);
+    }
+
+    /// @notice Set the USDC token and treasury address for mint fees.
+    /// @dev Only owner can set this. Required before commit-reveal minting on production.
+    function setTreasury(address _usdc, address _treasury) external onlyOwner {
+        usdc = IERC20(_usdc);
+        treasury = _treasury;
+        emit TreasurySet(_usdc, _treasury);
     }
 
     /// @notice Random seed for a given tokenId (used by off-chain SVG/metadata rendering).
@@ -310,6 +330,7 @@ contract GiraffeNFT is ERC721, Ownable {
     }
     
     /// @notice Reveal the secret and mint the giraffe.
+    /// @dev Requires 1 USDC mint fee (user must approve this contract first).
     /// @param commitId The commit ID from commitMint.
     /// @param secret The secret that was hashed to create the commitment.
     /// @return tokenId The minted token ID.
@@ -332,6 +353,12 @@ contract GiraffeNFT is ERC721, Ownable {
         
         if (keccak256(abi.encodePacked(secret)) != commit.commitment) {
             revert InvalidSecret();
+        }
+        
+        // Collect mint fee (if treasury is configured)
+        if (treasury != address(0) && address(usdc) != address(0)) {
+            bool success = usdc.transferFrom(msg.sender, treasury, MINT_FEE);
+            if (!success) revert MintFeeTransferFailed();
         }
         
         // Use blockhash from block after commit (wasn't known at commit time)

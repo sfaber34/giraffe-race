@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Address } from "@scaffold-ui/components";
-import { encodePacked, keccak256, toHex } from "viem";
+import { encodePacked, formatUnits, keccak256, toHex } from "viem";
 import { useAccount, useBlockNumber, usePublicClient } from "wagmi";
 import { GiraffeAnimated } from "~~/components/assets/GiraffeAnimated";
 import {
@@ -11,6 +11,8 @@ import {
   useScaffoldWriteContract,
   useTargetNetwork,
 } from "~~/hooks/scaffold-eth";
+
+const MINT_FEE = 1_000_000n; // 1 USDC (6 decimals)
 
 interface PendingCommit {
   commitId: `0x${string}`;
@@ -80,6 +82,7 @@ export const GiraffeNfts = () => {
   const [isCommitting, setIsCommitting] = useState(false);
   const [isRevealing, setIsRevealing] = useState<string | null>(null);
   const [isCancelling, setIsCancelling] = useState<string | null>(null);
+  const [isApproving, setIsApproving] = useState(false);
 
   const { data: blockNumber } = useBlockNumber({ watch: true });
 
@@ -134,6 +137,57 @@ export const GiraffeNfts = () => {
 
   const { writeContractAsync: writeGiraffeNftAsync } = useScaffoldWriteContract({
     contractName: "GiraffeNFT",
+  });
+
+  // Read treasury address from GiraffeNFT to check if mint fee is required
+  const { data: treasuryAddress } = useScaffoldReadContract({
+    contractName: "GiraffeNFT",
+    functionName: "treasury",
+    query: { enabled: !!giraffeNftContract },
+  });
+
+  // Check if mint fee is required (treasury is configured)
+  const mintFeeRequired = useMemo(() => {
+    return !!(treasuryAddress && treasuryAddress !== "0x0000000000000000000000000000000000000000");
+  }, [treasuryAddress]);
+
+  // Get USDC contract info for allowance check
+  const { data: usdcContract } = useDeployedContractInfo({
+    contractName: "MockUSDC",
+  });
+
+  // Read user's USDC allowance for GiraffeNFT contract
+  const { data: usdcAllowance, refetch: refetchAllowance } = useScaffoldReadContract({
+    contractName: "MockUSDC",
+    functionName: "allowance",
+    args: [connectedAddress, giraffeNftContract?.address],
+    query: { enabled: !!connectedAddress && !!giraffeNftContract && !!usdcContract && mintFeeRequired },
+  });
+
+  // Check if user has sufficient allowance
+  const hasAllowance = useMemo(() => {
+    if (!mintFeeRequired) return true;
+    if (!usdcAllowance) return false;
+    return usdcAllowance >= MINT_FEE;
+  }, [mintFeeRequired, usdcAllowance]);
+
+  // Read user's USDC balance
+  const { data: usdcBalance } = useScaffoldReadContract({
+    contractName: "MockUSDC",
+    functionName: "balanceOf",
+    args: [connectedAddress],
+    query: { enabled: !!connectedAddress && !!usdcContract && mintFeeRequired },
+  });
+
+  // Check if user has enough USDC balance
+  const hasSufficientBalance = useMemo(() => {
+    if (!mintFeeRequired) return true;
+    if (!usdcBalance) return false;
+    return usdcBalance >= MINT_FEE;
+  }, [mintFeeRequired, usdcBalance]);
+
+  const { writeContractAsync: writeUsdcAsync } = useScaffoldWriteContract({
+    contractName: "MockUSDC",
   });
 
   // Fetch pending commits from chain
@@ -310,6 +364,23 @@ export const GiraffeNfts = () => {
     }
   }, [connectedAddress, mintName, writeGiraffeNftAsync, refetchPendingCommits]);
 
+  const handleApproveUsdc = useCallback(async () => {
+    if (!connectedAddress || !giraffeNftContract?.address) return;
+
+    setIsApproving(true);
+    try {
+      await writeUsdcAsync({
+        functionName: "approve",
+        args: [giraffeNftContract.address, MINT_FEE], // Approve exactly 1 mint
+      });
+      setTimeout(() => void refetchAllowance(), 1000);
+    } catch (error) {
+      console.error("Approval failed:", error);
+    } finally {
+      setIsApproving(false);
+    }
+  }, [connectedAddress, giraffeNftContract?.address, writeUsdcAsync, refetchAllowance]);
+
   const handleRevealMint = useCallback(
     async (commit: PendingCommit) => {
       if (!commit || !connectedAddress || commit.secret === "0x") return;
@@ -323,13 +394,17 @@ export const GiraffeNfts = () => {
 
         removeSecret(connectedAddress, commit.name);
         void refetchPendingCommits();
+        // Refetch allowance after reveal since we spent some
+        if (mintFeeRequired) {
+          setTimeout(() => void refetchAllowance(), 1000);
+        }
       } catch (error) {
         console.error("Reveal failed:", error);
       } finally {
         setIsRevealing(null);
       }
     },
-    [writeGiraffeNftAsync, connectedAddress, refetchPendingCommits],
+    [writeGiraffeNftAsync, connectedAddress, refetchPendingCommits, mintFeeRequired, refetchAllowance],
   );
 
   const handleCancelCommit = useCallback(
@@ -397,6 +472,9 @@ export const GiraffeNfts = () => {
                 Minting uses commit-reveal to prevent gaming. After committing, wait{" "}
                 {minRevealBlocks?.toString() ?? "2"} blocks, then reveal to mint your unique giraffe.
               </p>
+              {mintFeeRequired && (
+                <p className="mt-2 text-primary font-medium">💰 Mint fee: {formatUnits(MINT_FEE, 6)} USDC</p>
+              )}
             </div>
 
             <label className="form-control w-full">
@@ -457,6 +535,37 @@ export const GiraffeNfts = () => {
                 <div className="text-xs opacity-70">Block: {blockNumber?.toString() ?? "..."}</div>
               </div>
 
+              {/* USDC approval status */}
+              {mintFeeRequired && (
+                <div className={`rounded-lg p-3 text-sm ${hasAllowance ? "bg-success/10" : "bg-warning/10"}`}>
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      {!hasSufficientBalance ? (
+                        <span className="text-error">
+                          ❌ Insufficient USDC balance (need {formatUnits(MINT_FEE, 6)} USDC)
+                        </span>
+                      ) : hasAllowance ? (
+                        <span className="text-success">✅ USDC approved for minting</span>
+                      ) : (
+                        <span className="text-warning">⚠️ Approve USDC before revealing</span>
+                      )}
+                    </div>
+                    {hasSufficientBalance && !hasAllowance && (
+                      <button className="btn btn-warning btn-sm" disabled={isApproving} onClick={handleApproveUsdc}>
+                        {isApproving ? (
+                          <>
+                            <span className="loading loading-spinner loading-xs"></span>
+                            Approving...
+                          </>
+                        ) : (
+                          "Approve USDC"
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <div className="flex flex-col gap-3">
                 {pendingCommits.map(commit => {
                   const status = getCommitStatus(commit);
@@ -465,6 +574,8 @@ export const GiraffeNfts = () => {
                   const blocksUntilExpiry =
                     status === "ready" && blockNumber ? Number(commit.maxRevealBlock - blockNumber) : 0;
                   const hasSecret = commit.secret !== "0x";
+                  const canReveal =
+                    status === "ready" && hasSecret && (!mintFeeRequired || (hasAllowance && hasSufficientBalance));
 
                   return (
                     <div
@@ -502,8 +613,9 @@ export const GiraffeNfts = () => {
                           {status === "ready" && hasSecret && (
                             <button
                               className="btn btn-success btn-sm"
-                              disabled={isRevealing === commit.commitId}
+                              disabled={isRevealing === commit.commitId || !canReveal}
                               onClick={() => handleRevealMint(commit)}
+                              title={!canReveal && mintFeeRequired ? "Approve USDC first" : undefined}
                             >
                               {isRevealing === commit.commitId ? (
                                 <>
@@ -511,7 +623,7 @@ export const GiraffeNfts = () => {
                                   Revealing...
                                 </>
                               ) : (
-                                "Reveal & Mint"
+                                `Reveal & Mint${mintFeeRequired ? " (1 USDC)" : ""}`
                               )}
                             </button>
                           )}

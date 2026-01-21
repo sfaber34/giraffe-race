@@ -81,5 +81,8 @@ contract DeployGiraffeRace is ScaffoldETHDeploy {
 
         // Allow the race contract to update readiness after races.
         giraffeNft.setRaceContract(address(race));
+
+        // Configure mint fee: 1 USDC goes to treasury
+        giraffeNft.setTreasury(usdcAddress, address(treasury));
     }
 }

@@ -785,6 +785,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "MINT_FEE",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "MIN_REVEAL_BLOCKS",
           inputs: [],
           outputs: [
@@ -1485,6 +1498,24 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "setTreasury",
+          inputs: [
+            {
+              name: "_usdc",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "_treasury",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
           name: "speedOf",
           inputs: [
             {
@@ -1636,6 +1667,32 @@ const deployedContracts = {
           ],
           outputs: [],
           stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "treasury",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "usdc",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "contract IERC20",
+            },
+          ],
+          stateMutability: "view",
         },
         {
           type: "event",
@@ -1851,6 +1908,25 @@ const deployedContracts = {
           anonymous: false,
         },
         {
+          type: "event",
+          name: "TreasurySet",
+          inputs: [
+            {
+              name: "usdc",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "treasury",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+          ],
+          anonymous: false,
+        },
+        {
           type: "error",
           name: "BlockhashUnavailable",
           inputs: [],
@@ -1996,6 +2072,11 @@ const deployedContracts = {
         },
         {
           type: "error",
+          name: "MintFeeTransferFailed",
+          inputs: [],
+        },
+        {
+          type: "error",
           name: "NameAlreadyTaken",
           inputs: [
             {
@@ -2064,9 +2145,14 @@ const deployedContracts = {
             },
           ],
         },
+        {
+          type: "error",
+          name: "TreasuryNotSet",
+          inputs: [],
+        },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 3,
+      deployedOnBlock: 4,
     },
     GiraffeRaceSimulator: {
       address: "0xe1aa25618fa0c7a1cfdab5d6b456af611873b629",
@@ -2184,7 +2270,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 3,
+      deployedOnBlock: 4,
     },
     GiraffeRace: {
       address: "0x196dbcbb54b8ec4958c959d8949ebfe87ac2aaaf",
@@ -3584,7 +3670,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 3,
+      deployedOnBlock: 4,
     },
   },
 } as const;
