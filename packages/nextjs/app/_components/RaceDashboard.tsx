@@ -1113,15 +1113,31 @@ export const RaceDashboard = () => {
                   <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
                     {goPhase ? (
                       <div
-                        className={`text-6xl font-black text-primary drop-shadow transition-opacity duration-[250ms] ${
+                        className={`flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-base-100/90 backdrop-blur-sm shadow-lg transition-opacity duration-[250ms] ${
                           goPhase === "solid" ? "opacity-100" : "opacity-0"
                         }`}
                       >
-                        GO!
+                        <div className="text-6xl font-black text-primary drop-shadow">GO!</div>
                       </div>
                     ) : isPlaying && !raceStarted && frame === 0 ? (
-                      <div className="text-6xl font-black text-primary drop-shadow">
-                        {Math.max(1, Math.ceil(startDelayRemainingMs / 1000))}
+                      <div className="flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-base-100/90 backdrop-blur-sm shadow-lg">
+                        <div className="text-6xl font-black text-primary drop-shadow">
+                          {Math.max(1, Math.ceil(startDelayRemainingMs / 1000))}
+                        </div>
+                      </div>
+                    ) : raceIsOver && myBet?.hasBet && revealedWinner !== null ? (
+                      <div className="flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-base-100/90 backdrop-blur-sm shadow-lg">
+                        {myBet.lane === revealedWinner ? (
+                          <>
+                            <div className="text-4xl font-black text-success drop-shadow">Your bet hit!</div>
+                            <div className="text-xl font-semibold text-success/80">Claim your winnings</div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="text-4xl font-black text-error drop-shadow">Sorry</div>
+                            <div className="text-xl font-semibold text-error/80">Your bet didn&apos;t win</div>
+                          </>
+                        )}
                       </div>
                     ) : null}
                   </div>
