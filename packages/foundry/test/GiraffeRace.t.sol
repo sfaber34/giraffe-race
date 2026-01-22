@@ -57,9 +57,9 @@ contract GiraffeRaceTest is Test {
             houseTokenIds[i] = giraffeNft.mintTo(owner, string(abi.encodePacked("house-", vm.toString(i))));
         }
 
-        // Deploy race contract
+        // Deploy race contract (address(0) for winProbTable = fallback to fixed odds)
         GiraffeRaceSimulator simulator = new GiraffeRaceSimulator();
-        race = new GiraffeRace(address(giraffeNft), owner, oddsAdmin, houseTokenIds, address(simulator), address(treasury));
+        race = new GiraffeRace(address(giraffeNft), owner, oddsAdmin, houseTokenIds, address(simulator), address(treasury), address(0));
         giraffeNft.setRaceContract(address(race));
         
         // Authorize race contract in treasury

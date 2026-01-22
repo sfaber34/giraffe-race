@@ -48,10 +48,12 @@ function splitmix64Next(state: { x: bigint }): bigint {
 }
 
 function clampScore(r: number): number {
+  // Match Solidity exactly: score=0 becomes 10, not 1
   if (!Number.isFinite(r)) return 10;
   const x = Math.floor(r);
-  if (x < 1) return 1;
+  if (x === 0) return 10;
   if (x > 10) return 10;
+  if (x < 1) return 1;
   return x;
 }
 

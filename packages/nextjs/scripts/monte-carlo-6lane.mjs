@@ -89,9 +89,10 @@ function ceilLog2(n) {
 
 function clampScore(r) {
   const x = Math.floor(Number(r));
-  if (!Number.isFinite(x)) return 10;
-  if (x < 1) return 1;
+  // Match Solidity exactly: score=0 becomes 10, not 1
+  if (!Number.isFinite(x) || x === 0) return 10;
   if (x > 10) return 10;
+  if (x < 1) return 1;
   return x;
 }
 

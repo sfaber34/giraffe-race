@@ -6,6 +6,11 @@ import { GiraffeRaceSimulator } from "./GiraffeRaceSimulator.sol";
 import { HouseTreasury } from "./HouseTreasury.sol";
 import { IERC721 } from "../lib/openzeppelin-contracts/contracts/token/ERC721/IERC721.sol";
 
+interface IWinProbTable6 {
+    function get(uint8[6] memory scores) external view returns (uint16[6] memory probsBps);
+    function getSorted(uint8 a, uint8 b, uint8 c, uint8 d, uint8 e, uint8 f) external view returns (uint16[6] memory probsBps);
+}
+
 interface IGiraffeNFT is IERC721 {
     function readinessOf(uint256 tokenId) external view returns (uint8);
     function conditioningOf(uint256 tokenId) external view returns (uint8);
@@ -16,7 +21,7 @@ interface IGiraffeNFT is IERC721 {
 
 /**
  * @title GiraffeRace
- * @notice Simple on-chain betting game: 4 identical giraffes, winner picked deterministically from a seed.
+ * @notice On-chain betting game: 6 giraffes race, winner picked deterministically from a seed.
  * @dev v1: single bet per address per race, parimutuel payout (winners split the pot pro-rata).
  *
  * Seed (v1) is derived from a future blockhash:
@@ -35,9 +40,7 @@ contract GiraffeRace {
     uint16 internal constant ODDS_SCALE = 10000;
     uint16 public constant HOUSE_EDGE_BPS = 500; // 5%
     uint32 internal constant MIN_DECIMAL_ODDS_BPS = 10100; // 1.01x
-    // TEMP (6-lane migration): we are temporarily disabling the probability-table-based odds quoting
-    // to avoid needing a much larger on-chain table. Keep the old code (commented) so we can restore it.
-    // Fixed decimal odds in basis points (ODDS_SCALE=1e4): 2.00x => 20000.
+    // Fallback fixed odds when no probability table is deployed (basis points: 2.00x => 20000)
     uint32 internal constant TEMP_FIXED_DECIMAL_ODDS_BPS = 20000;
     // Phase schedule (v2):
     // - Submissions close at (bettingCloseBlock - SUBMISSION_CLOSE_OFFSET_BLOCKS)
@@ -56,6 +59,7 @@ contract GiraffeRace {
     IGiraffeNFT public giraffeNft;
     GiraffeRaceSimulator public simulator;
     HouseTreasury public treasury;
+    IWinProbTable6 public winProbTable; // On-chain probability table for odds calculation
     // NOTE (testing): readiness decay after races is currently disabled in code.
     // When deploying a live version where readiness should always decay, uncomment the call in `_settleRace`.
 
@@ -186,13 +190,15 @@ contract GiraffeRace {
         address _oddsAdmin,
         uint256[LANE_COUNT] memory _houseGiraffeTokenIds,
         address _simulator,
-        address _treasury
+        address _treasury,
+        address _winProbTable
     ) {
         giraffeNft = IGiraffeNFT(_giraffeNft);
         house = _house;
         oddsAdmin = _oddsAdmin;
         simulator = GiraffeRaceSimulator(_simulator);
         treasury = HouseTreasury(_treasury);
+        winProbTable = IWinProbTable6(_winProbTable);
         houseGiraffeTokenIds = _houseGiraffeTokenIds;
 
         // Basic sanity: prevent accidental all-zeros configuration.
@@ -984,61 +990,58 @@ contract GiraffeRace {
         Race storage r = races[raceId];
         if (r.oddsSet) return;
 
-        uint8[LANE_COUNT] memory rr = raceScore[raceId];
-        uint8[LANE_COUNT] memory laneIdx = [uint8(0), 1, 2, 3, 4, 5];
+        uint8[LANE_COUNT] memory scores = raceScore[raceId];
 
-        // TEMP: fixed odds (disable probability table usage without deleting code).
-        // This keeps the flow "finalize -> odds set -> betting open" working.
-        for (uint8 lane = 0; lane < LANE_COUNT; lane++) {
-            r.decimalOddsBps[lane] = TEMP_FIXED_DECIMAL_ODDS_BPS;
-        }
-        r.oddsSet = true;
-        emit RaceOddsSet(raceId, r.decimalOddsBps);
-        return;
-
-        // Sort score ascending (and keep lane indices aligned). Small fixed-size sort.
-        for (uint8 i = 0; i < LANE_COUNT; i++) {
-            for (uint8 j = i + 1; j < LANE_COUNT; j++) {
-                if (rr[j] < rr[i]) {
-                    (rr[i], rr[j]) = (rr[j], rr[i]);
-                    (laneIdx[i], laneIdx[j]) = (laneIdx[j], laneIdx[i]);
-                }
+        // If no probability table is set, fall back to fixed odds
+        if (address(winProbTable) == address(0)) {
+            for (uint8 lane = 0; lane < LANE_COUNT; lane++) {
+                r.decimalOddsBps[lane] = TEMP_FIXED_DECIMAL_ODDS_BPS;
             }
+            r.oddsSet = true;
+            emit RaceOddsSet(raceId, r.decimalOddsBps);
+            return;
         }
 
-        // NOTE: Probability-table-based odds (4-lane) was removed; odds are now set externally via `setRaceOdds`.
+        // Get win probabilities from the on-chain table (handles sorting internally)
+        uint16[LANE_COUNT] memory probsBps = winProbTable.get(scores);
 
         // Symmetry fix: if multiple lanes have the same score, their true win probability is identical.
         // The lookup table is Monte Carlo-estimated, so those positions can differ slightly; we set each
         // equal-score group to the same rounded average (guarantees identical odds for identical score).
-        // uint16[4] memory probsAdj = probsBps;
-        uint8 start = 0;
-        while (start < LANE_COUNT) {
-            uint8 end = start;
-            while (end + 1 < LANE_COUNT && rr[end + 1] == rr[start]) {
-                end++;
-            }
-            uint8 len = end - start + 1;
-            if (len > 1) {
-                uint256 sum = 0;
-                for (uint8 i = start; i <= end; i++) {
-                    // sum += probsAdj[i];
-                }
-                // round(sum/len) to nearest
-                uint16 avg = uint16((sum + (len / 2)) / len);
-                for (uint8 i = start; i <= end; i++) {
-                    // probsAdj[i] = avg;
+        uint16[LANE_COUNT] memory probsAdj = probsBps;
+        
+        // Group lanes by score and average their probabilities
+        for (uint8 i = 0; i < LANE_COUNT; i++) {
+            uint256 sum = uint256(probsBps[i]);
+            uint8 count = 1;
+            
+            // Find all lanes with the same score
+            for (uint8 j = 0; j < LANE_COUNT; j++) {
+                if (j != i && scores[j] == scores[i]) {
+                    sum += uint256(probsBps[j]);
+                    count++;
                 }
             }
-            start = end + 1;
+            
+            // Average the probabilities for this score group
+            if (count > 1) {
+                probsAdj[i] = uint16((sum + (count / 2)) / count);
+            }
         }
 
+        // Convert probabilities to decimal odds with house edge
         for (uint8 i = 0; i < LANE_COUNT; i++) {
-            // uint16 p = probsAdj[i];
-            // if (p == 0) p = 1; // defensive
-            // uint256 o = (uint256(ODDS_SCALE) * uint256(ODDS_SCALE - HOUSE_EDGE_BPS)) / uint256(p);
-            // if (o < MIN_DECIMAL_ODDS_BPS) o = MIN_DECIMAL_ODDS_BPS;
-            // r.decimalOddsBps[laneIdx[i]] = uint32(o);
+            uint16 p = probsAdj[i];
+            if (p == 0) p = 1; // defensive: avoid division by zero
+            
+            // Decimal odds formula: (1 - houseEdge) / probability
+            // In basis points: (ODDS_SCALE * (ODDS_SCALE - HOUSE_EDGE_BPS)) / p
+            uint256 o = (uint256(ODDS_SCALE) * uint256(ODDS_SCALE - HOUSE_EDGE_BPS)) / uint256(p);
+            
+            // Apply minimum odds floor
+            if (o < MIN_DECIMAL_ODDS_BPS) o = MIN_DECIMAL_ODDS_BPS;
+            
+            r.decimalOddsBps[i] = uint32(o);
         }
 
         r.oddsSet = true;

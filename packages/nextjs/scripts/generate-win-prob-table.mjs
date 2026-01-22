@@ -5,14 +5,15 @@ import { Worker, isMainThread, parentPort, workerData } from "node:worker_thread
 import { keccak256, toHex } from "viem";
 
 /**
- * Precompute win probabilities by effective score (1-10) for 4-lane races.
+ * Precompute win probabilities by effective score (1-10) for 6-lane races.
  *
- * We compute only sorted score tuples (a<=b<=c<=d), count = 715.
+ * We compute only sorted score tuples (a<=b<=c<=d<=e<=f), count = 5005.
  * The resulting table stores per-position win probabilities (basis points, 0..10000) for the sorted order.
  *
  * Output:
  * - JSON checkpoint (optional)
- * - Solidity library file containing a packed hex table (uint16 bps x 4 lanes per entry)
+ * - Multiple Solidity contracts containing packed hex tables (split to fit under 24KB limit)
+ * - A router contract that delegates to the correct shard
  *
  * Usage:
  *   node packages/nextjs/scripts/generate-win-prob-table.mjs --samples 50000
@@ -20,14 +21,17 @@ import { keccak256, toHex } from "viem";
  * Flags:
  *   --samples N          (default 50000) Monte Carlo samples per sorted tuple
  *   --workers W          (default cpuCount-1, capped at 12) number of worker threads
- *   --out-sol PATH       (default packages/foundry/contracts/libraries/WinProbTable.sol)
- *   --checkpoint PATH    (default packages/nextjs/generated/win-prob-checkpoint.json)
+ *   --out-dir PATH       (default packages/foundry/contracts/libraries) output directory for Solidity files
+ *   --checkpoint PATH    (default packages/nextjs/generated/win-prob-checkpoint-6lane.json)
  *   --resume             resume from checkpoint if present
- *   --progress-every M   print progress every M tuples (default 5)
+ *   --progress-every M   print progress every M tuples (default 10)
  */
 
+const LANE_COUNT = 6;
+const ENTRY_BYTES = LANE_COUNT * 2; // 6 lanes × 2 bytes (uint16) = 12 bytes per entry
+
 // -----------------------
-// Race sim (JS port of TS)
+// Race sim (JS port of TS, 6 lanes)
 // -----------------------
 
 class DeterministicDice {
@@ -103,9 +107,10 @@ function ceilLog2(n) {
 
 function clampScore(r) {
   const x = Math.floor(Number(r));
-  if (!Number.isFinite(x)) return 10;
-  if (x < 1) return 1;
+  // Match Solidity exactly: score=0 becomes 10, not 1
+  if (!Number.isFinite(x) || x === 0) return 10;
   if (x > 10) return 10;
+  if (x < 1) return 1;
   return x;
 }
 
@@ -121,12 +126,12 @@ function scoreBps(score) {
 /**
  * @param {object} p
  * @param {`0x${string}`} p.seed
- * @param {number[]} p.score length 4
+ * @param {number[]} p.score length 6
  */
 function simulateRaceFromSeed({ seed, score }) {
   const dice = new DeterministicDice(seed);
-  const distances = [0, 0, 0, 0];
-  const bps = [0, 0, 0, 0].map((_, i) => scoreBps(score[i] ?? 10));
+  const distances = Array.from({ length: LANE_COUNT }, () => 0);
+  const bps = Array.from({ length: LANE_COUNT }, (_, i) => scoreBps(score[i] ?? 10));
 
   // constants (must match Solidity)
   const SPEED_RANGE = 10n;
@@ -135,7 +140,7 @@ function simulateRaceFromSeed({ seed, score }) {
 
   let finished = false;
   for (let t = 0; t < MAX_TICKS; t++) {
-    for (let a = 0; a < 4; a++) {
+    for (let a = 0; a < LANE_COUNT; a++) {
       const r = dice.roll(SPEED_RANGE); // 0..9
       const baseSpeed = Number(r + 1n); // 1..10
       // Probabilistic rounding (matches Solidity): avoids a chunky handicap from floor().
@@ -148,12 +153,7 @@ function simulateRaceFromSeed({ seed, score }) {
       }
       distances[a] += Math.max(1, q);
     }
-    if (
-      distances[0] >= TRACK_LENGTH ||
-      distances[1] >= TRACK_LENGTH ||
-      distances[2] >= TRACK_LENGTH ||
-      distances[3] >= TRACK_LENGTH
-    ) {
+    if (distances.some(d => d >= TRACK_LENGTH)) {
       finished = true;
       break;
     }
@@ -162,8 +162,9 @@ function simulateRaceFromSeed({ seed, score }) {
 
   const best = Math.max(...distances);
   const leaders = [];
-  for (let i = 0; i < 4; i++) if (distances[i] === best) leaders.push(i);
+  for (let i = 0; i < LANE_COUNT; i++) if (distances[i] === best) leaders.push(i);
   if (leaders.length === 1) return leaders[0];
+  // Dead heat: pick randomly (matches Solidity)
   const pick = Number(dice.roll(BigInt(leaders.length)));
   return leaders[pick];
 }
@@ -199,16 +200,16 @@ function parseArgs(argv) {
   const out = {
     samples: 50_000,
     workers: Math.max(1, Math.min(12, (os.cpus().length || 1) - 1)),
-    outSol: "packages/foundry/contracts/libraries/WinProbTable.sol",
-    checkpoint: "packages/nextjs/generated/win-prob-checkpoint.json",
+    outDir: "packages/foundry/contracts/libraries",
+    checkpoint: "packages/nextjs/generated/win-prob-checkpoint-6lane.json",
     resume: false,
-    progressEvery: 5,
+    progressEvery: 10,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--samples") out.samples = Number(argv[++i]);
     else if (a === "--workers") out.workers = Number(argv[++i]);
-    else if (a === "--out-sol") out.outSol = String(argv[++i]);
+    else if (a === "--out-dir") out.outDir = String(argv[++i]);
     else if (a === "--checkpoint") out.checkpoint = String(argv[++i]);
     else if (a === "--resume") out.resume = true;
     else if (a === "--progress-every") out.progressEvery = Number(argv[++i]);
@@ -216,21 +217,36 @@ function parseArgs(argv) {
   return out;
 }
 
-function* sortedScoreTuples() {
+/**
+ * Generate all sorted 6-tuples (a <= b <= c <= d <= e <= f) with values 1..10.
+ * Total count: C(10+6-1, 6) = C(15, 6) = 5005
+ */
+function* sortedScoreTuples6() {
   for (let a = 1; a <= 10; a++) {
     for (let b = a; b <= 10; b++) {
       for (let c = b; c <= 10; c++) {
         for (let d = c; d <= 10; d++) {
-          yield [a, b, c, d];
+          for (let e = d; e <= 10; e++) {
+            for (let f = e; f <= 10; f++) {
+              yield [a, b, c, d, e, f];
+            }
+          }
         }
       }
     }
   }
 }
 
-function tupleKey([a, b, c, d]) {
-  // pack into 16 bits (4 nybbles)
-  return (a & 0xf) | ((b & 0xf) << 4) | ((c & 0xf) << 8) | ((d & 0xf) << 12);
+function tupleKey6([a, b, c, d, e, f]) {
+  // pack into 24 bits (6 × 4-bit nybbles)
+  return (
+    (a & 0xf) |
+    ((b & 0xf) << 4) |
+    ((c & 0xf) << 8) |
+    ((d & 0xf) << 12) |
+    ((e & 0xf) << 16) |
+    ((f & 0xf) << 20)
+  );
 }
 
 function fmtDuration(seconds) {
@@ -254,8 +270,8 @@ function probsToU16Bps(wins, total) {
 }
 
 function computeTupleProbs(tuple, samples) {
-  const wins = [0, 0, 0, 0];
-  const key = tupleKey(tuple);
+  const wins = Array.from({ length: LANE_COUNT }, () => 0);
+  const key = tupleKey6(tuple);
   const state = { x: (BigInt(key) * 0x9e3779b97f4a7c15n) & MASK64 };
   for (let i = 0; i < samples; i++) {
     const seed = makeSeed32FromState(state);
@@ -287,18 +303,231 @@ function workerLoop() {
   parentPort.postMessage({ type: "ready" });
 }
 
+/**
+ * Split the table into shards that fit under 24KB each.
+ * Each entry is 12 bytes, so ~1700 entries per shard keeps us under 20KB with room for code.
+ */
+const ENTRIES_PER_SHARD = 1700;
+const TOTAL_TUPLES = 5005;
+const SHARD_COUNT = Math.ceil(TOTAL_TUPLES / ENTRIES_PER_SHARD); // 3 shards
+
+function generateShardContract(shardIndex, rows, startIndex) {
+  const tableBytes = [];
+  for (const row of rows) {
+    const probs = row.probs;
+    for (let i = 0; i < LANE_COUNT; i++) {
+      tableBytes.push(...encodeU16BE(probs[i]));
+    }
+  }
+
+  const hex = Buffer.from(Uint8Array.from(tableBytes)).toString("hex");
+  const entryCount = rows.length;
+
+  return `// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+/// @notice Win probability table shard ${shardIndex} of ${SHARD_COUNT} (6 lanes).
+/// @dev Contains entries ${startIndex} to ${startIndex + entryCount - 1} (${entryCount} entries).
+/// Each entry is ${ENTRY_BYTES} bytes: ${LANE_COUNT}× uint16 (basis points) in big-endian.
+contract WinProbTableShard${shardIndex} {
+    uint256 internal constant ENTRY_BYTES = ${ENTRY_BYTES};
+    uint256 internal constant SHARD_START = ${startIndex};
+    uint256 internal constant SHARD_LEN = ${entryCount};
+
+    bytes internal constant TABLE = hex"${hex}";
+
+    function getByGlobalIndex(uint256 globalIdx) external pure returns (uint16[${LANE_COUNT}] memory probsBps) {
+        require(globalIdx >= SHARD_START && globalIdx < SHARD_START + SHARD_LEN, "Index out of shard range");
+        uint256 localIdx = globalIdx - SHARD_START;
+        uint256 off = localIdx * ENTRY_BYTES;
+        for (uint256 i = 0; i < ${LANE_COUNT}; i++) {
+            probsBps[i] = _u16be(off + i * 2);
+        }
+    }
+
+    function shardRange() external pure returns (uint256 start, uint256 len) {
+        return (SHARD_START, SHARD_LEN);
+    }
+
+    function _u16be(uint256 off) private pure returns (uint16 v) {
+        uint8 hi = uint8(TABLE[off]);
+        uint8 lo = uint8(TABLE[off + 1]);
+        v = (uint16(hi) << 8) | uint16(lo);
+    }
+}
+`;
+}
+
+function generateRouterContract() {
+  // Build the combinatorial helper functions for 6 dimensions
+  return `// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+import "./WinProbTableShard0.sol";
+import "./WinProbTableShard1.sol";
+import "./WinProbTableShard2.sol";
+
+/// @notice Router for 6-lane win probability lookup table.
+/// @dev Routes queries to the correct shard based on the global index.
+/// Index order is all sorted tuples (a<=b<=c<=d<=e<=f) with a,b,c,d,e,f in [1..10], in nested-loop order.
+contract WinProbTable6 {
+    uint8 internal constant LANE_COUNT = 6;
+    uint256 internal constant ENTRY_BYTES = ${ENTRY_BYTES};
+    uint256 internal constant TABLE_LEN = ${TOTAL_TUPLES};
+    uint256 internal constant ENTRIES_PER_SHARD = ${ENTRIES_PER_SHARD};
+
+    WinProbTableShard0 public immutable shard0;
+    WinProbTableShard1 public immutable shard1;
+    WinProbTableShard2 public immutable shard2;
+
+    constructor(address _shard0, address _shard1, address _shard2) {
+        shard0 = WinProbTableShard0(_shard0);
+        shard1 = WinProbTableShard1(_shard1);
+        shard2 = WinProbTableShard2(_shard2);
+    }
+
+    /// @notice Compute the global index for a sorted 6-tuple.
+    /// @dev Uses combinatorial formulas to avoid iterating through all tuples.
+    /// Tuple must be sorted: a <= b <= c <= d <= e <= f, each in [1..10].
+    function _indexSorted(uint8 a, uint8 b, uint8 c, uint8 d, uint8 e, uint8 f) internal pure returns (uint256 idx) {
+        require(a >= 1 && f <= 10, "WinProbTable6: bad tuple");
+        require(a <= b && b <= c && c <= d && d <= e && e <= f, "WinProbTable6: not sorted");
+
+        // Count tuples lexicographically smaller using combinatorial formulas.
+        // For each position, count how many valid tuples have a smaller value at that position.
+        
+        // Position 0 (a): count tuples where first element < a
+        for (uint8 i = 1; i < a; i++) {
+            idx += _c5(uint8(16 - i)); // C(16-i, 5) = tuples starting with i
+        }
+        
+        // Position 1 (b): count tuples starting with a where second element < b
+        for (uint8 j = a; j < b; j++) {
+            idx += _c4(uint8(15 - j)); // C(15-j, 4)
+        }
+        
+        // Position 2 (c): count tuples starting with (a,b) where third element < c
+        for (uint8 k = b; k < c; k++) {
+            idx += _c3(uint8(14 - k)); // C(14-k, 3)
+        }
+        
+        // Position 3 (d): count tuples starting with (a,b,c) where fourth element < d
+        for (uint8 l = c; l < d; l++) {
+            idx += _c2(uint8(13 - l)); // C(13-l, 2)
+        }
+        
+        // Position 4 (e): count tuples starting with (a,b,c,d) where fifth element < e
+        for (uint8 m = d; m < e; m++) {
+            idx += uint256(12 - m); // C(12-m, 1) = 12-m
+        }
+        
+        // Position 5 (f): count tuples starting with (a,b,c,d,e) where sixth element < f
+        idx += uint256(f - e); // C(_, 0) = f - e
+    }
+
+    function _c2(uint8 n) private pure returns (uint256) {
+        if (n < 2) return 0;
+        return (uint256(n) * uint256(n - 1)) / 2;
+    }
+
+    function _c3(uint8 n) private pure returns (uint256) {
+        if (n < 3) return 0;
+        return (uint256(n) * uint256(n - 1) * uint256(n - 2)) / 6;
+    }
+
+    function _c4(uint8 n) private pure returns (uint256) {
+        if (n < 4) return 0;
+        return (uint256(n) * uint256(n - 1) * uint256(n - 2) * uint256(n - 3)) / 24;
+    }
+
+    function _c5(uint8 n) private pure returns (uint256) {
+        if (n < 5) return 0;
+        return (uint256(n) * uint256(n - 1) * uint256(n - 2) * uint256(n - 3) * uint256(n - 4)) / 120;
+    }
+
+    /// @notice Get win probabilities for a sorted 6-tuple.
+    /// @param a First score (smallest), b second, ..., f sixth (largest)
+    /// @return probsBps Win probability in basis points for each sorted position
+    function getSorted(uint8 a, uint8 b, uint8 c, uint8 d, uint8 e, uint8 f) 
+        external 
+        view 
+        returns (uint16[LANE_COUNT] memory probsBps) 
+    {
+        uint256 idx = _indexSorted(a, b, c, d, e, f);
+        return _getByIndex(idx);
+    }
+
+    /// @notice Get win probabilities by global table index.
+    function _getByIndex(uint256 idx) internal view returns (uint16[LANE_COUNT] memory probsBps) {
+        require(idx < TABLE_LEN, "WinProbTable6: index out of bounds");
+        
+        if (idx < ${ENTRIES_PER_SHARD}) {
+            return shard0.getByGlobalIndex(idx);
+        } else if (idx < ${ENTRIES_PER_SHARD * 2}) {
+            return shard1.getByGlobalIndex(idx);
+        } else {
+            return shard2.getByGlobalIndex(idx);
+        }
+    }
+
+    /// @notice Convenience: get probabilities for any 6 scores (auto-sorts them).
+    /// @dev Returns probabilities in the ORIGINAL order (not sorted order).
+    /// This handles the permutation so callers don't need to sort themselves.
+    function get(uint8[LANE_COUNT] memory scores) external view returns (uint16[LANE_COUNT] memory probsBps) {
+        // Sort scores while tracking original indices
+        uint8[LANE_COUNT] memory sorted;
+        uint8[LANE_COUNT] memory sortedToOriginal;
+        
+        for (uint8 i = 0; i < LANE_COUNT; i++) {
+            sorted[i] = scores[i];
+            sortedToOriginal[i] = i;
+        }
+        
+        // Simple insertion sort (small fixed size)
+        for (uint8 i = 1; i < LANE_COUNT; i++) {
+            uint8 key = sorted[i];
+            uint8 keyIdx = sortedToOriginal[i];
+            uint8 j = i;
+            while (j > 0 && sorted[j - 1] > key) {
+                sorted[j] = sorted[j - 1];
+                sortedToOriginal[j] = sortedToOriginal[j - 1];
+                j--;
+            }
+            sorted[j] = key;
+            sortedToOriginal[j] = keyIdx;
+        }
+        
+        // Clamp scores to [1, 10]
+        for (uint8 i = 0; i < LANE_COUNT; i++) {
+            if (sorted[i] < 1) sorted[i] = 1;
+            if (sorted[i] > 10) sorted[i] = 10;
+        }
+        
+        // Get probabilities for sorted tuple
+        uint16[LANE_COUNT] memory sortedProbs = this.getSorted(
+            sorted[0], sorted[1], sorted[2], sorted[3], sorted[4], sorted[5]
+        );
+        
+        // Map back to original order
+        for (uint8 i = 0; i < LANE_COUNT; i++) {
+            probsBps[sortedToOriginal[i]] = sortedProbs[i];
+        }
+    }
+}
+`;
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (!Number.isFinite(args.samples) || args.samples <= 0) throw new Error("--samples must be > 0");
   if (!Number.isFinite(args.workers) || args.workers <= 0) throw new Error("--workers must be > 0");
 
-  const totalTuples = 715;
   const startAt = Date.now();
 
   const checkpointAbs = path.resolve(args.checkpoint);
-  const outSolAbs = path.resolve(args.outSol);
+  const outDirAbs = path.resolve(args.outDir);
   fs.mkdirSync(path.dirname(checkpointAbs), { recursive: true });
-  fs.mkdirSync(path.dirname(outSolAbs), { recursive: true });
+  fs.mkdirSync(outDirAbs, { recursive: true });
 
   /** @type {{ idx: number, samples: number, rows: Array<{tuple:number[], probs:number[]}> }} */
   let checkpoint = { idx: 0, samples: args.samples, rows: [] };
@@ -310,19 +539,16 @@ async function main() {
     console.log(`Resuming from checkpoint: ${checkpoint.rows.length} rows`);
   }
 
-  const tableBytes = [];
-  for (const row of checkpoint.rows) {
-    const probs = row.probs;
-    for (let i = 0; i < 4; i++) tableBytes.push(...encodeU16BE(probs[i]));
-  }
-
-  const tuples = Array.from(sortedScoreTuples());
+  const tuples = Array.from(sortedScoreTuples6());
   const startIndex = checkpoint.rows.length;
-  if (startIndex >= totalTuples) {
-    console.log("Checkpoint already complete; emitting Solidity table...");
+  
+  if (startIndex >= TOTAL_TUPLES) {
+    console.log("Checkpoint already complete; emitting Solidity contracts...");
   } else {
-    const workerCount = Math.min(args.workers, totalTuples - startIndex);
-    console.log(`Workers: ${workerCount} | samples/tuple: ${args.samples} | total tuples: ${totalTuples}`);
+    const workerCount = Math.min(args.workers, TOTAL_TUPLES - startIndex);
+    console.log(`Workers: ${workerCount} | samples/tuple: ${args.samples} | total tuples: ${TOTAL_TUPLES}`);
+    console.log(`Entry size: ${ENTRY_BYTES} bytes | Total table size: ~${Math.ceil((TOTAL_TUPLES * ENTRY_BYTES) / 1024)} KB`);
+    console.log(`Shards: ${SHARD_COUNT} (${ENTRIES_PER_SHARD} entries each)`);
 
     /** @type {Worker[]} */
     const workers = [];
@@ -335,7 +561,7 @@ async function main() {
     let lastLogAt = Date.now();
 
     const dispatchOne = slot => {
-      if (nextDispatch >= totalTuples) return false;
+      if (nextDispatch >= TOTAL_TUPLES) return false;
       const tuple = tuples[nextDispatch];
       const jobId = `${nextDispatch}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
       slot.busy = true;
@@ -350,28 +576,26 @@ async function main() {
         const row = pending.get(nextCommit);
         pending.delete(nextCommit);
 
-        const probs = row.probs;
-        for (let i = 0; i < 4; i++) tableBytes.push(...encodeU16BE(probs[i]));
-        checkpoint.rows.push({ tuple: row.tuple, probs });
+        checkpoint.rows.push({ tuple: row.tuple, probs: row.probs });
         checkpoint.idx = nextCommit + 1;
         fs.writeFileSync(checkpointAbs, JSON.stringify(checkpoint));
 
         nextCommit++;
 
-        if (nextCommit % args.progressEvery === 0 || nextCommit === totalTuples) {
+        if (nextCommit % args.progressEvery === 0 || nextCommit === TOTAL_TUPLES) {
           const now = Date.now();
           const elapsedSec = (now - startAt) / 1000;
           const done = nextCommit;
-          const pct = ((100 * done) / totalTuples).toFixed(1);
+          const pct = ((100 * done) / TOTAL_TUPLES).toFixed(1);
           const tuplesPerSec = done / Math.max(1e-9, elapsedSec);
-          const remainingSec = (totalTuples - done) / Math.max(1e-9, tuplesPerSec);
+          const remainingSec = (TOTAL_TUPLES - done) / Math.max(1e-9, tuplesPerSec);
           const simsPerSec = ((done * args.samples) / Math.max(1e-9, elapsedSec)).toFixed(0);
 
-          const logEveryMs = 1000;
-          if (now - lastLogAt >= logEveryMs || done === totalTuples) {
+          const logEveryMs = 2000;
+          if (now - lastLogAt >= logEveryMs || done === TOTAL_TUPLES) {
             lastLogAt = now;
             console.log(
-              `[${pct}%] ${done}/${totalTuples} tuples | elapsed ${fmtDuration(elapsedSec)} | ETA ${fmtDuration(
+              `[${pct}%] ${done}/${TOTAL_TUPLES} tuples | elapsed ${fmtDuration(elapsedSec)} | ETA ${fmtDuration(
                 remainingSec,
               )} | ~${simsPerSec} sims/s | workers ${workerCount}`,
             );
@@ -410,7 +634,7 @@ async function main() {
         // Keep dispatching
         if (!finished) dispatchOne(slot);
 
-        if (nextCommit >= totalTuples && !finished) {
+        if (nextCommit >= TOTAL_TUPLES && !finished) {
           finished = true;
           resolve();
         }
@@ -440,70 +664,27 @@ async function main() {
     for (const w of workers) w.postMessage({ type: "stop" });
   }
 
-  const hex = Buffer.from(Uint8Array.from(tableBytes)).toString("hex");
-  const sol = `// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+  // Generate shard contracts
+  console.log(`\nGenerating ${SHARD_COUNT} shard contracts...`);
+  for (let shardIdx = 0; shardIdx < SHARD_COUNT; shardIdx++) {
+    const startIdx = shardIdx * ENTRIES_PER_SHARD;
+    const endIdx = Math.min(startIdx + ENTRIES_PER_SHARD, checkpoint.rows.length);
+    const shardRows = checkpoint.rows.slice(startIdx, endIdx);
+    
+    const sol = generateShardContract(shardIdx, shardRows, startIdx);
+    const shardPath = path.join(outDirAbs, `WinProbTableShard${shardIdx}.sol`);
+    fs.writeFileSync(shardPath, sol);
+    console.log(`  Wrote: ${shardPath} (${shardRows.length} entries, ~${Math.ceil((shardRows.length * ENTRY_BYTES) / 1024)} KB)`);
+  }
 
-/// @notice Readiness win probability lookup table (4 lanes).
-/// @dev Index order is all sorted tuples (a<=b<=c<=d) with a,b,c,d in [1..10], in nested-loop order.
-/// Each entry is 8 bytes: 4x uint16 (basis points) in big-endian.
-/// @dev This is a deployable contract (not a library) so \`GiraffeRace\` doesn't exceed the 24KB size limit.
-contract WinProbTable {
-    uint256 internal constant ENTRY_BYTES = 8;
-    uint256 internal constant TABLE_LEN = 715;
+  // Generate router contract
+  const routerSol = generateRouterContract();
+  const routerPath = path.join(outDirAbs, "WinProbTable6.sol");
+  fs.writeFileSync(routerPath, routerSol);
+  console.log(`  Wrote: ${routerPath}`);
 
-    bytes internal constant TABLE = hex"${hex}";
-
-    function _indexSorted(uint8 a, uint8 b, uint8 c, uint8 d) internal pure returns (uint256 idx) {
-        // Rank in nested-loop order without brute-forcing all 715 entries.
-        // Count of nondecreasing length-r sequences from [s..10] is C((10-s+1)+r-1, r).
-        if (a < 1 || d > 10) revert("WinProbTable: bad tuple");
-        if (a > b || b > c || c > d) revert("WinProbTable: bad tuple");
-
-        for (uint8 i = 1; i < a; i++) {
-            idx += _c3(uint8(13 - i)); // C((10-i)+3,3) = C(13-i,3)
-        }
-        for (uint8 j = a; j < b; j++) {
-            idx += _c2(uint8(12 - j)); // C(12-j,2)
-        }
-        for (uint8 k = b; k < c; k++) {
-            idx += uint256(11 - k); // C(11-k,1)
-        }
-        idx += uint256(d - c); // C(_,0)
-    }
-
-    function _c2(uint8 n) private pure returns (uint256) {
-        if (n < 2) return 0;
-        return (uint256(n) * uint256(n - 1)) / 2;
-    }
-
-    function _c3(uint8 n) private pure returns (uint256) {
-        if (n < 3) return 0;
-        return (uint256(n) * uint256(n - 1) * uint256(n - 2)) / 6;
-    }
-
-    function getSorted(uint8 a, uint8 b, uint8 c, uint8 d) external pure returns (uint16[4] memory probsBps) {
-        uint256 idx = _indexSorted(a, b, c, d);
-        uint256 off = idx * ENTRY_BYTES;
-        probsBps[0] = _u16be(off);
-        probsBps[1] = _u16be(off + 2);
-        probsBps[2] = _u16be(off + 4);
-        probsBps[3] = _u16be(off + 6);
-    }
-
-    function _u16be(uint256 off) private pure returns (uint16 v) {
-        // TABLE is a constant bytes, so bounds are guaranteed by construction.
-        uint8 hi = uint8(TABLE[off]);
-        uint8 lo = uint8(TABLE[off + 1]);
-        v = (uint16(hi) << 8) | uint16(lo);
-    }
-}
-`;
-
-  fs.mkdirSync(path.dirname(outSolAbs), { recursive: true });
-  fs.writeFileSync(outSolAbs, sol);
-  console.log(`Wrote Solidity table: ${outSolAbs}`);
-  console.log(`Checkpoint: ${checkpointAbs}`);
+  console.log(`\nCheckpoint: ${checkpointAbs}`);
+  console.log(`Done! Total tuples: ${checkpoint.rows.length}`);
 }
 
 if (isMainThread) {

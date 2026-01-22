@@ -14,11 +14,13 @@ import "../contracts/MockUSDC.sol";
  *      yarn deploy --file DeployGiraffeRace.s.sol  # local anvil chain
  *
  * Environment variables:
- *   TREASURY_OWNER - Controls treasury withdrawals AND owns house NFTs.
- *                    Should be a multisig in production.
- *   ODDS_ADMIN     - Can set race odds. Can be a hot wallet for frequent operations.
- *                    Defaults to TREASURY_OWNER for local testing.
- *   USDC_ADDRESS   - USDC contract address. If not set, deploys MockUSDC (local testing only).
+ *   TREASURY_OWNER   - Controls treasury withdrawals AND owns house NFTs.
+ *                      Should be a multisig in production.
+ *   ODDS_ADMIN       - Can set race odds. Can be a hot wallet for frequent operations.
+ *                      Defaults to TREASURY_OWNER for local testing.
+ *   USDC_ADDRESS     - USDC contract address. If not set, deploys MockUSDC (local testing only).
+ *   WIN_PROB_TABLE   - Address of the deployed WinProbTable6 contract. If not set, 
+ *                      uses fallback fixed odds (for local testing without generating the table).
  */
 contract DeployGiraffeRace is ScaffoldETHDeploy {
     function run() external ScaffoldEthDeployerRunner {
@@ -32,6 +34,10 @@ contract DeployGiraffeRace is ScaffoldETHDeploy {
 
         // USDC address - if not set, deploy MockUSDC for local testing.
         address usdcAddress = vm.envOr("USDC_ADDRESS", address(0));
+
+        // WinProbTable6 address - if not set, uses fallback fixed odds.
+        // To use the probability table, first deploy WinProbTable6 (and its shards), then pass the address here.
+        address winProbTable = vm.envOr("WIN_PROB_TABLE", address(0));
 
         // Deploy MockUSDC if needed (local testing)
         MockUSDC mockUsdc;
@@ -70,7 +76,8 @@ contract DeployGiraffeRace is ScaffoldETHDeploy {
             oddsAdmin,      // oddsAdmin: can set odds (hot wallet)
             houseTokenIds,
             address(simulator),
-            address(treasury)
+            address(treasury),
+            winProbTable    // probability table for odds (address(0) = fallback to fixed odds)
         );
 
         // Authorize race contract to collect bets and pay winners (we're still owner at this point)

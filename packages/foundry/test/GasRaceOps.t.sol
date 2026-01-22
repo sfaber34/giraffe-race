@@ -37,7 +37,7 @@ contract GasRaceOpsTest is Test {
         }
 
         simulator = new GiraffeRaceSimulator();
-        race = new GiraffeRace(address(giraffeNft), house, oddsAdmin, houseTokenIds, address(simulator), address(treasury));
+        race = new GiraffeRace(address(giraffeNft), house, oddsAdmin, houseTokenIds, address(simulator), address(treasury), address(0));
         giraffeNft.setRaceContract(address(race));
 
         // Authorize race contract in treasury
