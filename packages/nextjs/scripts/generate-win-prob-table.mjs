@@ -2,7 +2,6 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { Worker, isMainThread, parentPort, workerData } from "node:worker_threads";
-import { keccak256, toHex } from "viem";
 
 /**
  * Precompute win probabilities by effective score (1-10) for 6-lane races.
@@ -31,78 +30,70 @@ const LANE_COUNT = 6;
 const ENTRY_BYTES = LANE_COUNT * 2; // 6 lanes × 2 bytes (uint16) = 12 bytes per entry
 
 // -----------------------
-// Race sim (JS port of TS, 6 lanes)
+// Fast PRNG for Monte Carlo (xorshift128+)
+// Uses 32-bit Number operations for ~10-50x speedup over BigInt
+// Note: This is for probability estimation only, not for matching on-chain PRNG
 // -----------------------
 
-class DeterministicDice {
-  /** @type {Uint8Array} */
-  entropy;
-  /** nibble position 0..63 */
-  position = 0;
-
-  /** @param {`0x${string}`} seed */
+class FastRng {
   constructor(seed) {
-    this.entropy = hexToBytes(seed);
-  }
-
-  /** @param {bigint} n */
-  roll(n) {
-    if (n <= 0n) throw new Error("DeterministicDice: n must be > 0");
-    const bitsNeeded = ceilLog2(n);
-    let hexCharsNeeded = Number((bitsNeeded + 3n) / 4n);
-    if (hexCharsNeeded === 0) hexCharsNeeded = 1;
-
-    const maxValue = 16n ** BigInt(hexCharsNeeded);
-    const threshold = maxValue - (maxValue % n);
-
-    let value;
-    do {
-      value = this.consumeNibbles(hexCharsNeeded);
-    } while (value >= threshold);
-
-    return value % n;
-  }
-
-  /** @param {number} count */
-  consumeNibbles(count) {
-    let value = 0n;
-    for (let i = 0; i < count; i++) {
-      if (this.position >= 64) {
-        this.entropy = hexToBytes(keccak256(this.entropy));
-        this.position = 0;
+    // Initialize state from seed (can be number or hex string)
+    if (typeof seed === 'string') {
+      // Hash the hex string to get initial state
+      const s = seed.startsWith('0x') ? seed.slice(2) : seed;
+      this.s0 = 0;
+      this.s1 = 0;
+      this.s2 = 0;
+      this.s3 = 0;
+      for (let i = 0; i < s.length; i += 8) {
+        const chunk = parseInt(s.slice(i, i + 8) || '0', 16) >>> 0;
+        this.s0 = (this.s0 ^ chunk) >>> 0;
+        this.s1 = (this.s1 ^ (chunk * 0x85ebca6b)) >>> 0;
+        this.s2 = (this.s2 ^ (chunk * 0xc2b2ae35)) >>> 0;
+        this.s3 = (this.s3 ^ (chunk * 0x27d4eb2f)) >>> 0;
       }
-      const nibble = getNibble(this.entropy, this.position);
-      value = (value << 4n) + BigInt(nibble);
-      this.position++;
+      // Ensure non-zero state
+      if ((this.s0 | this.s1 | this.s2 | this.s3) === 0) {
+        this.s0 = 0x12345678;
+        this.s1 = 0x9abcdef0;
+        this.s2 = 0xdeadbeef;
+        this.s3 = 0xcafebabe;
+      }
+    } else {
+      // Numeric seed
+      this.s0 = (seed >>> 0) || 0x12345678;
+      this.s1 = ((seed * 0x85ebca6b) >>> 0) || 0x9abcdef0;
+      this.s2 = ((seed * 0xc2b2ae35) >>> 0) || 0xdeadbeef;
+      this.s3 = ((seed * 0x27d4eb2f) >>> 0) || 0xcafebabe;
     }
-    return value;
+    // Warm up
+    for (let i = 0; i < 20; i++) this.next();
   }
-}
 
-function hexToBytes(hex) {
-  const s = hex.startsWith("0x") ? hex.slice(2) : hex;
-  const out = new Uint8Array(s.length / 2);
-  for (let i = 0; i < out.length; i++) {
-    out[i] = Number.parseInt(s.slice(i * 2, i * 2 + 2), 16);
+  // xorshift128 - returns 32-bit unsigned integer
+  next() {
+    let t = this.s3;
+    const s = this.s0;
+    this.s3 = this.s2;
+    this.s2 = this.s1;
+    this.s1 = s;
+    t ^= t << 11;
+    t ^= t >>> 8;
+    this.s0 = (t ^ s ^ (s >>> 19)) >>> 0;
+    return this.s0;
   }
-  return out;
-}
 
-function getNibble(bytes, pos) {
-  const byteIndex = Math.floor(pos / 2);
-  const byteValue = bytes[byteIndex] ?? 0;
-  return pos % 2 === 0 ? byteValue >> 4 : byteValue & 0x0f;
-}
-
-function ceilLog2(n) {
-  if (n <= 1n) return 0n;
-  let result = 0n;
-  let temp = n - 1n;
-  while (temp > 0n) {
-    result++;
-    temp >>= 1n;
+  // Returns random integer in [0, n-1]
+  roll(n) {
+    if (n <= 1) return 0;
+    // Use rejection sampling for unbiased results
+    const limit = (0x100000000 - (0x100000000 % n)) >>> 0;
+    let r;
+    do {
+      r = this.next();
+    } while (r >= limit);
+    return r % n;
   }
-  return result;
 }
 
 function clampScore(r) {
@@ -124,71 +115,76 @@ function scoreBps(score) {
 
 /**
  * @param {object} p
- * @param {`0x${string}`} p.seed
+ * @param {`0x${string}` | number} p.seed
  * @param {number[]} p.score length 6
  */
 function simulateRaceFromSeed({ seed, score }) {
-  const dice = new DeterministicDice(seed);
-  const distances = Array.from({ length: LANE_COUNT }, () => 0);
-  const bps = Array.from({ length: LANE_COUNT }, (_, i) => scoreBps(score[i] ?? 10));
+  const rng = new FastRng(seed);
+  const distances = [0, 0, 0, 0, 0, 0]; // Fixed size array for speed
+  const bps = [
+    scoreBps(score[0] ?? 10),
+    scoreBps(score[1] ?? 10),
+    scoreBps(score[2] ?? 10),
+    scoreBps(score[3] ?? 10),
+    scoreBps(score[4] ?? 10),
+    scoreBps(score[5] ?? 10),
+  ];
 
-  // constants (must match Solidity)
-  const SPEED_RANGE = 10n;
+  // constants (match Solidity logic)
+  const SPEED_RANGE = 10;
   const TRACK_LENGTH = 1000;
   const MAX_TICKS = 500;
 
   let finished = false;
   for (let t = 0; t < MAX_TICKS; t++) {
     for (let a = 0; a < LANE_COUNT; a++) {
-      const r = dice.roll(SPEED_RANGE); // 0..9
-      const baseSpeed = Number(r + 1n); // 1..10
+      const r = rng.roll(SPEED_RANGE); // 0..9
+      const baseSpeed = r + 1; // 1..10
       // Probabilistic rounding (matches Solidity): avoids a chunky handicap from floor().
       const raw = baseSpeed * bps[a];
       let q = Math.floor(raw / 10_000);
       const rem = raw % 10_000;
       if (rem > 0) {
-        const pick = Number(dice.roll(10_000n)); // 0..9999
+        const pick = rng.roll(10_000); // 0..9999
         if (pick < rem) q += 1;
       }
-      distances[a] += Math.max(1, q);
+      distances[a] += q > 0 ? q : 1;
     }
-    if (distances.some(d => d >= TRACK_LENGTH)) {
+    // Check for finish - inline for speed
+    if (distances[0] >= TRACK_LENGTH || distances[1] >= TRACK_LENGTH ||
+        distances[2] >= TRACK_LENGTH || distances[3] >= TRACK_LENGTH ||
+        distances[4] >= TRACK_LENGTH || distances[5] >= TRACK_LENGTH) {
       finished = true;
       break;
     }
   }
   if (!finished) throw new Error("Race did not finish");
 
-  const best = Math.max(...distances);
+  // Find winner(s)
+  const best = Math.max(distances[0], distances[1], distances[2], 
+                        distances[3], distances[4], distances[5]);
   const leaders = [];
   for (let i = 0; i < LANE_COUNT; i++) if (distances[i] === best) leaders.push(i);
   if (leaders.length === 1) return leaders[0];
-  // Dead heat: pick randomly (matches Solidity)
-  const pick = Number(dice.roll(BigInt(leaders.length)));
-  return leaders[pick];
+  // Dead heat: pick randomly
+  return leaders[rng.roll(leaders.length)];
 }
 
 // -----------------------
-// PRNG: SplitMix64
+// Fast seed generation (32-bit splitmix32)
 // -----------------------
 
-const MASK64 = (1n << 64n) - 1n;
-const SPLITMIX64_GAMMA = 0x9e3779b97f4a7c15n;
-function splitmix64Next(state) {
-  state.x = (state.x + SPLITMIX64_GAMMA) & MASK64;
+function splitmix32Next(state) {
+  state.x = (state.x + 0x9e3779b9) >>> 0;
   let z = state.x;
-  z = ((z ^ (z >> 30n)) * 0xbf58476d1ce4e5b9n) & MASK64;
-  z = ((z ^ (z >> 27n)) * 0x94d049bb133111ebn) & MASK64;
-  return (z ^ (z >> 31n)) & MASK64;
+  z = Math.imul(z ^ (z >>> 16), 0x85ebca6b) >>> 0;
+  z = Math.imul(z ^ (z >>> 13), 0xc2b2ae35) >>> 0;
+  return (z ^ (z >>> 16)) >>> 0;
 }
 
-function makeSeed32FromState(state) {
-  const a = splitmix64Next(state);
-  const b = splitmix64Next(state);
-  const c = splitmix64Next(state);
-  const d = splitmix64Next(state);
-  const seed256 = (a << 192n) | (b << 128n) | (c << 64n) | d;
-  return /** @type {`0x${string}`} */ (toHex(seed256, { size: 32 }));
+function makeSeedFromState(state) {
+  // Generate a unique numeric seed - much faster than hex string
+  return splitmix32Next(state);
 }
 
 // -----------------------
@@ -275,13 +271,14 @@ function probsToU16Bps(wins, total) {
 }
 
 function computeTupleProbs(tuple, samples) {
-  const wins = Array.from({ length: LANE_COUNT }, () => 0);
+  const wins = [0, 0, 0, 0, 0, 0]; // Fixed array for speed
   const key = tupleKey6(tuple);
-  const state = { x: (BigInt(key) * 0x9e3779b97f4a7c15n) & MASK64 };
+  // Use 32-bit state for fast seeding
+  const state = { x: Math.imul(key, 0x9e3779b9) >>> 0 };
   for (let i = 0; i < samples; i++) {
-    const seed = makeSeed32FromState(state);
+    const seed = makeSeedFromState(state);
     const winner = simulateRaceFromSeed({ seed, score: tuple });
-    wins[winner] += 1;
+    wins[winner]++;
   }
   return probsToU16Bps(wins, samples);
 }
