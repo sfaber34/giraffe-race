@@ -195,24 +195,36 @@ export const PlaceBetCard = ({
           <div className="text-xs text-error">Insufficient USDC balance</div>
         )}
 
-        {needsApproval ? (
+        <div className="flex flex-col gap-2">
           <button
-            className="btn btn-primary"
-            disabled={isApproving || !placeBetValue || !hasEnoughUsdc || !!myBet?.hasBet || exceedsMaxBet}
+            className={`btn w-full ${needsApproval ? "btn-outline" : "btn-success"}`}
+            disabled={
+              isApproving ||
+              !needsApproval ||
+              betLane === null ||
+              !placeBetValue ||
+              !hasEnoughUsdc ||
+              !!myBet?.hasBet ||
+              exceedsMaxBet
+            }
             onClick={onApprove}
           >
-            {isApproving ? <span className="loading loading-spinner loading-xs" /> : null}
-            Approve USDC
+            {isApproving ? (
+              <span className="loading loading-spinner loading-xs" />
+            ) : !needsApproval && placeBetValue ? (
+              <span>✓</span>
+            ) : null}
+            {!needsApproval && placeBetValue ? "Approved" : "Approve USDC"}
           </button>
-        ) : (
           <button
-            className="btn btn-primary"
+            className="btn btn-primary w-full"
             disabled={
               !giraffeRaceContract ||
               !connectedAddress ||
               !canBet ||
               betLane === null ||
               !placeBetValue ||
+              needsApproval ||
               !!myBet?.hasBet ||
               !isViewingLatest ||
               !hasEnoughUsdc ||
@@ -222,7 +234,7 @@ export const PlaceBetCard = ({
           >
             Place bet
           </button>
-        )}
+        </div>
       </div>
     </div>
   );
