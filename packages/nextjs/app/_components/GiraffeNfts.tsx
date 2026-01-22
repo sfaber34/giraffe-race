@@ -72,7 +72,7 @@ export const GiraffeNfts = () => {
 
   const [mintName, setMintName] = useState("");
   const [ownedNfts, setOwnedNfts] = useState<
-    { tokenId: bigint; name: string; readiness: number; conditioning: number; speed: number }[]
+    { tokenId: bigint; name: string; zip: number; moxie: number; hustle: number }[]
   >([]);
   const [isLoadingOwnedNfts, setIsLoadingOwnedNfts] = useState(false);
   const [isGiraffeNftDeployedOnChain, setIsGiraffeNftDeployedOnChain] = useState<boolean | null>(null);
@@ -317,9 +317,9 @@ export const GiraffeNfts = () => {
             return {
               tokenId,
               name,
-              readiness: clampStat(Number(tuple[0] ?? 10)),
-              conditioning: clampStat(Number(tuple[1] ?? 10)),
-              speed: clampStat(Number(tuple[2] ?? 10)),
+              zip: clampStat(Number(tuple[0] ?? 10)),
+              moxie: clampStat(Number(tuple[1] ?? 10)),
+              hustle: clampStat(Number(tuple[2] ?? 10)),
             };
           }),
         );
@@ -685,7 +685,7 @@ export const GiraffeNfts = () => {
                           </span>
                         </div>
                         <div className="text-xs opacity-70">
-                          Readiness: {nft.readiness}/10 · Conditioning: {nft.conditioning}/10 · Speed: {nft.speed}/10
+                          Zip: {nft.zip}/10 · Moxie: {nft.moxie}/10 · Hustle: {nft.hustle}/10
                         </div>
                       </div>
                     </div>

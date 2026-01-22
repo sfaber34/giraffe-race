@@ -760,7 +760,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 6,
+      deployedOnBlock: 3,
     },
     GiraffeNFT: {
       address: "0x8ce361602b935680e8dec218b820ff5056beb7af",
@@ -898,25 +898,6 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "conditioningOf",
-          inputs: [
-            {
-              name: "tokenId",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          outputs: [
-            {
-              name: "",
-              type: "uint8",
-              internalType: "uint8",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
           name: "getApproved",
           inputs: [
             {
@@ -1012,6 +993,25 @@ const deployedContracts = {
               name: "",
               type: "bytes32[]",
               internalType: "bytes32[]",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "hustleOf",
+          inputs: [
+            {
+              name: "tokenId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "uint8",
+              internalType: "uint8",
             },
           ],
           stateMutability: "view",
@@ -1143,7 +1143,7 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "mintWithReadiness",
+          name: "mintWithZip",
           inputs: [
             {
               name: "to",
@@ -1151,7 +1151,7 @@ const deployedContracts = {
               internalType: "address",
             },
             {
-              name: "readiness",
+              name: "zip",
               type: "uint8",
               internalType: "uint8",
             },
@@ -1169,6 +1169,25 @@ const deployedContracts = {
             },
           ],
           stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "moxieOf",
+          inputs: [
+            {
+              name: "tokenId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "uint8",
+              internalType: "uint8",
+            },
+          ],
+          stateMutability: "view",
         },
         {
           type: "function",
@@ -1256,25 +1275,6 @@ const deployedContracts = {
               name: "",
               type: "address",
               internalType: "address",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "readinessOf",
-          inputs: [
-            {
-              name: "tokenId",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          outputs: [
-            {
-              name: "",
-              type: "uint8",
-              internalType: "uint8",
             },
           ],
           stateMutability: "view",
@@ -1434,17 +1434,17 @@ const deployedContracts = {
               internalType: "uint256",
             },
             {
-              name: "readiness",
+              name: "zip",
               type: "uint8",
               internalType: "uint8",
             },
             {
-              name: "conditioning",
+              name: "moxie",
               type: "uint8",
               internalType: "uint8",
             },
             {
-              name: "speed",
+              name: "hustle",
               type: "uint8",
               internalType: "uint8",
             },
@@ -1460,24 +1460,6 @@ const deployedContracts = {
               name: "_race",
               type: "address",
               internalType: "address",
-            },
-          ],
-          outputs: [],
-          stateMutability: "nonpayable",
-        },
-        {
-          type: "function",
-          name: "setReadinessForTesting",
-          inputs: [
-            {
-              name: "tokenId",
-              type: "uint256",
-              internalType: "uint256",
-            },
-            {
-              name: "readiness",
-              type: "uint8",
-              internalType: "uint8",
             },
           ],
           outputs: [],
@@ -1503,22 +1485,21 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "speedOf",
+          name: "setZipForTesting",
           inputs: [
             {
               name: "tokenId",
               type: "uint256",
               internalType: "uint256",
             },
-          ],
-          outputs: [
             {
-              name: "",
+              name: "zip",
               type: "uint8",
               internalType: "uint8",
             },
           ],
-          stateMutability: "view",
+          outputs: [],
+          stateMutability: "nonpayable",
         },
         {
           type: "function",
@@ -1532,17 +1513,17 @@ const deployedContracts = {
           ],
           outputs: [
             {
-              name: "readiness",
+              name: "zip",
               type: "uint8",
               internalType: "uint8",
             },
             {
-              name: "conditioning",
+              name: "moxie",
               type: "uint8",
               internalType: "uint8",
             },
             {
-              name: "speed",
+              name: "hustle",
               type: "uint8",
               internalType: "uint8",
             },
@@ -1677,6 +1658,25 @@ const deployedContracts = {
               name: "",
               type: "address",
               internalType: "contract IERC20",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "zipOf",
+          inputs: [
+            {
+              name: "tokenId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "uint8",
+              internalType: "uint8",
             },
           ],
           stateMutability: "view",
@@ -2139,7 +2139,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 6,
+      deployedOnBlock: 2,
     },
     GiraffeRaceSimulator: {
       address: "0xe1aa25618fa0c7a1cfdab5d6b456af611873b629",
@@ -2257,7 +2257,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 3,
+      deployedOnBlock: 5,
     },
     WinProbTableShard0: {
       address: "0xe1da8919f262ee86f9be05059c9280142cf23f48",
@@ -2301,7 +2301,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 6,
+      deployedOnBlock: 5,
     },
     WinProbTableShard1: {
       address: "0x0c8e79f3534b00d9a3d4a856b665bf4ebc22f2ba",
@@ -2345,7 +2345,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 6,
+      deployedOnBlock: 5,
     },
     WinProbTableShard2: {
       address: "0xed1db453c3156ff3155a97ad217b3087d5dc5f6e",
@@ -2389,7 +2389,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 6,
+      deployedOnBlock: 5,
     },
     WinProbTableShard3: {
       address: "0xf7cd8fa9b94db2aa972023b379c7f72c65e4de9d",
@@ -2433,7 +2433,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 6,
+      deployedOnBlock: 3,
     },
     WinProbTableShard4: {
       address: "0x12975173b87f7595ee45dffb2ab812ece596bf84",
@@ -2477,7 +2477,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 4,
+      deployedOnBlock: 5,
     },
     WinProbTableShard5: {
       address: "0x82dc47734901ee7d4f4232f398752cb9dd5daccc",
@@ -2521,7 +2521,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 6,
+      deployedOnBlock: 5,
     },
     WinProbTable6: {
       address: "0x196dbcbb54b8ec4958c959d8949ebfe87ac2aaaf",
@@ -2705,7 +2705,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 6,
+      deployedOnBlock: 5,
     },
     GiraffeRace: {
       address: "0x6379ebd504941f50d5bfde9348b37593bd29c835",
@@ -4226,7 +4226,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 6,
+      deployedOnBlock: 5,
     },
   },
 } as const;

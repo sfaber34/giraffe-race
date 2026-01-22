@@ -96,7 +96,7 @@ contract DeployGiraffeRace is ScaffoldETHDeploy {
         // Transfer treasury ownership to the actual treasuryOwner (multisig)
         treasury.transferOwnership(treasuryOwner);
 
-        // Allow the race contract to update readiness after races.
+        // Allow the race contract to update stats after races.
         giraffeNft.setRaceContract(address(race));
 
         // Configure mint fee: 1 USDC goes to treasury

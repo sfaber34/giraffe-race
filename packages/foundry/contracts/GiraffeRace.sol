@@ -12,10 +12,10 @@ interface IWinProbTable6 {
 }
 
 interface IGiraffeNFT is IERC721 {
-    function readinessOf(uint256 tokenId) external view returns (uint8);
-    function conditioningOf(uint256 tokenId) external view returns (uint8);
-    function speedOf(uint256 tokenId) external view returns (uint8);
-    function statsOf(uint256 tokenId) external view returns (uint8 readiness, uint8 conditioning, uint8 speed);
+    function zipOf(uint256 tokenId) external view returns (uint8);
+    function moxieOf(uint256 tokenId) external view returns (uint8);
+    function hustleOf(uint256 tokenId) external view returns (uint8);
+    function statsOf(uint256 tokenId) external view returns (uint8 zip, uint8 moxie, uint8 hustle);
 }
 
 /**
@@ -119,7 +119,7 @@ contract GiraffeRace {
     mapping(uint256 => RaceGiraffes) private raceGiraffes;
     // Snapshot of "effective score" (1-10) for each lane at lineup finalization time.
     // Effective score is computed as the equally-weighted average of:
-    //   readiness, conditioning, speed (each 1-10).
+    //   zip, moxie, hustle (each 1-10).
     mapping(uint256 => uint8[LANE_COUNT]) private raceScore;
     mapping(uint256 => mapping(address => bool)) private hasSubmittedGiraffe;
     mapping(uint256 => RaceEntry[]) private raceEntries;
@@ -249,7 +249,7 @@ contract GiraffeRace {
     }
 
     /// @notice Deterministically simulate a race from a seed + lane effective score snapshot.
-    /// @dev Effective score is typically the rounded average of readiness/conditioning/speed.
+    /// @dev Effective score is typically the rounded average of zip/moxie/hustle.
     function simulateWithScore(bytes32 seed, uint8[LANE_COUNT] calldata score)
         external
         view

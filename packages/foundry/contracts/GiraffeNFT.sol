@@ -29,13 +29,13 @@ contract GiraffeNFT is ERC721, Ownable {
     mapping(uint256 => bytes32) private _seeds;
     // Name collision protection: track which name hashes are used
     mapping(bytes32 => bool) private _usedNames; // nameHash => isUsed
-    // Readiness is a simple 1-10 attribute that affects race performance.
-    mapping(uint256 => uint8) private _readiness; // 0 = legacy/uninitialized (treated as 10)
+    // Zip is a simple 1-10 attribute that affects race performance.
+    mapping(uint256 => uint8) private _zip; // 0 = legacy/uninitialized (treated as 10)
     // Additional 1-10 attributes that affect race performance.
-    // Race performance uses the equally-weighted average of (readiness, conditioning, speed) as an effective score.
+    // Race performance uses the equally-weighted average of (zip, moxie, hustle) as an effective score.
     // 0 = legacy/uninitialized (treated as 10)
-    mapping(uint256 => uint8) private _conditioning;
-    mapping(uint256 => uint8) private _speed;
+    mapping(uint256 => uint8) private _moxie;
+    mapping(uint256 => uint8) private _hustle;
     address public raceContract;
 
     // Owner index (lightweight "enumerable" for UX/testing):
@@ -193,29 +193,29 @@ contract GiraffeNFT is ERC721, Ownable {
         return keccak256(bytes(lowerName));
     }
 
-    function readinessOf(uint256 tokenId) external view returns (uint8) {
+    function zipOf(uint256 tokenId) external view returns (uint8) {
         require(_ownerOf(tokenId) != address(0), "GiraffeNFT: nonexistent token");
-        return _clampStat(_readiness[tokenId]);
+        return _clampStat(_zip[tokenId]);
     }
 
-    function conditioningOf(uint256 tokenId) external view returns (uint8) {
+    function moxieOf(uint256 tokenId) external view returns (uint8) {
         require(_ownerOf(tokenId) != address(0), "GiraffeNFT: nonexistent token");
-        return _clampStat(_conditioning[tokenId]);
+        return _clampStat(_moxie[tokenId]);
     }
 
-    function speedOf(uint256 tokenId) external view returns (uint8) {
+    function hustleOf(uint256 tokenId) external view returns (uint8) {
         require(_ownerOf(tokenId) != address(0), "GiraffeNFT: nonexistent token");
-        return _clampStat(_speed[tokenId]);
+        return _clampStat(_hustle[tokenId]);
     }
 
-    function statsOf(uint256 tokenId) external view returns (uint8 readiness, uint8 conditioning, uint8 speed) {
+    function statsOf(uint256 tokenId) external view returns (uint8 zip, uint8 moxie, uint8 hustle) {
         require(_ownerOf(tokenId) != address(0), "GiraffeNFT: nonexistent token");
-        readiness = _clampStat(_readiness[tokenId]);
-        conditioning = _clampStat(_conditioning[tokenId]);
-        speed = _clampStat(_speed[tokenId]);
+        zip = _clampStat(_zip[tokenId]);
+        moxie = _clampStat(_moxie[tokenId]);
+        hustle = _clampStat(_hustle[tokenId]);
     }
 
-    function _mintGiraffe(address to, string memory giraffeName, uint8 readiness) internal returns (uint256 tokenId) {
+    function _mintGiraffe(address to, string memory giraffeName, uint8 zip) internal returns (uint256 tokenId) {
         tokenId = nextTokenId++;
         
         // Name is required - validate and check for collisions
@@ -235,10 +235,10 @@ contract GiraffeNFT is ERC721, Ownable {
         bytes32 seed = keccak256(abi.encodePacked(bh, address(this), tokenId, to, "GIRAFFE_SEED_V1"));
         _seeds[tokenId] = seed;
         // All stats are [1..10] (0 treated as 10 for backwards compatibility).
-        // New mints should be full stats (10), but we keep an explicit readiness parameter for local testing.
-        _readiness[tokenId] = _clampStat(readiness);
-        _conditioning[tokenId] = 10;
-        _speed[tokenId] = 10;
+        // New mints should be full stats (10), but we keep an explicit zip parameter for local testing.
+        _zip[tokenId] = _clampStat(zip);
+        _moxie[tokenId] = 10;
+        _hustle[tokenId] = 10;
         _safeMint(to, tokenId);
         emit GiraffeMinted(tokenId, to, seed, giraffeName);
     }
@@ -256,28 +256,28 @@ contract GiraffeNFT is ERC721, Ownable {
         return _mintGiraffe(to, giraffeName, 10);
     }
 
-    /// @notice Mint an GiraffeNFT with an explicit readiness (testing helper).
+    /// @notice Mint an GiraffeNFT with an explicit zip (testing helper).
     /// @dev Permissionless on local chain only (chainid 31337).
-    function mintWithReadiness(address to, uint8 readiness, string calldata giraffeName)
+    function mintWithZip(address to, uint8 zip, string calldata giraffeName)
         external
         onlyLocalTesting
         returns (uint256 tokenId)
     {
-        return _mintGiraffe(to, giraffeName, readiness);
+        return _mintGiraffe(to, giraffeName, zip);
     }
 
-    /// @notice Permissionless local testing helper to set readiness directly on an existing token.
-    function setReadinessForTesting(uint256 tokenId, uint8 readiness) external onlyLocalTesting {
+    /// @notice Permissionless local testing helper to set zip directly on an existing token.
+    function setZipForTesting(uint256 tokenId, uint8 zip) external onlyLocalTesting {
         require(_ownerOf(tokenId) != address(0), "GiraffeNFT: nonexistent token");
-        _readiness[tokenId] = _clampStat(readiness);
+        _zip[tokenId] = _clampStat(zip);
     }
 
     /// @notice Permissionless local testing helper to set all stats directly on an existing token.
-    function setForTesting(uint256 tokenId, uint8 readiness, uint8 conditioning, uint8 speed) external onlyLocalTesting {
+    function setForTesting(uint256 tokenId, uint8 zip, uint8 moxie, uint8 hustle) external onlyLocalTesting {
         require(_ownerOf(tokenId) != address(0), "GiraffeNFT: nonexistent token");
-        _readiness[tokenId] = _clampStat(readiness);
-        _conditioning[tokenId] = _clampStat(conditioning);
-        _speed[tokenId] = _clampStat(speed);
+        _zip[tokenId] = _clampStat(zip);
+        _moxie[tokenId] = _clampStat(moxie);
+        _hustle[tokenId] = _clampStat(hustle);
     }
 
     function nameOf(uint256 tokenId) external view returns (string memory) {
@@ -358,9 +358,9 @@ contract GiraffeNFT is ERC721, Ownable {
         _seeds[tokenId] = seed;
         
         _giraffeNames[tokenId] = commit.name;
-        _readiness[tokenId] = 10;
-        _conditioning[tokenId] = 10;
-        _speed[tokenId] = 10;
+        _zip[tokenId] = 10;
+        _moxie[tokenId] = 10;
+        _hustle[tokenId] = 10;
         
         _safeMint(msg.sender, tokenId);
         

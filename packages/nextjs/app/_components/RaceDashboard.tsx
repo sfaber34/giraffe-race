@@ -487,9 +487,9 @@ export const RaceDashboard = () => {
     const parse = (raw: unknown) => {
       const t = (Array.isArray(raw) ? raw : []) as any[];
       return {
-        readiness: clamp(Number(t[0] ?? 10)),
-        conditioning: clamp(Number(t[1] ?? 10)),
-        speed: clamp(Number(t[2] ?? 10)),
+        zip: clamp(Number(t[0] ?? 10)),
+        moxie: clamp(Number(t[1] ?? 10)),
+        hustle: clamp(Number(t[2] ?? 10)),
       };
     };
     return [
@@ -1668,7 +1668,7 @@ export const RaceDashboard = () => {
                 </div>
                 <div className="text-xs opacity-70">
                   Anyone can create/finalize/settle. Odds are auto-quoted on-chain at lineup finalization based on the
-                  locked effective score snapshot (avg of readiness/conditioning/speed).
+                  locked effective score snapshot (avg of zip/moxie/hustle).
                 </div>
               </div>
 
@@ -2057,9 +2057,9 @@ export const RaceDashboard = () => {
                                   )}
                                 </span>
                                 <span className="flex flex-col items-end text-xs opacity-80">
-                                  <span>Readiness {laneStats[lane]?.readiness ?? 10}/10</span>
-                                  <span>Conditioning {laneStats[lane]?.conditioning ?? 10}/10</span>
-                                  <span>Speed {laneStats[lane]?.speed ?? 10}/10</span>
+                                  <span>Zip {laneStats[lane]?.zip ?? 10}/10</span>
+                                  <span>Moxie {laneStats[lane]?.moxie ?? 10}/10</span>
+                                  <span>Hustle {laneStats[lane]?.hustle ?? 10}/10</span>
                                   {lineupFinalized ? (
                                     <span className="font-mono opacity-90">{oddsLabelForLane(lane)}</span>
                                   ) : null}

@@ -15,7 +15,7 @@ contract GiraffeRaceSimulator {
     uint16 internal constant BPS_DENOM = 10000;
 
     /// @notice Deterministically choose a winner given a seed + lane effective score snapshot.
-    /// @dev `scores` is a 1-10 value per lane (typically the rounded average of readiness/conditioning/speed).
+    /// @dev `scores` is a 1-10 value per lane (typically the rounded average of zip/moxie/hustle).
     /// @return winner The primary winner (first in tie order). For dead heats, use `winnersWithScore`.
     function winnerWithScore(bytes32 seed, uint8[LANE_COUNT] memory scores)
         external
@@ -27,7 +27,7 @@ contract GiraffeRaceSimulator {
     }
 
     /// @notice Deterministically simulate a race and return ALL winners (for dead heat support).
-    /// @dev `scores` is a 1-10 value per lane (typically the rounded average of readiness/conditioning/speed).
+    /// @dev `scores` is a 1-10 value per lane (typically the rounded average of zip/moxie/hustle).
     /// @return winners Array of winning lane indices (length 1 = normal win, length 2+ = dead heat).
     /// @return winnerCount Number of winners (1 = normal, 2+ = dead heat).
     /// @return distances Final distances after all ticks.
@@ -54,7 +54,7 @@ contract GiraffeRaceSimulator {
     }
 
     /// @notice Deterministically simulate a race given a seed + lane effective score snapshot.
-    /// @dev `scores` is a 1-10 value per lane (typically the rounded average of readiness/conditioning/speed).
+    /// @dev `scores` is a 1-10 value per lane (typically the rounded average of zip/moxie/hustle).
     function simulateWithScore(bytes32 seed, uint8[LANE_COUNT] memory scores)
         external
         pure

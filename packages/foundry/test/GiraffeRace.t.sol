@@ -30,7 +30,7 @@ contract GiraffeRaceTest is Test {
     uint256 internal constant MAX_TICKS = 500;
     uint256 internal constant SPEED_RANGE = 10;
     // These win-distribution "stats" tests are intentionally heavy and are mostly for manual inspection.
-    // With readiness decay (extra state updates per settle), we reduce the batch size to avoid OOG in CI/default runs.
+    // With stat decay (extra state updates per settle), we reduce the batch size to avoid OOG in CI/default runs.
     uint256 internal constant STATS_BATCH_SIZE = 50;
     uint256 internal constant STATS_BATCHES = 10; // 10 * 50 = 500 races total (expected)
     string internal constant STATS_DIR = "./tmp/win-stats";
@@ -85,7 +85,7 @@ contract GiraffeRaceTest is Test {
         raceId; // silence unused warning (odds auto-set during finalization)
     }
 
-    function testReadinessStartsAt10AndDecreasesAfterRace() public {
+    function testStatsRemainAt10AfterRace() public {
         vm.roll(100);
         uint256 raceId = race.createRace();
 
@@ -94,7 +94,7 @@ contract GiraffeRaceTest is Test {
         uint64 submissionCloseBlock = closeBlock - 10;
 
         // Finalization entropy uses blockhash(submissionCloseBlock - 1).
-        bytes32 forcedLineupBh = keccak256("forced lineup blockhash readiness");
+        bytes32 forcedLineupBh = keccak256("forced lineup blockhash stats");
         vm.roll(uint256(submissionCloseBlock - 1));
         vm.setBlockhash(uint256(submissionCloseBlock - 1), forcedLineupBh);
         vm.roll(uint256(submissionCloseBlock));
@@ -104,20 +104,19 @@ contract GiraffeRaceTest is Test {
         uint8[LANE_COUNT] memory snap = race.getRaceScoreById(raceId);
         for (uint256 i = 0; i < LANE_COUNT; i++) {
             assertEq(uint256(snap[i]), 10);
-            assertEq(uint256(giraffeNft.readinessOf(houseTokenIds[i])), 10);
+            assertEq(uint256(giraffeNft.zipOf(houseTokenIds[i])), 10);
         }
 
         // Settlement entropy uses blockhash(closeBlock).
-        bytes32 forcedBh = keccak256("forced settle blockhash readiness");
+        bytes32 forcedBh = keccak256("forced settle blockhash stats");
         vm.roll(uint256(closeBlock));
         vm.setBlockhash(uint256(closeBlock), forcedBh);
         vm.roll(uint256(closeBlock) + 1);
         race.settleRace();
 
-        // TEMP (testing): readiness decay after races is disabled in `GiraffeRace`.
-        // When re-enabled, this should go back to expecting 9.
+        // Stats remain at 10 after racing (no decay).
         for (uint256 i = 0; i < LANE_COUNT; i++) {
-            assertEq(uint256(giraffeNft.readinessOf(houseTokenIds[i])), 10);
+            assertEq(uint256(giraffeNft.zipOf(houseTokenIds[i])), 10);
         }
     }
 
