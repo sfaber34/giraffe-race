@@ -11,6 +11,7 @@ import {
   useScaffoldWriteContract,
   useTargetNetwork,
 } from "~~/hooks/scaffold-eth";
+import { containsProfanity } from "~~/utils/profanityFilter";
 
 const MINT_FEE = 1_000_000n; // 1 USDC (6 decimals)
 
@@ -83,6 +84,7 @@ export const GiraffeNfts = () => {
   const [isRevealing, setIsRevealing] = useState<string | null>(null);
   const [isCancelling, setIsCancelling] = useState<string | null>(null);
   const [isApproving, setIsApproving] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
 
   const { data: blockNumber } = useBlockNumber({ watch: true });
 
@@ -338,12 +340,40 @@ export const GiraffeNfts = () => {
     nextTokenId,
   ]);
 
+  // Validate name for profanity
+  const validateName = useCallback((name: string): boolean => {
+    if (containsProfanity(name)) {
+      setNameError("Name contains inappropriate language. Please choose another name.");
+      return false;
+    }
+    setNameError(null);
+    return true;
+  }, []);
+
+  // Handle name input change with validation
+  const handleNameChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const newName = e.target.value;
+      setMintName(newName);
+      if (newName.trim()) {
+        validateName(newName);
+      } else {
+        setNameError(null);
+      }
+    },
+    [validateName],
+  );
+
   const handleCommitMint = useCallback(async () => {
     if (!connectedAddress || !mintName.trim()) return;
 
+    const name = mintName.trim();
+
+    // Final validation before commit
+    if (!validateName(name)) return;
+
     setIsCommitting(true);
     try {
-      const name = mintName.trim();
       const secret = generateSecret();
       const commitment = computeCommitment(secret);
 
@@ -356,13 +386,14 @@ export const GiraffeNfts = () => {
       });
 
       setMintName("");
+      setNameError(null);
       setTimeout(() => void refetchPendingCommits(), 1000);
     } catch (error) {
       console.error("Commit failed:", error);
     } finally {
       setIsCommitting(false);
     }
-  }, [connectedAddress, mintName, writeGiraffeNftAsync, refetchPendingCommits]);
+  }, [connectedAddress, mintName, validateName, writeGiraffeNftAsync, refetchPendingCommits]);
 
   const handleApproveUsdc = useCallback(async () => {
     if (!connectedAddress || !giraffeNftContract?.address) return;
@@ -482,14 +513,18 @@ export const GiraffeNfts = () => {
                 <span className="label-text">Name your Giraffe</span>
               </div>
               <input
-                className="input input-bordered w-full"
+                className={`input input-bordered w-full ${nameError ? "input-error" : ""}`}
                 value={mintName}
-                onChange={e => setMintName(e.target.value)}
+                onChange={handleNameChange}
                 placeholder="e.g. speedy-bob"
                 maxLength={32}
               />
               <div className="label">
-                <span className="label-text-alt opacity-70">1-32 characters, must be unique</span>
+                {nameError ? (
+                  <span className="label-text-alt text-error">{nameError}</span>
+                ) : (
+                  <span className="label-text-alt opacity-70">1-32 characters, must be unique</span>
+                )}
               </div>
             </label>
 
@@ -500,6 +535,7 @@ export const GiraffeNfts = () => {
                 !giraffeNftContract ||
                 isGiraffeNftDeployedOnChain !== true ||
                 mintName.trim().length === 0 ||
+                !!nameError ||
                 isCommitting
               }
               onClick={handleCommitMint}

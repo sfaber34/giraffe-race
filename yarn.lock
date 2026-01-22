@@ -3184,6 +3184,7 @@ __metadata:
     eslint-config-prettier: ~10.1.1
     eslint-plugin-prettier: ~5.2.4
     kubo-rpc-client: ~5.0.2
+    leo-profanity: ^1.9.0
     next: ~15.2.8
     next-nprogress-bar: ~2.3.13
     next-themes: ~0.3.0
@@ -8668,6 +8669,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"french-badwords-list@npm:^1.0.7":
+  version: 1.0.7
+  resolution: "french-badwords-list@npm:1.0.7"
+  checksum: 613f51468a571df6aa4146aef124a0fff3d398d9aa6ea949af03b737eb493fd2493a4650f2adbbc458c45c0da1081b2653b68878abba8210e353316b2ebfda3c
+  languageName: node
+  linkType: hard
+
 "fs-extra@npm:11.1.0":
   version: 11.1.0
   resolution: "fs-extra@npm:11.1.0"
@@ -10506,6 +10514,21 @@ __metadata:
   dependencies:
     language-subtag-registry: ^0.3.20
   checksum: 57c530796dc7179914dee71bc94f3747fd694612480241d0453a063777265dfe3a951037f7acb48f456bf167d6eb419d4c00263745326b3ba1cdcf4657070e78
+  languageName: node
+  linkType: hard
+
+"leo-profanity@npm:^1.9.0":
+  version: 1.9.0
+  resolution: "leo-profanity@npm:1.9.0"
+  dependencies:
+    french-badwords-list: ^1.0.7
+    russian-bad-words: ^0.5.0
+  dependenciesMeta:
+    french-badwords-list:
+      optional: true
+    russian-bad-words:
+      optional: true
+  checksum: c2bb550f8332e1c6fc9014411984f5674e4ca95a77ce411042ae61a139ef7f359ad4814b49171c1f4872bbaf1376802b2753fc463feeecdbfd1fbb9859007d70
   languageName: node
   linkType: hard
 
@@ -13575,6 +13598,13 @@ __metadata:
   dependencies:
     queue-microtask: ^1.2.2
   checksum: cb4f97ad25a75ebc11a8ef4e33bb962f8af8516bb2001082ceabd8902e15b98f4b84b4f8a9b222e5d57fc3bd1379c483886ed4619367a7680dad65316993021d
+  languageName: node
+  linkType: hard
+
+"russian-bad-words@npm:^0.5.0":
+  version: 0.5.0
+  resolution: "russian-bad-words@npm:0.5.0"
+  checksum: 10d6beac857d1edf6d18b0f75fe930962a69af98e488836753cd3a79933adcf71c51a283922b4f9deb8240c34fb4131923fdf1866a9d89f6bae443838dd6daf5
   languageName: node
   linkType: hard
 
