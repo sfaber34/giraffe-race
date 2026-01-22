@@ -37,10 +37,11 @@ contract GiraffeRace {
     // - decimal odds are stored in basis points (1e4). Example: 3.80x => 38000.
     // - house edge is enforced by requiring an overround >= 1/(1-edge).
     uint16 internal constant ODDS_SCALE = 10000;
-    uint16 public constant HOUSE_EDGE_BPS = 500; // 5%
+    uint16 public constant MAX_HOUSE_EDGE_BPS = 3000; // 30% max (sanity cap)
     uint32 internal constant MIN_DECIMAL_ODDS_BPS = 10100; // 1.01x
-    // Fallback fixed odds when no probability table is deployed (basis points: 2.00x => 20000)
-    uint32 internal constant TEMP_FIXED_DECIMAL_ODDS_BPS = 20000;
+    // Fallback fixed odds when no probability table is deployed.
+    // For 6 equal racers with 5% house edge: 6.0 * 0.95 = 5.70x => 57000 bps
+    uint32 internal constant TEMP_FIXED_DECIMAL_ODDS_BPS = 57000;
     // Phase schedule (v2):
     // - Submissions close at (bettingCloseBlock - SUBMISSION_CLOSE_OFFSET_BLOCKS)
     // - Betting is only open after submissions close (inclusive) and before bettingCloseBlock (exclusive)
@@ -54,6 +55,7 @@ contract GiraffeRace {
     uint8 public constant SPEED_RANGE = 10; // speeds per tick: 1-10
 
     address public treasuryOwner;  // Owns house NFTs + controls admin functions (should be multisig)
+    uint16 public houseEdgeBps = 500; // 5% default, configurable by treasuryOwner
     IGiraffeNFT public giraffeNft;
     GiraffeRaceSimulator public simulator;
     HouseTreasury public treasury;
@@ -141,8 +143,10 @@ contract GiraffeRace {
     event WinProbTableUpdated(address indexed newTable);
     event GiraffeAssigned(uint256 indexed raceId, uint256 indexed tokenId, address indexed originalOwner, uint8 lane);
     event HouseGiraffeAssigned(uint256 indexed raceId, uint256 indexed tokenId, uint8 lane);
+    event HouseEdgeUpdated(uint16 oldEdgeBps, uint16 newEdgeBps);
 
     error InvalidRace();
+    error HouseEdgeTooHigh();
     error NoClaimableBets();
     error BettingClosed();
     error BettingNotOpen();
@@ -211,6 +215,15 @@ contract GiraffeRace {
 
     function trackLength() external pure returns (uint16) {
         return TRACK_LENGTH;
+    }
+
+    /// @notice Update the house edge (in basis points). Max 20%.
+    /// @param newEdgeBps The new house edge in basis points (e.g., 500 = 5%).
+    function setHouseEdgeBps(uint16 newEdgeBps) external onlyTreasuryOwner {
+        if (newEdgeBps > MAX_HOUSE_EDGE_BPS) revert HouseEdgeTooHigh();
+        uint16 oldEdgeBps = houseEdgeBps;
+        houseEdgeBps = newEdgeBps;
+        emit HouseEdgeUpdated(oldEdgeBps, newEdgeBps);
     }
 
     /**
@@ -315,7 +328,7 @@ contract GiraffeRace {
      * House edge enforcement:
      * Let decimal odds be O_i. We require sum(1/O_i) >= 1/(1-edge). For edge=5%, that's >= 1.052631...
      * Using basis points, we enforce:
-     *   sum(ODDS_SCALE^2 / O_i_bps) >= ceil(ODDS_SCALE*ODDS_SCALE / (ODDS_SCALE - HOUSE_EDGE_BPS))
+     *   sum(ODDS_SCALE^2 / O_i_bps) >= ceil(ODDS_SCALE*ODDS_SCALE / (ODDS_SCALE - houseEdgeBps))
      */
     function setRaceOdds(uint256 raceId, uint32[LANE_COUNT] calldata decimalOddsBps) external onlyTreasuryOwner {
         Race storage r = races[raceId];
@@ -339,8 +352,8 @@ contract GiraffeRace {
             invSumBps += (num + uint256(o) - 1) / uint256(o);
         }
 
-        uint256 minOverroundBps = (uint256(ODDS_SCALE) * uint256(ODDS_SCALE) + (ODDS_SCALE - HOUSE_EDGE_BPS) - 1)
-            / (ODDS_SCALE - HOUSE_EDGE_BPS);
+        uint256 minOverroundBps = (uint256(ODDS_SCALE) * uint256(ODDS_SCALE) + (ODDS_SCALE - houseEdgeBps) - 1)
+            / (ODDS_SCALE - houseEdgeBps);
         if (invSumBps < minOverroundBps) revert InvalidOdds();
 
         r.decimalOddsBps = decimalOddsBps;
@@ -1030,8 +1043,8 @@ contract GiraffeRace {
             if (p == 0) p = 1; // defensive: avoid division by zero
             
             // Decimal odds formula: (1 - houseEdge) / probability
-            // In basis points: (ODDS_SCALE * (ODDS_SCALE - HOUSE_EDGE_BPS)) / p
-            uint256 o = (uint256(ODDS_SCALE) * uint256(ODDS_SCALE - HOUSE_EDGE_BPS)) / uint256(p);
+            // In basis points: (ODDS_SCALE * (ODDS_SCALE - houseEdgeBps)) / p
+            uint256 o = (uint256(ODDS_SCALE) * uint256(ODDS_SCALE - houseEdgeBps)) / uint256(p);
             
             // Apply minimum odds floor
             if (o < MIN_DECIMAL_ODDS_BPS) o = MIN_DECIMAL_ODDS_BPS;
