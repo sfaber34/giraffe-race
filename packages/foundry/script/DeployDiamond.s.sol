@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "forge-std/Script.sol";
+import "./DeployHelpers.s.sol";
 import { LibDiamond } from "../contracts/diamond/libraries/LibDiamond.sol";
 import { GiraffeRaceDiamond } from "../contracts/diamond/Diamond.sol";
 import { DiamondCutFacet } from "../contracts/diamond/facets/DiamondCutFacet.sol";
@@ -29,8 +29,14 @@ import { WinProbTableShard5 } from "../contracts/libraries/WinProbTableShard5.so
  * @title DeployDiamond
  * @notice Deployment script for GiraffeRace Diamond implementation
  * @dev Deploys all facets and initializes the diamond with proper function selectors
+ *      Integrated with Scaffold-ETH 2 deployment system
+ *
+ * Environment variables:
+ *   TREASURY_OWNER   - Controls treasury withdrawals AND owns house NFTs.
+ *                      Should be a multisig in production.
+ *   USDC_ADDRESS     - USDC contract address. If not set, deploys MockUSDC (local testing only).
  */
-contract DeployDiamond is Script {
+contract DeployDiamond is ScaffoldETHDeploy {
     // Facet instances
     DiamondCutFacet diamondCutFacet;
     DiamondLoupeFacet diamondLoupeFacet;
@@ -40,24 +46,38 @@ contract DeployDiamond is Script {
     GiraffeSubmissionFacet giraffeSubmissionFacet;
     RaceViewsFacet raceViewsFacet;
 
-    function run() external {
-        uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
-        address deployer = vm.addr(deployerPrivateKey);
+    function run() external ScaffoldEthDeployerRunner {
+        // Treasury owner: controls treasury AND owns house NFTs.
+        // In production, this should be a multisig (e.g., Gnosis Safe).
+        address treasuryOwner = vm.envOr("TREASURY_OWNER", deployer);
 
-        vm.startBroadcast(deployerPrivateKey);
+        // USDC address - if not set, deploy MockUSDC for local testing.
+        address usdcAddress = vm.envOr("USDC_ADDRESS", address(0));
 
-        // 1. Deploy supporting contracts (same as before)
-        MockUSDC usdc = new MockUSDC();
-        console.log("MockUSDC deployed at:", address(usdc));
+        // 1. Deploy supporting contracts
+        MockUSDC mockUsdc;
+        if (usdcAddress == address(0)) {
+            mockUsdc = new MockUSDC();
+            usdcAddress = address(mockUsdc);
+            // Mint some test USDC to treasury owner for initial bankroll
+            mockUsdc.mint(treasuryOwner, 100_000 * 1e6); // 100k USDC
+            console.log("MockUSDC deployed at:", usdcAddress);
+            deployments.push(Deployment("MockUSDC", usdcAddress));
+        }
 
         GiraffeNFT giraffeNft = new GiraffeNFT();
         console.log("GiraffeNFT deployed at:", address(giraffeNft));
+        deployments.push(Deployment("GiraffeNFT", address(giraffeNft)));
 
         GiraffeRaceSimulator simulator = new GiraffeRaceSimulator();
         console.log("GiraffeRaceSimulator deployed at:", address(simulator));
+        deployments.push(Deployment("GiraffeRaceSimulator", address(simulator)));
 
-        HouseTreasury treasury = new HouseTreasury(address(usdc), deployer);
+        // Deploy Treasury with deployer as initial owner (so we can authorize the diamond)
+        // Ownership will be transferred to treasuryOwner at the end.
+        HouseTreasury treasury = new HouseTreasury(usdcAddress, deployer);
         console.log("HouseTreasury deployed at:", address(treasury));
+        deployments.push(Deployment("HouseTreasury", address(treasury)));
 
         // Deploy WinProbTable shards
         WinProbTableShard0 shard0 = new WinProbTableShard0();
@@ -75,16 +95,17 @@ contract DeployDiamond is Script {
             address(shard5)
         );
         console.log("WinProbTable6 deployed at:", address(winProbTable));
+        deployments.push(Deployment("WinProbTable6", address(winProbTable)));
 
-        // 2. Mint house giraffes
+        // 2. Mint house giraffes to treasuryOwner
         uint256[6] memory houseGiraffeTokenIds;
-        houseGiraffeTokenIds[0] = giraffeNft.mintTo(deployer, "house-1");
-        houseGiraffeTokenIds[1] = giraffeNft.mintTo(deployer, "house-2");
-        houseGiraffeTokenIds[2] = giraffeNft.mintTo(deployer, "house-3");
-        houseGiraffeTokenIds[3] = giraffeNft.mintTo(deployer, "house-4");
-        houseGiraffeTokenIds[4] = giraffeNft.mintTo(deployer, "house-5");
-        houseGiraffeTokenIds[5] = giraffeNft.mintTo(deployer, "house-6");
-        console.log("Minted 6 house giraffes");
+        houseGiraffeTokenIds[0] = giraffeNft.mintTo(treasuryOwner, "house-1");
+        houseGiraffeTokenIds[1] = giraffeNft.mintTo(treasuryOwner, "house-2");
+        houseGiraffeTokenIds[2] = giraffeNft.mintTo(treasuryOwner, "house-3");
+        houseGiraffeTokenIds[3] = giraffeNft.mintTo(treasuryOwner, "house-4");
+        houseGiraffeTokenIds[4] = giraffeNft.mintTo(treasuryOwner, "house-5");
+        houseGiraffeTokenIds[5] = giraffeNft.mintTo(treasuryOwner, "house-6");
+        console.log("Minted 6 house giraffes to treasuryOwner");
 
         // 3. Deploy facets
         diamondCutFacet = new DiamondCutFacet();
@@ -111,7 +132,7 @@ contract DeployDiamond is Script {
         // 4. Deploy Diamond
         GiraffeRaceDiamond.DiamondArgs memory diamondArgs = GiraffeRaceDiamond.DiamondArgs({
             giraffeNft: address(giraffeNft),
-            treasuryOwner: deployer,
+            treasuryOwner: treasuryOwner,
             houseGiraffeTokenIds: houseGiraffeTokenIds,
             simulator: address(simulator),
             treasury: address(treasury),
@@ -124,6 +145,8 @@ contract DeployDiamond is Script {
             diamondArgs
         );
         console.log("GiraffeRaceDiamond deployed at:", address(diamond));
+        // Register as "GiraffeRace" for frontend compatibility
+        deployments.push(Deployment("GiraffeRace", address(diamond)));
 
         // 5. Add facets to diamond
         _addFacets(address(diamond));
@@ -132,15 +155,25 @@ contract DeployDiamond is Script {
         treasury.authorize(address(diamond));
         console.log("Diamond authorized in treasury");
 
-        vm.stopBroadcast();
+        // 7. Transfer treasury ownership to the actual treasuryOwner (multisig)
+        if (treasuryOwner != deployer) {
+            treasury.transferOwnership(treasuryOwner);
+            console.log("Treasury ownership transferred to:", treasuryOwner);
+        }
+
+        // 8. Configure GiraffeNFT
+        giraffeNft.setRaceContract(address(diamond));
+        giraffeNft.setTreasury(usdcAddress, address(treasury));
+        console.log("GiraffeNFT configured with race contract and treasury");
 
         console.log("\n=== Deployment Summary ===");
-        console.log("Diamond:    ", address(diamond));
-        console.log("USDC:       ", address(usdc));
-        console.log("GiraffeNFT: ", address(giraffeNft));
-        console.log("Treasury:   ", address(treasury));
-        console.log("Simulator:  ", address(simulator));
-        console.log("WinProbTable:", address(winProbTable));
+        console.log("GiraffeRace (Diamond):", address(diamond));
+        console.log("USDC:                 ", usdcAddress);
+        console.log("GiraffeNFT:           ", address(giraffeNft));
+        console.log("Treasury:             ", address(treasury));
+        console.log("Simulator:            ", address(simulator));
+        console.log("WinProbTable:         ", address(winProbTable));
+        console.log("Treasury Owner:       ", treasuryOwner);
     }
 
     function _addFacets(address diamond) internal {

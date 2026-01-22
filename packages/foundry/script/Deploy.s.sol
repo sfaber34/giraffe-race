@@ -2,7 +2,7 @@
 pragma solidity ^0.8.19;
 
 import "./DeployHelpers.s.sol";
-import { DeployGiraffeRace } from "./DeployGiraffeRace.s.sol";
+import { DeployDiamond } from "./DeployDiamond.s.sol";
 
 /**
  * @notice Main deployment script for all contracts
@@ -15,7 +15,7 @@ contract DeployScript is ScaffoldETHDeploy {
         // Deploys all your contracts sequentially
         // Add new deployments here when needed
 
-        DeployGiraffeRace deployGiraffeRace = new DeployGiraffeRace();
-        deployGiraffeRace.run();
+        DeployDiamond deployDiamond = new DeployDiamond();
+        deployDiamond.run();
     }
 }

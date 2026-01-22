@@ -1,17 +1,41 @@
-# 🏗 Scaffold-ETH 2
+# 🦒 Giraffe Race
 
 ## What it is
-Basic test of how to do a deterministic giraffe race game using deterministic dice. The seed for a race is keccak256(abi.encodePacked(bh, raceId, address(this))). It has many limitations (betting payout scheme, using eth for bets, a draw picks a winner at random between the draw giraffes, All giraffes have same (no) stats, I'm sure other stuff) but a basic test so far.
+A deterministic giraffe racing game built on Ethereum using the Diamond pattern (EIP-2535). The game features on-chain race simulation, NFT giraffes with stats, and a USDC-based betting system with fixed odds.
+
+## Architecture
+
+The smart contracts use the **Diamond Pattern** for modularity and upgradeability:
+- `Diamond.sol` - Main proxy contract
+- `AdminFacet.sol` - House edge, max bet configuration
+- `RaceLifecycleFacet.sol` - Race creation, finalization, settlement
+- `BettingFacet.sol` - Bet placement and claims
+- `GiraffeSubmissionFacet.sol` - NFT submission for races
+- `RaceViewsFacet.sol` - Read-only view functions
+
+Supporting contracts:
+- `GiraffeNFT.sol` - ERC721 giraffes with zip/moxie/hustle stats
+- `GiraffeRaceSimulator.sol` - Deterministic race simulation
+- `HouseTreasury.sol` - USDC bankroll management
+- `WinProbTable6.sol` - On-chain probability lookup table
 
 ## How to test it
-- Send a transaction to createRace. Either use the one with closeBlock input to set a closeBlock in the future or use the one without an input to automatically set closeBlock to +10 blocks in the future
-- Optionally place bets with raceId = nextRaceId - 1
-- Advance the local chain using the "Mine +" buttons on the homepage. If you didn't place bets you'll have to advance the local chain 11 blocks.
-- Use settleRace to settle it (if you're past the closeBlock)
-- Enter your settled race ID on the homepage to see if the TS emoji replay matches the solidity result
-- Hit claim function to get paid if you bet correctly.
+1. Start local chain: `yarn chain`
+2. Deploy contracts: `yarn deploy`
+3. Start frontend: `yarn start`
+4. Use the Debug Contracts page to interact with the GiraffeRace contract
 
-Note: The default owner of GiraffeRace.sol is 0x668887c62AF23E42aB10105CB4124CF2C656F331. Might have to change that in DeployGiraffeRace.s.sol.
+### Race Flow
+1. **Create Race**: `createRace()` - Opens submission window
+2. **Submit Giraffes** (optional): `submitGiraffe(tokenId)` - Enter your giraffe
+3. **Finalize**: `finalizeRaceGiraffes()` - Closes submissions, opens betting
+4. **Place Bets**: `placeBet(lane, amount)` - Bet USDC on a lane
+5. **Settle**: `settleRace()` - Determines winner using blockhash entropy
+6. **Claim**: `claim()` or `claimNextWinningPayout()` - Collect winnings
+
+## Environment Variables
+- `TREASURY_OWNER` - Controls treasury withdrawals and owns house NFTs (use multisig in production)
+- `USDC_ADDRESS` - USDC contract address (if not set, deploys MockUSDC for testing)
 
 <h4 align="center">
   <a href="https://docs.scaffoldeth.io">Documentation</a> |

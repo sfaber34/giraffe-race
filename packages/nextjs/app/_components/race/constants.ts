@@ -1,4 +1,4 @@
-// Race-related constants - keep in sync with GiraffeRace.sol
+// Race-related constants - keep in sync with GiraffeRaceStorage.sol (Diamond pattern)
 
 export const USDC_DECIMALS = 6;
 export const LANE_COUNT = 6 as const;
