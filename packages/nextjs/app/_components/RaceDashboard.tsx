@@ -26,6 +26,7 @@ const MAX_TICKS = 500;
 
 type RaceStatus =
   | "no_race"
+  | "cooldown"
   | "submissions_open"
   | "awaiting_finalization"
   | "betting_open"
@@ -235,6 +236,23 @@ export const RaceDashboard = () => {
   const hasAnyRace = !!giraffeRaceContract && nextRaceId > 0n;
   const latestRaceId = hasAnyRace ? nextRaceId - 1n : null;
 
+  // Get the cooldown status for creating new races
+  const { data: cooldownData } = useScaffoldReadContract({
+    contractName: "GiraffeRace",
+    functionName: "getCreateRaceCooldown" as any,
+    query: { enabled: !!giraffeRaceContract },
+  } as any);
+
+  const cooldownStatus = useMemo(() => {
+    if (!cooldownData) return null;
+    const [canCreate, blocksRemaining, cooldownEndsAtBlock] = cooldownData as unknown as [boolean, bigint, bigint];
+    return {
+      canCreate,
+      blocksRemaining,
+      cooldownEndsAtBlock,
+    };
+  }, [cooldownData]);
+
   const { data: settledLiabilityData } = useScaffoldReadContract({
     contractName: "GiraffeRace",
     functionName: "settledLiability",
@@ -388,13 +406,18 @@ export const RaceDashboard = () => {
     };
   }, [raceData]);
 
-  // Parse the schedule data (separate submission and betting deadlines)
+  // Parse the schedule data (separate submission and betting deadlines, plus settlement block)
   const parsedSchedule = useMemo(() => {
     if (!raceScheduleData) return null;
-    const [bettingCloseBlock, submissionCloseBlock] = raceScheduleData as [bigint, bigint];
+    const [bettingCloseBlock, submissionCloseBlock, settledAtBlock] = raceScheduleData as unknown as [
+      bigint,
+      bigint,
+      bigint,
+    ];
     return {
       bettingCloseBlock,
       submissionCloseBlock,
+      settledAtBlock,
     };
   }, [raceScheduleData]);
 
@@ -551,8 +574,21 @@ export const RaceDashboard = () => {
 
   const status: RaceStatus = useMemo(() => {
     if (!giraffeRaceContract) return "no_race";
-    if (!hasAnyRace || !parsed) return "no_race";
-    if (parsed.settled) return "settled";
+
+    // No race exists yet
+    if (!hasAnyRace || !parsed) {
+      return "no_race";
+    }
+
+    // Race is settled - check if we're in cooldown before next race
+    if (parsed.settled) {
+      // If cooldown is active and we're viewing the latest settled race, show cooldown
+      if (cooldownStatus && !cooldownStatus.canCreate && cooldownStatus.blocksRemaining > 0n) {
+        return "cooldown";
+      }
+      return "settled";
+    }
+
     if (blockNumber === undefined) return "betting_closed";
 
     // Check submissions phase
@@ -572,7 +608,7 @@ export const RaceDashboard = () => {
     }
 
     return "betting_closed";
-  }, [giraffeRaceContract, hasAnyRace, parsed, blockNumber, submissionCloseBlock, bettingCloseBlock]);
+  }, [giraffeRaceContract, hasAnyRace, parsed, blockNumber, submissionCloseBlock, bettingCloseBlock, cooldownStatus]);
 
   // Reset the local "submitted token" lock when we change race or wallet.
   useEffect(() => {
@@ -1194,7 +1230,9 @@ export const RaceDashboard = () => {
     };
   }, [cameraScrollEl, simulation]);
 
-  const activeRaceExists = status !== "no_race" && !parsed?.settled;
+  const activeRaceExists = status !== "no_race" && status !== "cooldown" && status !== "settled" && !parsed?.settled;
+  const isInCooldown =
+    status === "cooldown" || (cooldownStatus && !cooldownStatus.canCreate && cooldownStatus.blocksRemaining > 0n);
 
   return (
     <div className="flex flex-col w-full">
@@ -1694,6 +1732,16 @@ export const RaceDashboard = () => {
                   start={bettingCloseBlock ?? undefined}
                   end={bettingCloseBlock ? bettingCloseBlock + 1n : undefined}
                 />
+                {(status === "settled" || status === "cooldown") &&
+                  cooldownStatus &&
+                  cooldownStatus.cooldownEndsAtBlock > 0n && (
+                    <BlockCountdownBar
+                      label="Cooldown (next race)"
+                      current={blockNumber}
+                      start={parsedSchedule?.settledAtBlock ?? undefined}
+                      end={cooldownStatus.cooldownEndsAtBlock}
+                    />
+                  )}
               </div>
 
               <div className="divider my-1" />
@@ -1709,12 +1757,14 @@ export const RaceDashboard = () => {
                 <div className="flex flex-wrap gap-2">
                   <button
                     className="btn btn-sm btn-primary"
-                    disabled={!giraffeRaceContract || activeRaceExists || !isViewingLatest}
+                    disabled={!giraffeRaceContract || activeRaceExists || isInCooldown || !isViewingLatest}
                     onClick={async () => {
                       await writeGiraffeRaceAsync({ functionName: "createRace" } as any);
                     }}
                   >
-                    Create race
+                    {isInCooldown && cooldownStatus
+                      ? `Cooldown (${cooldownStatus.blocksRemaining.toString()} blocks)`
+                      : "Create race"}
                   </button>
                   <button
                     className="btn btn-sm btn-outline"

@@ -46,9 +46,12 @@ contract GiraffeRace {
     // - Submissions close at submissionCloseBlock (set when race is created)
     // - Betting opens when finalizeRaceGiraffes() is called, and closes at bettingCloseBlock
     //   (bettingCloseBlock is set at finalization time, NOT at race creation)
-    // This ensures bettors always get a full betting window after lineup is finalized.
+    // - After settlement, there's a cooldown before a new race can be created
+    // This ensures bettors always get a full betting window after lineup is finalized,
+    // and users have time to see the race replay before the next race starts.
     uint64 internal constant SUBMISSION_WINDOW_BLOCKS = 10;
     uint64 internal constant BETTING_WINDOW_BLOCKS = 10;
+    uint64 internal constant POST_RACE_COOLDOWN_BLOCKS = 5;
     // Cap entrant pool size to keep `settleRace` gas bounded. Can be increased later.
     uint16 public constant MAX_ENTRIES_PER_RACE = 128;
     uint16 public constant TRACK_LENGTH = 1000;
@@ -69,6 +72,9 @@ contract GiraffeRace {
         // Block when betting closes (set when finalizeRaceGiraffes() is called, NOT at race creation).
         // This ensures the betting window only starts after finalization actually happens.
         uint64 bettingCloseBlock;
+        // Block when race was settled (set when settleRace() is called).
+        // Used to enforce cooldown before next race can be created.
+        uint64 settledAtBlock;
         // Lane lineup finalized from entrant pool + house fill.
         bool giraffesFinalized;
         // Fixed odds quoted for lanes (locked once set; required before betting).
@@ -176,6 +182,7 @@ contract GiraffeRace {
     error EntryPoolFull();
     error GiraffesAlreadyFinalized();
     error PreviousRaceNotSettled();
+    error CooldownNotElapsed();
     error NotTreasuryOwner();
     error OddsNotSet();
     error OddsAlreadySet();
@@ -281,9 +288,14 @@ contract GiraffeRace {
 
     function _createRace() internal returns (uint256 raceId) {
         // Only allow one open race at a time: previous race must be settled before creating a new one.
+        // Also enforce a cooldown period after settlement to let users see the race replay.
         if (nextRaceId > 0) {
             Race storage prev = races[nextRaceId - 1];
             if (!prev.settled) revert PreviousRaceNotSettled();
+            // Cooldown: must wait POST_RACE_COOLDOWN_BLOCKS after settlement
+            if (block.number < uint256(prev.settledAtBlock) + POST_RACE_COOLDOWN_BLOCKS) {
+                revert CooldownNotElapsed();
+            }
         }
 
         // Set submission deadline. Betting deadline will be set when finalizeRaceGiraffes() is called.
@@ -482,6 +494,7 @@ contract GiraffeRace {
         (uint8[LANE_COUNT] memory winners, uint8 winnerCount,) = simulator.winnersWithScore(simSeed, raceScore[raceId]);
 
         r.settled = true;
+        r.settledAtBlock = uint64(block.number);
         r.winner = winners[0]; // Primary winner (backwards compatible)
         r.deadHeatCount = winnerCount;
         r.winners = winners;
@@ -638,14 +651,39 @@ contract GiraffeRace {
     }
 
     /// @notice Bot/UI helper: return the schedule blocks for a race.
-    /// @dev For non-existent races (submissionCloseBlock == 0), returns (0, 0).
+    /// @dev For non-existent races (submissionCloseBlock == 0), returns (0, 0, 0).
     ///      Note: bettingCloseBlock is 0 until finalizeRaceGiraffes() is called.
-    function getRaceScheduleById(uint256 raceId) external view returns (uint64 bettingCloseBlock, uint64 submissionCloseBlock) {
+    ///      Note: settledAtBlock is 0 until settleRace() is called.
+    function getRaceScheduleById(uint256 raceId) external view returns (uint64 bettingCloseBlock, uint64 submissionCloseBlock, uint64 settledAtBlock) {
         Race storage r = races[raceId];
         submissionCloseBlock = r.submissionCloseBlock;
-        if (submissionCloseBlock == 0) return (0, 0);
+        if (submissionCloseBlock == 0) return (0, 0, 0);
         bettingCloseBlock = r.bettingCloseBlock; // May be 0 if not yet finalized
-        return (bettingCloseBlock, submissionCloseBlock);
+        settledAtBlock = r.settledAtBlock; // May be 0 if not yet settled
+        return (bettingCloseBlock, submissionCloseBlock, settledAtBlock);
+    }
+
+    /// @notice UI helper: check if a new race can be created (cooldown elapsed).
+    /// @return canCreate True if createRace() would succeed
+    /// @return blocksRemaining Blocks until cooldown ends (0 if can create now)
+    /// @return cooldownEndsAtBlock Block number when cooldown ends (0 if no previous race or already elapsed)
+    function getCreateRaceCooldown() external view returns (bool canCreate, uint64 blocksRemaining, uint64 cooldownEndsAtBlock) {
+        if (nextRaceId == 0) {
+            return (true, 0, 0);
+        }
+        
+        Race storage prev = races[nextRaceId - 1];
+        if (!prev.settled) {
+            return (false, 0, 0); // Previous race not settled yet
+        }
+        
+        cooldownEndsAtBlock = prev.settledAtBlock + POST_RACE_COOLDOWN_BLOCKS;
+        if (block.number >= cooldownEndsAtBlock) {
+            return (true, 0, cooldownEndsAtBlock);
+        }
+        
+        blocksRemaining = uint64(cooldownEndsAtBlock - block.number);
+        return (false, blocksRemaining, cooldownEndsAtBlock);
     }
 
     /// @notice Bot helper: return whether key permissionless ops are currently executable, plus blockhash windows.

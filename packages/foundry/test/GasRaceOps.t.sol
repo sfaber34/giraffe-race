@@ -46,7 +46,7 @@ contract GasRaceOpsTest is Test {
 
     function _prepFinalize(uint256 raceId, bytes32 forcedLineupBh) internal returns (uint64 submissionCloseBlock) {
         // Get submissionCloseBlock from schedule
-        (, submissionCloseBlock) = race.getRaceScheduleById(raceId);
+        (, submissionCloseBlock,) = race.getRaceScheduleById(raceId);
         // Finalization entropy uses blockhash(submissionCloseBlock - 1).
         vm.roll(uint256(submissionCloseBlock - 1));
         vm.setBlockhash(uint256(submissionCloseBlock - 1), forcedLineupBh);
@@ -55,7 +55,7 @@ contract GasRaceOpsTest is Test {
 
     function _prepSettle(uint256 raceId, bytes32 forcedBh) internal returns (uint64 bettingCloseBlock) {
         // Get bettingCloseBlock from schedule (should be set after finalization)
-        (bettingCloseBlock,) = race.getRaceScheduleById(raceId);
+        (bettingCloseBlock,,) = race.getRaceScheduleById(raceId);
         require(bettingCloseBlock > 0, "bettingCloseBlock not set - finalization required first");
         // Settlement entropy uses blockhash(bettingCloseBlock).
         vm.roll(uint256(bettingCloseBlock));
@@ -118,7 +118,7 @@ contract GasRaceOpsTest is Test {
         (uint256 gCreate, uint256 raceId) = _gasCallCreateRace();
         
         // Get the schedule - submissionCloseBlock is set at creation
-        (, uint64 submissionCloseBlock) = race.getRaceScheduleById(raceId);
+        (, uint64 submissionCloseBlock,) = race.getRaceScheduleById(raceId);
 
         // 50 unique entrants submit one token each.
         for (uint256 i = 0; i < 50; i++) {

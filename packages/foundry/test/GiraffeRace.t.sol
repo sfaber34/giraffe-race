@@ -78,7 +78,7 @@ contract GiraffeRaceTest is Test {
     // Helper to finalize a race and return the bettingCloseBlock
     function _finalize(uint256 raceId, bytes32 forcedLineupBh) internal returns (uint64 bettingCloseBlock) {
         // Get the schedule - submissionCloseBlock is set at creation
-        (uint64 bettingCloseBlockBefore, uint64 submissionCloseBlock) = race.getRaceScheduleById(raceId);
+        (uint64 bettingCloseBlockBefore, uint64 submissionCloseBlock,) = race.getRaceScheduleById(raceId);
         require(bettingCloseBlockBefore == 0, "test: race already finalized");
         
         // Finalization entropy uses blockhash(submissionCloseBlock - 1).
@@ -88,7 +88,7 @@ contract GiraffeRaceTest is Test {
         race.finalizeRaceGiraffes();
         
         // After finalization, bettingCloseBlock is now set
-        (bettingCloseBlock,) = race.getRaceScheduleById(raceId);
+        (bettingCloseBlock,,) = race.getRaceScheduleById(raceId);
         require(bettingCloseBlock > 0, "test: finalization did not set bettingCloseBlock");
     }
 
@@ -323,7 +323,7 @@ contract GiraffeRaceTest is Test {
         uint256 raceId = race.createRace();
 
         // Get the schedule - submissionCloseBlock is set at creation
-        (, uint64 submissionCloseBlock) = race.getRaceScheduleById(raceId);
+        (, uint64 submissionCloseBlock,) = race.getRaceScheduleById(raceId);
 
         vm.prank(alice);
         uint256 aliceTokenId = giraffeNft.mint("alice");
@@ -339,7 +339,7 @@ contract GiraffeRaceTest is Test {
         uint256 raceId = race.createRace();
 
         // Get the schedule - submissionCloseBlock is set at creation
-        (, uint64 submissionCloseBlock) = race.getRaceScheduleById(raceId);
+        (, uint64 submissionCloseBlock,) = race.getRaceScheduleById(raceId);
 
         // Try to bet before finalization (betting window not open yet)
         vm.roll(uint256(submissionCloseBlock));
@@ -361,7 +361,7 @@ contract GiraffeRaceTest is Test {
         uint256 raceId = race.createRace();
 
         // Get the schedule - submissionCloseBlock is set at creation
-        (, uint64 submissionCloseBlock) = race.getRaceScheduleById(raceId);
+        (, uint64 submissionCloseBlock,) = race.getRaceScheduleById(raceId);
 
         // Finalization entropy uses blockhash(submissionCloseBlock - 1).
         bytes32 forcedLineupBh = keccak256("forced lineup blockhash 50 entrants");
@@ -382,7 +382,7 @@ contract GiraffeRaceTest is Test {
         race.finalizeRaceGiraffes();
         
         // Get the bettingCloseBlock which is now set after finalization
-        (uint64 bettingCloseBlock,) = race.getRaceScheduleById(raceId);
+        (uint64 bettingCloseBlock,,) = race.getRaceScheduleById(raceId);
 
         // Settlement entropy uses blockhash(bettingCloseBlock).
         bytes32 forcedBh = keccak256("forced settle blockhash 50 entrants");
@@ -419,7 +419,7 @@ contract GiraffeRaceTest is Test {
             uint256 raceId = race.createRace();
 
             // Get the schedule - submissionCloseBlock is set at creation
-            (, uint64 submissionCloseBlock) = race.getRaceScheduleById(raceId);
+            (, uint64 submissionCloseBlock,) = race.getRaceScheduleById(raceId);
 
             // Finalization entropy uses blockhash(submissionCloseBlock - 1).
             bytes32 forcedLineupBh = keccak256(abi.encodePacked("lineup", globalI));
@@ -429,7 +429,7 @@ contract GiraffeRaceTest is Test {
             race.finalizeRaceGiraffes();
             
             // Get the bettingCloseBlock which is now set after finalization
-            (uint64 bettingCloseBlock,) = race.getRaceScheduleById(raceId);
+            (uint64 bettingCloseBlock,,) = race.getRaceScheduleById(raceId);
 
             (, uint256[LANE_COUNT] memory tokenIds,) = race.getRaceGiraffes();
 
