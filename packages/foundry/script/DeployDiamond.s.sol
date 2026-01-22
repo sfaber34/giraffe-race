@@ -230,17 +230,16 @@ contract DeployDiamond is Script {
     }
 
     function _getBettingSelectors() internal pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](10);
+        bytes4[] memory selectors = new bytes4[](9);
         selectors[0] = BettingFacet.placeBet.selector;
         selectors[1] = BettingFacet.claim.selector;
         selectors[2] = BettingFacet.claimNextWinningPayout.selector;
-        selectors[3] = BettingFacet.getBet.selector;
-        selectors[4] = BettingFacet.getBetById.selector;
-        selectors[5] = BettingFacet.getClaimRemaining.selector;
-        selectors[6] = BettingFacet.getWinningClaimRemaining.selector;
-        selectors[7] = BettingFacet.getNextWinningClaim.selector;
-        selectors[8] = BettingFacet.getNextClaim.selector;
-        selectors[9] = BettingFacet.settledLiability.selector;
+        selectors[3] = BettingFacet.getBetById.selector;
+        selectors[4] = BettingFacet.getClaimRemaining.selector;
+        selectors[5] = BettingFacet.getWinningClaimRemaining.selector;
+        selectors[6] = BettingFacet.getNextWinningClaim.selector;
+        selectors[7] = BettingFacet.getNextClaim.selector;
+        selectors[8] = BettingFacet.settledLiability.selector;
         return selectors;
     }
 
@@ -255,26 +254,24 @@ contract DeployDiamond is Script {
     }
 
     function _getRaceViewsSelectors() internal pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](19);
+        // NOTE: Removed getRace(), getRaceGiraffes(), getRaceScore() - use ById versions instead
+        bytes4[] memory selectors = new bytes4[](16);
         selectors[0] = RaceViewsFacet.laneCount.selector;
         selectors[1] = RaceViewsFacet.tickCount.selector;
         selectors[2] = RaceViewsFacet.speedRange.selector;
         selectors[3] = RaceViewsFacet.trackLength.selector;
-        selectors[4] = RaceViewsFacet.getRace.selector;
-        selectors[5] = RaceViewsFacet.getRaceById.selector;
-        selectors[6] = RaceViewsFacet.getRaceFlagsById.selector;
-        selectors[7] = RaceViewsFacet.getRaceScheduleById.selector;
-        selectors[8] = RaceViewsFacet.getRaceOddsById.selector;
-        selectors[9] = RaceViewsFacet.getRaceDeadHeatById.selector;
-        selectors[10] = RaceViewsFacet.getRaceActionabilityById.selector;
-        selectors[11] = RaceViewsFacet.getRaceGiraffes.selector;
-        selectors[12] = RaceViewsFacet.getRaceGiraffesById.selector;
-        selectors[13] = RaceViewsFacet.getRaceScore.selector;
-        selectors[14] = RaceViewsFacet.getRaceScoreById.selector;
-        selectors[15] = RaceViewsFacet.simulate.selector;
-        selectors[16] = RaceViewsFacet.simulateWithScore.selector;
-        selectors[17] = RaceViewsFacet.giraffeNft.selector;
-        selectors[18] = RaceViewsFacet.simulator.selector;
+        selectors[4] = RaceViewsFacet.getRaceById.selector;
+        selectors[5] = RaceViewsFacet.getRaceFlagsById.selector;
+        selectors[6] = RaceViewsFacet.getRaceScheduleById.selector;
+        selectors[7] = RaceViewsFacet.getRaceOddsById.selector;
+        selectors[8] = RaceViewsFacet.getRaceDeadHeatById.selector;
+        selectors[9] = RaceViewsFacet.getRaceActionabilityById.selector;
+        selectors[10] = RaceViewsFacet.getRaceGiraffesById.selector;
+        selectors[11] = RaceViewsFacet.getRaceScoreById.selector;
+        selectors[12] = RaceViewsFacet.simulate.selector;
+        selectors[13] = RaceViewsFacet.simulateWithScore.selector;
+        selectors[14] = RaceViewsFacet.giraffeNft.selector;
+        selectors[15] = RaceViewsFacet.simulator.selector;
         // Note: treasury() and winProbTable() have selector conflicts, handled separately
         return selectors;
     }

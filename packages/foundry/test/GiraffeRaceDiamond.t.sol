@@ -178,18 +178,17 @@ contract GiraffeRaceDiamondTest is Test {
             functionSelectors: lifecycleSelectors
         });
 
-        // BettingFacet
-        bytes4[] memory bettingSelectors = new bytes4[](10);
+        // BettingFacet (NOTE: getBet removed - use getBetById instead)
+        bytes4[] memory bettingSelectors = new bytes4[](9);
         bettingSelectors[0] = BettingFacet.placeBet.selector;
         bettingSelectors[1] = BettingFacet.claim.selector;
         bettingSelectors[2] = BettingFacet.claimNextWinningPayout.selector;
-        bettingSelectors[3] = BettingFacet.getBet.selector;
-        bettingSelectors[4] = BettingFacet.getBetById.selector;
-        bettingSelectors[5] = BettingFacet.getClaimRemaining.selector;
-        bettingSelectors[6] = BettingFacet.getWinningClaimRemaining.selector;
-        bettingSelectors[7] = BettingFacet.getNextWinningClaim.selector;
-        bettingSelectors[8] = BettingFacet.getNextClaim.selector;
-        bettingSelectors[9] = BettingFacet.settledLiability.selector;
+        bettingSelectors[3] = BettingFacet.getBetById.selector;
+        bettingSelectors[4] = BettingFacet.getClaimRemaining.selector;
+        bettingSelectors[5] = BettingFacet.getWinningClaimRemaining.selector;
+        bettingSelectors[6] = BettingFacet.getNextWinningClaim.selector;
+        bettingSelectors[7] = BettingFacet.getNextClaim.selector;
+        bettingSelectors[8] = BettingFacet.settledLiability.selector;
         cut[3] = LibDiamond.FacetCut({
             facetAddress: address(bettingFacet),
             action: LibDiamond.FacetCutAction.Add,
@@ -209,27 +208,24 @@ contract GiraffeRaceDiamondTest is Test {
             functionSelectors: submissionSelectors
         });
 
-        // RaceViewsFacet
-        bytes4[] memory viewsSelectors = new bytes4[](19);
+        // RaceViewsFacet (NOTE: getRace, getRaceGiraffes, getRaceScore removed - use ById versions)
+        bytes4[] memory viewsSelectors = new bytes4[](16);
         viewsSelectors[0] = RaceViewsFacet.laneCount.selector;
         viewsSelectors[1] = RaceViewsFacet.tickCount.selector;
         viewsSelectors[2] = RaceViewsFacet.speedRange.selector;
         viewsSelectors[3] = RaceViewsFacet.trackLength.selector;
-        viewsSelectors[4] = RaceViewsFacet.getRace.selector;
-        viewsSelectors[5] = RaceViewsFacet.getRaceById.selector;
-        viewsSelectors[6] = RaceViewsFacet.getRaceFlagsById.selector;
-        viewsSelectors[7] = RaceViewsFacet.getRaceScheduleById.selector;
-        viewsSelectors[8] = RaceViewsFacet.getRaceOddsById.selector;
-        viewsSelectors[9] = RaceViewsFacet.getRaceDeadHeatById.selector;
-        viewsSelectors[10] = RaceViewsFacet.getRaceActionabilityById.selector;
-        viewsSelectors[11] = RaceViewsFacet.getRaceGiraffes.selector;
-        viewsSelectors[12] = RaceViewsFacet.getRaceGiraffesById.selector;
-        viewsSelectors[13] = RaceViewsFacet.getRaceScore.selector;
-        viewsSelectors[14] = RaceViewsFacet.getRaceScoreById.selector;
-        viewsSelectors[15] = RaceViewsFacet.simulate.selector;
-        viewsSelectors[16] = RaceViewsFacet.simulateWithScore.selector;
-        viewsSelectors[17] = RaceViewsFacet.giraffeNft.selector;
-        viewsSelectors[18] = RaceViewsFacet.simulator.selector;
+        viewsSelectors[4] = RaceViewsFacet.getRaceById.selector;
+        viewsSelectors[5] = RaceViewsFacet.getRaceFlagsById.selector;
+        viewsSelectors[6] = RaceViewsFacet.getRaceScheduleById.selector;
+        viewsSelectors[7] = RaceViewsFacet.getRaceOddsById.selector;
+        viewsSelectors[8] = RaceViewsFacet.getRaceDeadHeatById.selector;
+        viewsSelectors[9] = RaceViewsFacet.getRaceActionabilityById.selector;
+        viewsSelectors[10] = RaceViewsFacet.getRaceGiraffesById.selector;
+        viewsSelectors[11] = RaceViewsFacet.getRaceScoreById.selector;
+        viewsSelectors[12] = RaceViewsFacet.simulate.selector;
+        viewsSelectors[13] = RaceViewsFacet.simulateWithScore.selector;
+        viewsSelectors[14] = RaceViewsFacet.giraffeNft.selector;
+        viewsSelectors[15] = RaceViewsFacet.simulator.selector;
         cut[5] = LibDiamond.FacetCut({
             facetAddress: address(raceViewsFacet),
             action: LibDiamond.FacetCutAction.Add,

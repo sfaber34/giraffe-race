@@ -30,24 +30,7 @@ contract RaceViewsFacet {
     }
 
     // ============ Race State ============
-
-    function getRace()
-        external
-        view
-        returns (
-            uint64 bettingCloseBlock,
-            bool settled,
-            uint8 winner,
-            bytes32 seed,
-            uint256 totalPot,
-            uint256[LANE_COUNT] memory totalOnLane
-        )
-    {
-        GiraffeRaceStorage.Layout storage s = GiraffeRaceStorage.layout();
-        uint256 raceId = _latestRaceId(s);
-        GiraffeRaceStorage.Race storage r = s.races[raceId];
-        return (r.bettingCloseBlock, r.settled, r.winner, r.seed, r.totalPot, r.totalOnLane);
-    }
+    // NOTE: Non-ById variants removed. UI should call latestRaceId() then use ById functions.
 
     function getRaceById(uint256 raceId)
         external
@@ -158,21 +141,7 @@ contract RaceViewsFacet {
     }
 
     // ============ Giraffe Assignments ============
-
-    function getRaceGiraffes()
-        external
-        view
-        returns (
-            uint8 assignedCount,
-            uint256[LANE_COUNT] memory tokenIds,
-            address[LANE_COUNT] memory originalOwners
-        )
-    {
-        GiraffeRaceStorage.Layout storage s = GiraffeRaceStorage.layout();
-        uint256 raceId = _latestRaceId(s);
-        GiraffeRaceStorage.RaceGiraffes storage ra = s.raceGiraffes[raceId];
-        return (ra.assignedCount, ra.tokenIds, ra.originalOwners);
-    }
+    // NOTE: Non-ById variants removed. UI should call latestRaceId() then use ById functions.
 
     function getRaceGiraffesById(uint256 raceId)
         external
@@ -185,12 +154,6 @@ contract RaceViewsFacet {
     {
         GiraffeRaceStorage.RaceGiraffes storage ra = GiraffeRaceStorage.layout().raceGiraffes[raceId];
         return (ra.assignedCount, ra.tokenIds, ra.originalOwners);
-    }
-
-    function getRaceScore() external view returns (uint8[LANE_COUNT] memory score) {
-        GiraffeRaceStorage.Layout storage s = GiraffeRaceStorage.layout();
-        uint256 raceId = _latestRaceId(s);
-        return s.raceScore[raceId];
     }
 
     function getRaceScoreById(uint256 raceId) external view returns (uint8[LANE_COUNT] memory score) {
@@ -227,12 +190,5 @@ contract RaceViewsFacet {
 
     function winProbTable() external view returns (address) {
         return address(GiraffeRaceStorage.layout().winProbTable);
-    }
-
-    // ============ Internal Helpers ============
-
-    function _latestRaceId(GiraffeRaceStorage.Layout storage s) internal view returns (uint256 raceId) {
-        if (s.nextRaceId == 0) revert GiraffeRaceStorage.InvalidRace();
-        return s.nextRaceId - 1;
     }
 }

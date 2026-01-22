@@ -190,13 +190,7 @@ contract BettingFacet {
     }
 
     // ============ View Functions ============
-
-    function getBet(address bettor) external view returns (uint128 amount, uint8 lane, bool claimed) {
-        GiraffeRaceStorage.Layout storage s = GiraffeRaceStorage.layout();
-        uint256 raceId = _latestRaceId(s);
-        GiraffeRaceStorage.Bet storage b = s.bets[raceId][bettor];
-        return (b.amount, b.lane, b.claimed);
-    }
+    // NOTE: getBet() removed. UI should call latestRaceId() then use getBetById().
 
     function getBetById(uint256 raceId, address bettor) external view returns (uint128 amount, uint8 lane, bool claimed) {
         GiraffeRaceStorage.Layout storage s = GiraffeRaceStorage.layout();
@@ -344,10 +338,5 @@ contract BettingFacet {
         if (s.nextRaceId == 0) revert GiraffeRaceStorage.InvalidRace();
         raceId = s.nextRaceId - 1;
         if (s.races[raceId].settled) revert GiraffeRaceStorage.InvalidRace();
-    }
-
-    function _latestRaceId(GiraffeRaceStorage.Layout storage s) internal view returns (uint256 raceId) {
-        if (s.nextRaceId == 0) revert GiraffeRaceStorage.InvalidRace();
-        return s.nextRaceId - 1;
     }
 }

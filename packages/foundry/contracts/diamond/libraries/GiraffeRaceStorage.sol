@@ -23,9 +23,14 @@ interface IWinProbTable6 {
  * @title GiraffeRaceStorage
  * @notice Diamond storage pattern for GiraffeRace - single source of truth for all storage
  * @dev Uses EIP-2535 Diamond storage pattern to avoid storage collisions between facets
+ *      NOTE: Constants are defined here directly (not imported) because Solidity requires
+ *      compile-time literals for struct array sizes. GiraffeRaceConstants.sol exports
+ *      these same values for external contracts that need them.
  */
 library GiraffeRaceStorage {
     // ============ Constants ============
+    // Defined directly here for struct array compatibility (Solidity limitation)
+    // These values are mirrored in GiraffeRaceConstants.sol for external access
     uint8 internal constant LANE_COUNT = 6;
     uint16 internal constant ODDS_SCALE = 10000;
     uint16 internal constant MAX_HOUSE_EDGE_BPS = 3000; // 30% max
