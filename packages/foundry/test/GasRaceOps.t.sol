@@ -18,7 +18,7 @@ contract GasRaceOpsTest is Test {
     HouseTreasury internal treasury;
     MockUSDC internal usdc;
 
-    address internal house = address(0xBEEF);       // Treasury owner + house NFT owner  
+    address internal treasuryOwner = address(0xBEEF);  // Treasury owner + house NFT owner  
     address internal oddsAdmin = address(0x0DD5);   // Odds admin
     address internal alice = address(0xA11CE);
     uint256[6] internal houseTokenIds;
@@ -28,20 +28,20 @@ contract GasRaceOpsTest is Test {
     function setUp() public {
         // Deploy MockUSDC and Treasury
         usdc = new MockUSDC();
-        treasury = new HouseTreasury(address(usdc), house);
+        treasury = new HouseTreasury(address(usdc), treasuryOwner);
         usdc.mint(address(treasury), INITIAL_BANKROLL);
 
         giraffeNft = new GiraffeNFT();
         for (uint256 i = 0; i < 6; i++) {
-            houseTokenIds[i] = giraffeNft.mintTo(house, string(abi.encodePacked("house-", vm.toString(i))));
+            houseTokenIds[i] = giraffeNft.mintTo(treasuryOwner, string(abi.encodePacked("house-", vm.toString(i))));
         }
 
         simulator = new GiraffeRaceSimulator();
-        race = new GiraffeRace(address(giraffeNft), house, oddsAdmin, houseTokenIds, address(simulator), address(treasury), address(0));
+        race = new GiraffeRace(address(giraffeNft), treasuryOwner, oddsAdmin, houseTokenIds, address(simulator), address(treasury), address(0));
         giraffeNft.setRaceContract(address(race));
 
         // Authorize race contract in treasury
-        vm.prank(house);
+        vm.prank(treasuryOwner);
         treasury.authorize(address(race));
     }
 

@@ -7,6 +7,13 @@ import "../contracts/GiraffeRaceSimulator.sol";
 import "../contracts/GiraffeNFT.sol";
 import "../contracts/HouseTreasury.sol";
 import "../contracts/MockUSDC.sol";
+import "../contracts/libraries/WinProbTableShard0.sol";
+import "../contracts/libraries/WinProbTableShard1.sol";
+import "../contracts/libraries/WinProbTableShard2.sol";
+import "../contracts/libraries/WinProbTableShard3.sol";
+import "../contracts/libraries/WinProbTableShard4.sol";
+import "../contracts/libraries/WinProbTableShard5.sol";
+import "../contracts/libraries/WinProbTable6.sol";
 
 /**
  * @notice Deploy script for GiraffeRace contract
@@ -19,8 +26,6 @@ import "../contracts/MockUSDC.sol";
  *   ODDS_ADMIN       - Can set race odds. Can be a hot wallet for frequent operations.
  *                      Defaults to TREASURY_OWNER for local testing.
  *   USDC_ADDRESS     - USDC contract address. If not set, deploys MockUSDC (local testing only).
- *   WIN_PROB_TABLE   - Address of the deployed WinProbTable6 contract. If not set, 
- *                      uses fallback fixed odds (for local testing without generating the table).
  */
 contract DeployGiraffeRace is ScaffoldETHDeploy {
     function run() external ScaffoldEthDeployerRunner {
@@ -34,10 +39,6 @@ contract DeployGiraffeRace is ScaffoldETHDeploy {
 
         // USDC address - if not set, deploy MockUSDC for local testing.
         address usdcAddress = vm.envOr("USDC_ADDRESS", address(0));
-
-        // WinProbTable6 address - if not set, uses fallback fixed odds.
-        // To use the probability table, first deploy WinProbTable6 (and its shards), then pass the address here.
-        address winProbTable = vm.envOr("WIN_PROB_TABLE", address(0));
 
         // Deploy MockUSDC if needed (local testing)
         MockUSDC mockUsdc;
@@ -60,6 +61,22 @@ contract DeployGiraffeRace is ScaffoldETHDeploy {
         GiraffeNFT giraffeNft = new GiraffeNFT();
         GiraffeRaceSimulator simulator = new GiraffeRaceSimulator();
 
+        // Deploy the WinProbTable contracts (6 shards + router)
+        WinProbTableShard0 shard0 = new WinProbTableShard0();
+        WinProbTableShard1 shard1 = new WinProbTableShard1();
+        WinProbTableShard2 shard2 = new WinProbTableShard2();
+        WinProbTableShard3 shard3 = new WinProbTableShard3();
+        WinProbTableShard4 shard4 = new WinProbTableShard4();
+        WinProbTableShard5 shard5 = new WinProbTableShard5();
+        WinProbTable6 winProbTable = new WinProbTable6(
+            address(shard0),
+            address(shard1),
+            address(shard2),
+            address(shard3),
+            address(shard4),
+            address(shard5)
+        );
+
         // Mint the initial "house giraffes" to treasuryOwner (the multisig)
         uint256[6] memory houseTokenIds;
         houseTokenIds[0] = giraffeNft.mintTo(treasuryOwner, "house-1");
@@ -69,15 +86,15 @@ contract DeployGiraffeRace is ScaffoldETHDeploy {
         houseTokenIds[4] = giraffeNft.mintTo(treasuryOwner, "house-5");
         houseTokenIds[5] = giraffeNft.mintTo(treasuryOwner, "house-6");
 
-        // Deploy the race contract with treasury
+        // Deploy the race contract with treasury and win probability table
         GiraffeRace race = new GiraffeRace(
             address(giraffeNft),
-            treasuryOwner,  // house: owns house NFTs (multisig)
+            treasuryOwner,  // treasuryOwner: owns house NFTs (multisig)
             oddsAdmin,      // oddsAdmin: can set odds (hot wallet)
             houseTokenIds,
             address(simulator),
             address(treasury),
-            winProbTable    // probability table for odds (address(0) = fallback to fixed odds)
+            address(winProbTable)  // on-chain probability table for odds
         );
 
         // Authorize race contract to collect bets and pay winners (we're still owner at this point)

@@ -54,12 +54,13 @@ contract GiraffeRace {
     uint16 public constant MAX_TICKS = 500;
     uint8 public constant SPEED_RANGE = 10; // speeds per tick: 1-10
 
-    address public house;      // Owns house NFTs (should be multisig/treasuryOwner)
+    address public treasuryOwner;  // Owns house NFTs + controls admin functions (should be multisig)
     address public oddsAdmin;  // Can set odds (can be hot wallet for operations)
     IGiraffeNFT public giraffeNft;
     GiraffeRaceSimulator public simulator;
     HouseTreasury public treasury;
     IWinProbTable6 public winProbTable; // On-chain probability table for odds calculation
+    
     // NOTE (testing): readiness decay after races is currently disabled in code.
     // When deploying a live version where readiness should always decay, uncomment the call in `_settleRace`.
 
@@ -85,7 +86,7 @@ contract GiraffeRace {
         uint8 assignedCount;
         // Token ID for each lane (0..LANE_COUNT-1). 0 means unassigned (valid tokenIds start at 1 in our GiraffeNFT).
         uint256[LANE_COUNT] tokenIds;
-        // The owner snapshot for each lane at the time the entrant was selected (or `house` for house fill).
+        // The owner snapshot for each lane at the time the entrant was selected (or `treasuryOwner` for house fill).
         address[LANE_COUNT] originalOwners;
     }
 
@@ -142,6 +143,7 @@ contract GiraffeRace {
     event RaceSettledDeadHeat(uint256 indexed raceId, bytes32 seed, uint8 deadHeatCount, uint8[6] winners);
     event Claimed(uint256 indexed raceId, address indexed bettor, uint256 payout);
     event GiraffeSubmitted(uint256 indexed raceId, address indexed owner, uint256 indexed tokenId, uint8 lane);
+    event WinProbTableUpdated(address indexed newTable);
     event GiraffeAssigned(uint256 indexed raceId, uint256 indexed tokenId, address indexed originalOwner, uint8 lane);
     event HouseGiraffeAssigned(uint256 indexed raceId, uint256 indexed tokenId, uint8 lane);
 
@@ -167,15 +169,15 @@ contract GiraffeRace {
     error EntryPoolFull();
     error GiraffesAlreadyFinalized();
     error PreviousRaceNotSettled();
-    error NotHouse();
+    error NotTreasuryOwner();
     error NotOddsAdmin();
     error OddsNotSet();
     error OddsAlreadySet();
     error InvalidOdds();
     error InsufficientBankroll();
 
-    modifier onlyHouse() {
-        if (msg.sender != house) revert NotHouse();
+    modifier onlyTreasuryOwner() {
+        if (msg.sender != treasuryOwner) revert NotTreasuryOwner();
         _;
     }
 
@@ -194,7 +196,7 @@ contract GiraffeRace {
         address _winProbTable
     ) {
         giraffeNft = IGiraffeNFT(_giraffeNft);
-        house = _house;
+        treasuryOwner = _house;
         oddsAdmin = _oddsAdmin;
         simulator = GiraffeRaceSimulator(_simulator);
         treasury = HouseTreasury(_treasury);
@@ -357,6 +359,15 @@ contract GiraffeRace {
         r.decimalOddsBps = decimalOddsBps;
         r.oddsSet = true;
         emit RaceOddsSet(raceId, decimalOddsBps);
+    }
+
+    /**
+     * @notice Update the win probability table contract address.
+     * @dev Only callable by treasuryOwner. Set to address(0) to use fallback fixed odds.
+     */
+    function setWinProbTable(address _winProbTable) external onlyTreasuryOwner {
+        winProbTable = IWinProbTable6(_winProbTable);
+        emit WinProbTableUpdated(_winProbTable);
     }
 
     /**
@@ -1116,10 +1127,10 @@ contract GiraffeRace {
             availableIdx[uint8(pick)] = availableIdx[availableCount];
 
             uint256 houseTokenId = houseGiraffeTokenIds[idx];
-            if (giraffeNft.ownerOf(houseTokenId) != house) revert InvalidHouseGiraffe();
+            if (giraffeNft.ownerOf(houseTokenId) != treasuryOwner) revert InvalidHouseGiraffe();
 
             ra.tokenIds[lane] = houseTokenId;
-            ra.originalOwners[lane] = house;
+            ra.originalOwners[lane] = treasuryOwner;
             emit HouseGiraffeAssigned(raceId, houseTokenId, lane);
         }
 

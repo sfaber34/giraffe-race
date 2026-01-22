@@ -67,10 +67,9 @@ contract GiraffeRaceSimulator {
 
     function _scoreBps(uint8 score) internal pure returns (uint16) {
         // Map score 1..10 -> multiplier in basis points.
-        // Tuning: reduce how much score=1 handicaps speed so extreme mismatches aren't ~50x longshots.
-        if (score == 0) score = 10;
-        if (score > 10) score = 10;
+        // Clamp score to [1, 10]
         if (score < 1) score = 1;
+        if (score > 10) score = 10;
         uint256 minBps = 9585;
         uint256 range = 10000 - minBps; // 415
         return uint16(minBps + (uint256(score - 1) * range) / 9);

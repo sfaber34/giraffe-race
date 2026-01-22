@@ -760,7 +760,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 2,
+      deployedOnBlock: 3,
     },
     GiraffeNFT: {
       address: "0x8ce361602b935680e8dec218b820ff5056beb7af",
@@ -2152,7 +2152,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 4,
+      deployedOnBlock: 3,
     },
     GiraffeRaceSimulator: {
       address: "0xe1aa25618fa0c7a1cfdab5d6b456af611873b629",
@@ -2270,10 +2270,458 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
+      deployedOnBlock: 3,
+    },
+    WinProbTableShard0: {
+      address: "0xe1da8919f262ee86f9be05059c9280142cf23f48",
+      abi: [
+        {
+          type: "function",
+          name: "getByGlobalIndex",
+          inputs: [
+            {
+              name: "globalIdx",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "probsBps",
+              type: "uint16[6]",
+              internalType: "uint16[6]",
+            },
+          ],
+          stateMutability: "pure",
+        },
+        {
+          type: "function",
+          name: "shardRange",
+          inputs: [],
+          outputs: [
+            {
+              name: "start",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "len",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "pure",
+        },
+      ],
+      inheritedFunctions: {},
+      deployedOnBlock: 4,
+    },
+    WinProbTableShard1: {
+      address: "0x0c8e79f3534b00d9a3d4a856b665bf4ebc22f2ba",
+      abi: [
+        {
+          type: "function",
+          name: "getByGlobalIndex",
+          inputs: [
+            {
+              name: "globalIdx",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "probsBps",
+              type: "uint16[6]",
+              internalType: "uint16[6]",
+            },
+          ],
+          stateMutability: "pure",
+        },
+        {
+          type: "function",
+          name: "shardRange",
+          inputs: [],
+          outputs: [
+            {
+              name: "start",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "len",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "pure",
+        },
+      ],
+      inheritedFunctions: {},
+      deployedOnBlock: 4,
+    },
+    WinProbTableShard2: {
+      address: "0xed1db453c3156ff3155a97ad217b3087d5dc5f6e",
+      abi: [
+        {
+          type: "function",
+          name: "getByGlobalIndex",
+          inputs: [
+            {
+              name: "globalIdx",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "probsBps",
+              type: "uint16[6]",
+              internalType: "uint16[6]",
+            },
+          ],
+          stateMutability: "pure",
+        },
+        {
+          type: "function",
+          name: "shardRange",
+          inputs: [],
+          outputs: [
+            {
+              name: "start",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "len",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "pure",
+        },
+      ],
+      inheritedFunctions: {},
+      deployedOnBlock: 4,
+    },
+    WinProbTableShard3: {
+      address: "0xf7cd8fa9b94db2aa972023b379c7f72c65e4de9d",
+      abi: [
+        {
+          type: "function",
+          name: "getByGlobalIndex",
+          inputs: [
+            {
+              name: "globalIdx",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "probsBps",
+              type: "uint16[6]",
+              internalType: "uint16[6]",
+            },
+          ],
+          stateMutability: "pure",
+        },
+        {
+          type: "function",
+          name: "shardRange",
+          inputs: [],
+          outputs: [
+            {
+              name: "start",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "len",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "pure",
+        },
+      ],
+      inheritedFunctions: {},
+      deployedOnBlock: 2,
+    },
+    WinProbTableShard4: {
+      address: "0x12975173b87f7595ee45dffb2ab812ece596bf84",
+      abi: [
+        {
+          type: "function",
+          name: "getByGlobalIndex",
+          inputs: [
+            {
+              name: "globalIdx",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "probsBps",
+              type: "uint16[6]",
+              internalType: "uint16[6]",
+            },
+          ],
+          stateMutability: "pure",
+        },
+        {
+          type: "function",
+          name: "shardRange",
+          inputs: [],
+          outputs: [
+            {
+              name: "start",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "len",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "pure",
+        },
+      ],
+      inheritedFunctions: {},
+      deployedOnBlock: 4,
+    },
+    WinProbTableShard5: {
+      address: "0x82dc47734901ee7d4f4232f398752cb9dd5daccc",
+      abi: [
+        {
+          type: "function",
+          name: "getByGlobalIndex",
+          inputs: [
+            {
+              name: "globalIdx",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "probsBps",
+              type: "uint16[6]",
+              internalType: "uint16[6]",
+            },
+          ],
+          stateMutability: "pure",
+        },
+        {
+          type: "function",
+          name: "shardRange",
+          inputs: [],
+          outputs: [
+            {
+              name: "start",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "len",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "pure",
+        },
+      ],
+      inheritedFunctions: {},
+      deployedOnBlock: 4,
+    },
+    WinProbTable6: {
+      address: "0x196dbcbb54b8ec4958c959d8949ebfe87ac2aaaf",
+      abi: [
+        {
+          type: "constructor",
+          inputs: [
+            {
+              name: "_shard0",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "_shard1",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "_shard2",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "_shard3",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "_shard4",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "_shard5",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "get",
+          inputs: [
+            {
+              name: "scores",
+              type: "uint8[6]",
+              internalType: "uint8[6]",
+            },
+          ],
+          outputs: [
+            {
+              name: "probsBps",
+              type: "uint16[6]",
+              internalType: "uint16[6]",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getSorted",
+          inputs: [
+            {
+              name: "a",
+              type: "uint8",
+              internalType: "uint8",
+            },
+            {
+              name: "b",
+              type: "uint8",
+              internalType: "uint8",
+            },
+            {
+              name: "c",
+              type: "uint8",
+              internalType: "uint8",
+            },
+            {
+              name: "d",
+              type: "uint8",
+              internalType: "uint8",
+            },
+            {
+              name: "e",
+              type: "uint8",
+              internalType: "uint8",
+            },
+            {
+              name: "f",
+              type: "uint8",
+              internalType: "uint8",
+            },
+          ],
+          outputs: [
+            {
+              name: "probsBps",
+              type: "uint16[6]",
+              internalType: "uint16[6]",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "shard0",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "contract WinProbTableShard0",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "shard1",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "contract WinProbTableShard1",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "shard2",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "contract WinProbTableShard2",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "shard3",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "contract WinProbTableShard3",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "shard4",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "contract WinProbTableShard4",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "shard5",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "contract WinProbTableShard5",
+            },
+          ],
+          stateMutability: "view",
+        },
+      ],
+      inheritedFunctions: {},
       deployedOnBlock: 4,
     },
     GiraffeRace: {
-      address: "0x196dbcbb54b8ec4958c959d8949ebfe87ac2aaaf",
+      address: "0x6379ebd504941f50d5bfde9348b37593bd29c835",
       abi: [
         {
           type: "constructor",
@@ -2305,6 +2753,11 @@ const deployedContracts = {
             },
             {
               name: "_treasury",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "_winProbTable",
               type: "address",
               internalType: "address",
             },
@@ -3022,19 +3475,6 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "house",
-          inputs: [],
-          outputs: [
-            {
-              name: "",
-              type: "address",
-              internalType: "address",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
           name: "houseGiraffeTokenIds",
           inputs: [
             {
@@ -3135,6 +3575,19 @@ const deployedContracts = {
               name: "decimalOddsBps",
               type: "uint32[6]",
               internalType: "uint32[6]",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "setWinProbTable",
+          inputs: [
+            {
+              name: "_winProbTable",
+              type: "address",
+              internalType: "address",
             },
           ],
           outputs: [],
@@ -3287,6 +3740,32 @@ const deployedContracts = {
               name: "",
               type: "address",
               internalType: "contract HouseTreasury",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "treasuryOwner",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "winProbTable",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "contract IWinProbTable6",
             },
           ],
           stateMutability: "view",
@@ -3529,6 +4008,19 @@ const deployedContracts = {
           anonymous: false,
         },
         {
+          type: "event",
+          name: "WinProbTableUpdated",
+          inputs: [
+            {
+              name: "newTable",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+          ],
+          anonymous: false,
+        },
+        {
           type: "error",
           name: "AlreadyBet",
           inputs: [],
@@ -3610,11 +4102,6 @@ const deployedContracts = {
         },
         {
           type: "error",
-          name: "NotHouse",
-          inputs: [],
-        },
-        {
-          type: "error",
           name: "NotOddsAdmin",
           inputs: [],
         },
@@ -3626,6 +4113,11 @@ const deployedContracts = {
         {
           type: "error",
           name: "NotTokenOwner",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "NotTreasuryOwner",
           inputs: [],
         },
         {

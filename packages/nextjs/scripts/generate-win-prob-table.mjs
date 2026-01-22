@@ -107,10 +107,9 @@ function ceilLog2(n) {
 
 function clampScore(r) {
   const x = Math.floor(Number(r));
-  // Match Solidity exactly: score=0 becomes 10, not 1
-  if (!Number.isFinite(x) || x === 0) return 10;
+  // Clamp to [1, 10]
+  if (!Number.isFinite(x) || x < 1) return 1;
   if (x > 10) return 10;
-  if (x < 1) return 1;
   return x;
 }
 
@@ -207,11 +206,17 @@ function parseArgs(argv) {
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (a === "--samples") out.samples = Number(argv[++i]);
+    // Handle both --arg=value and --arg value formats
+    if (a.startsWith("--samples=")) out.samples = Number(a.split("=")[1]);
+    else if (a === "--samples") out.samples = Number(argv[++i]);
+    else if (a.startsWith("--workers=")) out.workers = Number(a.split("=")[1]);
     else if (a === "--workers") out.workers = Number(argv[++i]);
+    else if (a.startsWith("--out-dir=")) out.outDir = String(a.split("=")[1]);
     else if (a === "--out-dir") out.outDir = String(argv[++i]);
+    else if (a.startsWith("--checkpoint=")) out.checkpoint = String(a.split("=")[1]);
     else if (a === "--checkpoint") out.checkpoint = String(argv[++i]);
     else if (a === "--resume") out.resume = true;
+    else if (a.startsWith("--progress-every=")) out.progressEvery = Number(a.split("=")[1]);
     else if (a === "--progress-every") out.progressEvery = Number(argv[++i]);
   }
   return out;
@@ -305,11 +310,12 @@ function workerLoop() {
 
 /**
  * Split the table into shards that fit under 24KB each.
- * Each entry is 12 bytes, so ~1700 entries per shard keeps us under 20KB with room for code.
+ * Each entry is 12 bytes. With ~850 entries per shard, we get ~10KB of data per shard,
+ * leaving plenty of room for contract code overhead (~12-14KB).
  */
-const ENTRIES_PER_SHARD = 1700;
+const ENTRIES_PER_SHARD = 850;
 const TOTAL_TUPLES = 5005;
-const SHARD_COUNT = Math.ceil(TOTAL_TUPLES / ENTRIES_PER_SHARD); // 3 shards
+const SHARD_COUNT = Math.ceil(TOTAL_TUPLES / ENTRIES_PER_SHARD); // 6 shards
 
 function generateShardContract(shardIndex, rows, startIndex) {
   const tableBytes = [];
@@ -359,13 +365,43 @@ contract WinProbTableShard${shardIndex} {
 }
 
 function generateRouterContract() {
-  // Build the combinatorial helper functions for 6 dimensions
+  // Generate imports for all shards
+  const imports = Array.from({ length: SHARD_COUNT }, (_, i) => 
+    `import "./WinProbTableShard${i}.sol";`
+  ).join('\n');
+
+  // Generate shard variables
+  const shardVars = Array.from({ length: SHARD_COUNT }, (_, i) =>
+    `    WinProbTableShard${i} public immutable shard${i};`
+  ).join('\n');
+
+  // Generate constructor params
+  const constructorParams = Array.from({ length: SHARD_COUNT }, (_, i) =>
+    `address _shard${i}`
+  ).join(', ');
+
+  // Generate constructor body
+  const constructorBody = Array.from({ length: SHARD_COUNT }, (_, i) =>
+    `        shard${i} = WinProbTableShard${i}(_shard${i});`
+  ).join('\n');
+
+  // Generate _getByIndex routing logic
+  let routingLogic = '';
+  for (let i = 0; i < SHARD_COUNT; i++) {
+    const threshold = ENTRIES_PER_SHARD * (i + 1);
+    if (i === 0) {
+      routingLogic += `        if (idx < ${threshold}) {\n            return shard0.getByGlobalIndex(idx);\n        }`;
+    } else if (i < SHARD_COUNT - 1) {
+      routingLogic += ` else if (idx < ${threshold}) {\n            return shard${i}.getByGlobalIndex(idx);\n        }`;
+    } else {
+      routingLogic += ` else {\n            return shard${i}.getByGlobalIndex(idx);\n        }`;
+    }
+  }
+
   return `// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "./WinProbTableShard0.sol";
-import "./WinProbTableShard1.sol";
-import "./WinProbTableShard2.sol";
+${imports}
 
 /// @notice Router for 6-lane win probability lookup table.
 /// @dev Routes queries to the correct shard based on the global index.
@@ -376,14 +412,10 @@ contract WinProbTable6 {
     uint256 internal constant TABLE_LEN = ${TOTAL_TUPLES};
     uint256 internal constant ENTRIES_PER_SHARD = ${ENTRIES_PER_SHARD};
 
-    WinProbTableShard0 public immutable shard0;
-    WinProbTableShard1 public immutable shard1;
-    WinProbTableShard2 public immutable shard2;
+${shardVars}
 
-    constructor(address _shard0, address _shard1, address _shard2) {
-        shard0 = WinProbTableShard0(_shard0);
-        shard1 = WinProbTableShard1(_shard1);
-        shard2 = WinProbTableShard2(_shard2);
+    constructor(${constructorParams}) {
+${constructorBody}
     }
 
     /// @notice Compute the global index for a sorted 6-tuple.
@@ -397,32 +429,39 @@ contract WinProbTable6 {
         // For each position, count how many valid tuples have a smaller value at that position.
         
         // Position 0 (a): count tuples where first element < a
+        // For each value i, tuples starting with i have remaining 5 elements in [i, 10]
+        // Count = C(10-i+1+5-1, 5) = C(15-i, 5)
         for (uint8 i = 1; i < a; i++) {
-            idx += _c5(uint8(16 - i)); // C(16-i, 5) = tuples starting with i
+            idx += _c5(uint8(15 - i)); // C(15-i, 5)
         }
         
-        // Position 1 (b): count tuples starting with a where second element < b
+        // Position 1 (b): given a fixed, count tuples where second element < b
+        // For j in [a, b-1], remaining 4 elements in [j, 10]: C(10-j+1+4-1, 4) = C(14-j, 4)
         for (uint8 j = a; j < b; j++) {
-            idx += _c4(uint8(15 - j)); // C(15-j, 4)
+            idx += _c4(uint8(14 - j)); // C(14-j, 4)
         }
         
         // Position 2 (c): count tuples starting with (a,b) where third element < c
+        // For k in [b, c-1], remaining 3 elements in [k, 10]: C(13-k, 3)
         for (uint8 k = b; k < c; k++) {
-            idx += _c3(uint8(14 - k)); // C(14-k, 3)
+            idx += _c3(uint8(13 - k)); // C(13-k, 3)
         }
         
         // Position 3 (d): count tuples starting with (a,b,c) where fourth element < d
+        // For l in [c, d-1], remaining 2 elements in [l, 10]: C(12-l, 2)
         for (uint8 l = c; l < d; l++) {
-            idx += _c2(uint8(13 - l)); // C(13-l, 2)
+            idx += _c2(uint8(12 - l)); // C(12-l, 2)
         }
         
         // Position 4 (e): count tuples starting with (a,b,c,d) where fifth element < e
+        // For m in [d, e-1], remaining 1 element in [m, 10]: C(11-m, 1) = 11-m
         for (uint8 m = d; m < e; m++) {
-            idx += uint256(12 - m); // C(12-m, 1) = 12-m
+            idx += uint256(11 - m); // C(11-m, 1) = 11-m
         }
         
         // Position 5 (f): count tuples starting with (a,b,c,d,e) where sixth element < f
-        idx += uint256(f - e); // C(_, 0) = f - e
+        // Just f - e (number of values in [e, f-1])
+        idx += uint256(f - e);
     }
 
     function _c2(uint8 n) private pure returns (uint256) {
@@ -461,13 +500,7 @@ contract WinProbTable6 {
     function _getByIndex(uint256 idx) internal view returns (uint16[LANE_COUNT] memory probsBps) {
         require(idx < TABLE_LEN, "WinProbTable6: index out of bounds");
         
-        if (idx < ${ENTRIES_PER_SHARD}) {
-            return shard0.getByGlobalIndex(idx);
-        } else if (idx < ${ENTRIES_PER_SHARD * 2}) {
-            return shard1.getByGlobalIndex(idx);
-        } else {
-            return shard2.getByGlobalIndex(idx);
-        }
+${routingLogic}
     }
 
     /// @notice Convenience: get probabilities for any 6 scores (auto-sorts them).
