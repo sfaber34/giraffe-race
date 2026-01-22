@@ -1351,7 +1351,11 @@ export const RaceDashboard = () => {
                           </div>
                         </div>
                       ) : raceIsOver && myBet?.hasBet && revealedWinner !== null ? (
-                        <div className="flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-base-100/90 backdrop-blur-sm shadow-lg">
+                        // User placed a bet - show win/lose result with cooldown
+                        <div
+                          className="flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-base-100/90 backdrop-blur-sm shadow-lg"
+                          style={{ minWidth: 320 }}
+                        >
                           {myBet.lane === revealedWinner ? (
                             <>
                               <div className="text-4xl font-black text-success drop-shadow">Your bet hit!</div>
@@ -1367,18 +1371,64 @@ export const RaceDashboard = () => {
                               <div className="text-xl font-semibold text-error/80">Your bet didn&apos;t win</div>
                             </>
                           )}
+                          {/* Cooldown countdown for next race */}
+                          {cooldownStatus && cooldownStatus.cooldownEndsAtBlock > 0n && (
+                            <div className="w-full mt-2">
+                              <BlockCountdownBar
+                                label={cooldownStatus.canCreate ? "Next race available" : "Next race in"}
+                                current={blockNumber}
+                                start={parsedSchedule?.settledAtBlock ?? undefined}
+                                end={cooldownStatus.cooldownEndsAtBlock}
+                              />
+                            </div>
+                          )}
                         </div>
-                      ) : null}
-                    </>
-                  ) : (
-                    // Pre-race overlay (submissions open, betting open, bet placed)
-                    <>
-                      {status === "submissions_open" ? (
+                      ) : raceIsOver && revealedWinner !== null ? (
+                        // User did NOT place a bet - show race over with cooldown
                         <div
                           className="flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-base-100/90 backdrop-blur-sm shadow-lg"
                           style={{ minWidth: 320 }}
                         >
-                          <div className="text-3xl font-black text-primary drop-shadow">Submissions open</div>
+                          <div className="text-3xl font-black text-primary drop-shadow">Race complete</div>
+                          <div className="text-lg font-semibold text-base-content/70 flex items-center gap-2">
+                            <span>Winner:</span>
+                            <GiraffeAnimated
+                              idPrefix={`overlay-winner-${(viewingRaceId ?? 0n).toString()}-${revealedWinner}`}
+                              tokenId={laneTokenIds[revealedWinner] ?? 0n}
+                              playbackRate={1}
+                              playing={true}
+                              sizePx={48}
+                            />
+                            <LaneName
+                              tokenId={laneTokenIds[revealedWinner] ?? 0n}
+                              fallback={`Lane ${revealedWinner}`}
+                            />
+                          </div>
+                          {/* Cooldown countdown for next race */}
+                          {cooldownStatus && cooldownStatus.cooldownEndsAtBlock > 0n && (
+                            <div className="w-full mt-2">
+                              <BlockCountdownBar
+                                label={cooldownStatus.canCreate ? "Next race available" : "Next race in"}
+                                current={blockNumber}
+                                start={parsedSchedule?.settledAtBlock ?? undefined}
+                                end={cooldownStatus.cooldownEndsAtBlock}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      ) : null}
+                    </>
+                  ) : (
+                    // Pre-race overlay (submissions open, awaiting finalization, betting open, bet placed, settled, cooldown)
+                    <>
+                      {status === "submissions_open" || status === "awaiting_finalization" ? (
+                        <div
+                          className="flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-base-100/90 backdrop-blur-sm shadow-lg"
+                          style={{ minWidth: 320 }}
+                        >
+                          <div className="text-3xl font-black text-primary drop-shadow">
+                            {status === "submissions_open" ? "Submissions open" : "Awaiting lineup"}
+                          </div>
                           {submittedTokenId ? (
                             <div className="text-xl font-semibold text-base-content/80 flex items-center gap-2">
                               <span>You entered</span>
@@ -1396,16 +1446,25 @@ export const RaceDashboard = () => {
                               </span>
                             </div>
                           ) : (
-                            <div className="text-lg font-semibold text-base-content/70">Enter a giraffe</div>
+                            <div className="text-lg font-semibold text-base-content/70">
+                              {status === "submissions_open" ? "Enter a giraffe" : "Waiting for finalization..."}
+                            </div>
                           )}
-                          <div className="w-full mt-2">
-                            <BlockCountdownBar
-                              label="Submissions close in"
-                              current={blockNumber}
-                              start={startBlock ?? undefined}
-                              end={submissionCloseBlock ?? undefined}
-                            />
-                          </div>
+                          {status === "submissions_open" && (
+                            <div className="w-full mt-2">
+                              <BlockCountdownBar
+                                label="Submissions close in"
+                                current={blockNumber}
+                                start={startBlock ?? undefined}
+                                end={submissionCloseBlock ?? undefined}
+                              />
+                            </div>
+                          )}
+                          {status === "awaiting_finalization" && (
+                            <div className="w-full mt-2 text-sm text-base-content/60 text-center">
+                              Submissions closed. Waiting for lineup to be finalized.
+                            </div>
+                          )}
                         </div>
                       ) : status === "betting_open" ? (
                         <div
@@ -1476,6 +1535,50 @@ export const RaceDashboard = () => {
                               <div className="text-lg font-semibold text-base-content/70">Waiting for settlement</div>
                             </>
                           )}
+                        </div>
+                      ) : status === "settled" || status === "cooldown" ? (
+                        // Race is settled or in cooldown - show waiting for next race
+                        <div
+                          className="flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-base-100/90 backdrop-blur-sm shadow-lg"
+                          style={{ minWidth: 320 }}
+                        >
+                          <div className="text-3xl font-black text-primary drop-shadow">Race complete</div>
+                          {parsed?.winner !== undefined && (
+                            <div className="text-lg font-semibold text-base-content/70 flex items-center gap-2">
+                              <span>Winner:</span>
+                              <GiraffeAnimated
+                                idPrefix={`overlay-settled-winner-${(viewingRaceId ?? 0n).toString()}-${parsed.winner}`}
+                                tokenId={laneTokenIds[parsed.winner] ?? 0n}
+                                playbackRate={1}
+                                playing={true}
+                                sizePx={48}
+                              />
+                              <LaneName
+                                tokenId={laneTokenIds[parsed.winner] ?? 0n}
+                                fallback={`Lane ${parsed.winner}`}
+                              />
+                            </div>
+                          )}
+                          {/* Cooldown countdown for next race */}
+                          {cooldownStatus && cooldownStatus.cooldownEndsAtBlock > 0n && (
+                            <div className="w-full mt-2">
+                              <BlockCountdownBar
+                                label={cooldownStatus.canCreate ? "Next race available" : "Next race in"}
+                                current={blockNumber}
+                                start={parsedSchedule?.settledAtBlock ?? undefined}
+                                end={cooldownStatus.cooldownEndsAtBlock}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      ) : status === "no_race" ? (
+                        // No race exists - prompt to create one
+                        <div
+                          className="flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-base-100/90 backdrop-blur-sm shadow-lg"
+                          style={{ minWidth: 320 }}
+                        >
+                          <div className="text-3xl font-black text-primary drop-shadow">No race active</div>
+                          <div className="text-lg font-semibold text-base-content/70">Create a race to get started</div>
                         </div>
                       ) : null}
                     </>
