@@ -86,13 +86,8 @@ class FastRng {
   // Returns random integer in [0, n-1]
   roll(n) {
     if (n <= 1) return 0;
-    // Use rejection sampling for unbiased results
-    const limit = (0x100000000 - (0x100000000 % n)) >>> 0;
-    let r;
-    do {
-      r = this.next();
-    } while (r >= limit);
-    return r % n;
+    // Simple modulo - slight bias for large n but fine for our use case (n <= 10000)
+    return this.next() % n;
   }
 }
 
@@ -284,25 +279,31 @@ function computeTupleProbs(tuple, samples) {
 }
 
 function workerLoop() {
-  const samples = workerData?.samples;
-  if (!Number.isFinite(samples) || samples <= 0) throw new Error("Worker: invalid samples");
-  if (!parentPort) throw new Error("Worker: missing parentPort");
+  try {
+    const samples = workerData?.samples;
+    if (!Number.isFinite(samples) || samples <= 0) throw new Error("Worker: invalid samples");
+    if (!parentPort) throw new Error("Worker: missing parentPort");
 
-  parentPort.on("message", msg => {
-    if (!msg || typeof msg !== "object") return;
-    if (msg.type === "stop") process.exit(0);
-    if (msg.type !== "job") return;
-    const { id, index, tuple } = msg;
-    try {
-      const probs = computeTupleProbs(tuple, samples);
-      parentPort.postMessage({ type: "result", id, index, tuple, probs });
-    } catch (e) {
-      parentPort.postMessage({ type: "error", id, index, error: String(e?.message || e) });
-    }
-  });
+    parentPort.on("message", msg => {
+      if (!msg || typeof msg !== "object") return;
+      if (msg.type === "stop") process.exit(0);
+      if (msg.type !== "job") return;
+      const { id, index, tuple } = msg;
+      try {
+        const probs = computeTupleProbs(tuple, samples);
+        parentPort.postMessage({ type: "result", id, index, tuple, probs });
+      } catch (e) {
+        console.error(`Worker error on job ${index}:`, e);
+        parentPort.postMessage({ type: "error", id, index, error: String(e?.message || e) });
+      }
+    });
 
-  // Signal ready
-  parentPort.postMessage({ type: "ready" });
+    // Signal ready
+    parentPort.postMessage({ type: "ready" });
+  } catch (e) {
+    console.error("Worker initialization error:", e);
+    process.exit(1);
+  }
 }
 
 /**
@@ -593,6 +594,10 @@ async function main() {
     const dispatchOne = slot => {
       if (nextDispatch >= TOTAL_TUPLES) return false;
       const tuple = tuples[nextDispatch];
+      if (!tuple) {
+        console.error(`dispatchOne: tuple is undefined at index ${nextDispatch}`);
+        return false;
+      }
       const jobId = `${nextDispatch}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
       slot.busy = true;
       slot.worker.postMessage({ type: "job", id: jobId, index: nextDispatch, tuple });
@@ -608,28 +613,30 @@ async function main() {
 
         checkpoint.rows.push({ tuple: row.tuple, probs: row.probs });
         checkpoint.idx = nextCommit + 1;
-        fs.writeFileSync(checkpointAbs, JSON.stringify(checkpoint));
+        
+        try {
+          fs.writeFileSync(checkpointAbs, JSON.stringify(checkpoint));
+        } catch (e) {
+          console.error(`Failed to write checkpoint:`, e);
+        }
 
         nextCommit++;
 
-        if (nextCommit % args.progressEvery === 0 || nextCommit === TOTAL_TUPLES) {
-          const now = Date.now();
+        // Progress output every 10 seconds or at completion
+        const now = Date.now();
+        if (nextCommit === TOTAL_TUPLES || now - lastLogAt >= 10000) {
           const elapsedSec = (now - startAt) / 1000;
           const done = nextCommit;
           const pct = ((100 * done) / TOTAL_TUPLES).toFixed(1);
-          const tuplesPerSec = done / Math.max(1e-9, elapsedSec);
-          const remainingSec = (TOTAL_TUPLES - done) / Math.max(1e-9, tuplesPerSec);
-          const simsPerSec = ((done * args.samples) / Math.max(1e-9, elapsedSec)).toFixed(0);
-
-          const logEveryMs = 2000;
-          if (now - lastLogAt >= logEveryMs || done === TOTAL_TUPLES) {
-            lastLogAt = now;
-            console.log(
-              `[${pct}%] ${done}/${TOTAL_TUPLES} tuples | elapsed ${fmtDuration(elapsedSec)} | ETA ${fmtDuration(
-                remainingSec,
-              )} | ~${simsPerSec} sims/s | workers ${workerCount}`,
-            );
-          }
+          const tuplesPerSec = done / Math.max(0.001, elapsedSec);
+          const remainingSec = (TOTAL_TUPLES - done) / Math.max(0.001, tuplesPerSec);
+          const simsPerSec = ((done * args.samples) / Math.max(0.001, elapsedSec)).toFixed(0);
+          lastLogAt = now;
+          console.log(
+            `[${pct}%] ${done}/${TOTAL_TUPLES} tuples | elapsed ${fmtDuration(elapsedSec)} | ETA ${fmtDuration(
+              remainingSec,
+            )} | ~${simsPerSec} sims/s`,
+          );
         }
       }
     };
@@ -643,7 +650,8 @@ async function main() {
         if (msg.type === "ready") {
           readyCount++;
           if (readyCount === workerCount) {
-            // Initial fill
+            // Initial fill - dispatch jobs to all workers
+            console.log(`All ${workerCount} workers ready. Starting...`);
             for (const s of pool) dispatchOne(s);
           }
           return;
@@ -670,22 +678,37 @@ async function main() {
         }
       };
 
+      // Timeout if workers don't respond within 30 seconds
+      const workerTimeout = setTimeout(() => {
+        if (!finished) {
+          console.error(`Timeout: only ${readyCount}/${workerCount} workers ready after 30s`);
+          finished = true;
+          reject(new Error("Worker initialization timeout"));
+        }
+      }, 30000);
+
       for (let i = 0; i < workerCount; i++) {
         const w = new Worker(new URL(import.meta.url), { workerData: { samples: args.samples }, type: "module" });
         const slot = { worker: w, busy: false, job: null };
         pool.push(slot);
         workers.push(w);
-        w.on("message", msg => onWorkerMessage(slot, msg));
+        w.on("message", msg => {
+          onWorkerMessage(slot, msg);
+          if (readyCount === workerCount) clearTimeout(workerTimeout);
+        });
         w.on("error", err => {
+          console.error(`Worker ${i} error:`, err);
           if (finished) return;
           finished = true;
+          clearTimeout(workerTimeout);
           reject(err);
         });
         w.on("exit", code => {
           if (finished) return;
           if (code !== 0) {
             finished = true;
-            reject(new Error(`Worker exited with code ${code}`));
+            clearTimeout(workerTimeout);
+            reject(new Error(`Worker ${i} exited with code ${code}`));
           }
         });
       }
