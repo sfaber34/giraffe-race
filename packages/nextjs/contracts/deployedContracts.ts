@@ -760,7 +760,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 3,
+      deployedOnBlock: 5,
     },
     GiraffeNFT: {
       address: "0x8ce361602b935680e8dec218b820ff5056beb7af",
@@ -1125,35 +1125,6 @@ const deployedContracts = {
               name: "to",
               type: "address",
               internalType: "address",
-            },
-            {
-              name: "giraffeName",
-              type: "string",
-              internalType: "string",
-            },
-          ],
-          outputs: [
-            {
-              name: "tokenId",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          stateMutability: "nonpayable",
-        },
-        {
-          type: "function",
-          name: "mintWithZip",
-          inputs: [
-            {
-              name: "to",
-              type: "address",
-              internalType: "address",
-            },
-            {
-              name: "zip",
-              type: "uint8",
-              internalType: "uint8",
             },
             {
               name: "giraffeName",
@@ -2139,7 +2110,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 2,
+      deployedOnBlock: 5,
     },
     GiraffeRaceSimulator: {
       address: "0xe1aa25618fa0c7a1cfdab5d6b456af611873b629",
@@ -2257,7 +2228,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 5,
+      deployedOnBlock: 3,
     },
     WinProbTableShard0: {
       address: "0xe1da8919f262ee86f9be05059c9280142cf23f48",
@@ -2433,7 +2404,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 3,
+      deployedOnBlock: 5,
     },
     WinProbTableShard4: {
       address: "0x12975173b87f7595ee45dffb2ab812ece596bf84",
@@ -2705,7 +2676,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 5,
+      deployedOnBlock: 4,
     },
     GiraffeRace: {
       address: "0x6379ebd504941f50d5bfde9348b37593bd29c835",

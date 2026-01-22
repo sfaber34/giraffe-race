@@ -173,10 +173,13 @@ contract GiraffeNFTTest is Test {
         
         (uint8 zip, uint8 moxie, uint8 hustle) = giraffeNFT.statsOf(tokenId);
         
-        // All stats should be 10 for a new mint
-        assertEq(zip, 10);
-        assertEq(moxie, 10);
-        assertEq(hustle, 10);
+        // Stats should be random values in range 1-10
+        assertGe(zip, 1);
+        assertLe(zip, 10);
+        assertGe(moxie, 1);
+        assertLe(moxie, 10);
+        assertGe(hustle, 1);
+        assertLe(hustle, 10);
     }
 
     // ============ Commit-Reveal Tests ============
@@ -237,11 +240,14 @@ contract GiraffeNFTTest is Test {
         assertEq(giraffeNFT.ownerOf(tokenId), user1);
         assertEq(giraffeNFT.nameOf(tokenId), "RevealGiraffe");
         
-        // Stats should be 10/10/10
+        // Stats should be random values in range 1-10 (derived from commit-reveal seed)
         (uint8 zip, uint8 moxie, uint8 hustle) = giraffeNFT.statsOf(tokenId);
-        assertEq(zip, 10);
-        assertEq(moxie, 10);
-        assertEq(hustle, 10);
+        assertGe(zip, 1);
+        assertLe(zip, 10);
+        assertGe(moxie, 1);
+        assertLe(moxie, 10);
+        assertGe(hustle, 1);
+        assertLe(hustle, 10);
         
         // Commit status should be Revealed
         (, , , GiraffeNFT.CommitStatus status, , ) = giraffeNFT.getCommit(commitId);

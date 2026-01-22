@@ -85,8 +85,18 @@ contract GiraffeRaceTest is Test {
         raceId; // silence unused warning (odds auto-set during finalization)
     }
 
-    function testStatsRemainAt10AfterRace() public {
+    function testStatsRemainUnchangedAfterRace() public {
         vm.roll(100);
+        
+        // Store initial stats (randomly assigned at mint)
+        uint8[LANE_COUNT] memory initialZip;
+        for (uint256 i = 0; i < LANE_COUNT; i++) {
+            initialZip[i] = giraffeNft.zipOf(houseTokenIds[i]);
+            // Verify stats are in valid range 1-10
+            assertGe(initialZip[i], 1);
+            assertLe(initialZip[i], 10);
+        }
+        
         uint256 raceId = race.createRace();
 
         uint64 closeBlock;
@@ -100,11 +110,12 @@ contract GiraffeRaceTest is Test {
         vm.roll(uint256(submissionCloseBlock));
         race.finalizeRaceGiraffes();
 
-        // Snapshot should show full effective score (all stats default to 10).
+        // Snapshot should show effective score (average of random stats).
         uint8[LANE_COUNT] memory snap = race.getRaceScoreById(raceId);
         for (uint256 i = 0; i < LANE_COUNT; i++) {
-            assertEq(uint256(snap[i]), 10);
-            assertEq(uint256(giraffeNft.zipOf(houseTokenIds[i])), 10);
+            // Effective score should be in valid range 1-10
+            assertGe(snap[i], 1);
+            assertLe(snap[i], 10);
         }
 
         // Settlement entropy uses blockhash(closeBlock).
@@ -114,14 +125,20 @@ contract GiraffeRaceTest is Test {
         vm.roll(uint256(closeBlock) + 1);
         race.settleRace();
 
-        // Stats remain at 10 after racing (no decay).
+        // Stats remain unchanged after racing (no decay).
         for (uint256 i = 0; i < LANE_COUNT; i++) {
-            assertEq(uint256(giraffeNft.zipOf(houseTokenIds[i])), 10);
+            assertEq(uint256(giraffeNft.zipOf(houseTokenIds[i])), uint256(initialZip[i]));
         }
     }
 
     function testOddsAreEqualWhenAllScoresEqual() public {
         vm.roll(123);
+        
+        // Set all house giraffes to equal stats so odds will be equal
+        for (uint256 i = 0; i < LANE_COUNT; i++) {
+            giraffeNft.setForTesting(houseTokenIds[i], 10, 10, 10);
+        }
+        
         uint256 raceId = race.createRace();
         uint64 closeBlock;
         (closeBlock,,,,,) = race.getRace();

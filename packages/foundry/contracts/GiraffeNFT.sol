@@ -143,6 +143,13 @@ contract GiraffeNFT is ERC721, Ownable {
         return s;
     }
 
+    /// @notice Derive a random stat (1-10) from a seed and salt.
+    /// @dev Uses keccak256 to derive independent random values for each stat.
+    function _randomStat(bytes32 seed, bytes32 salt) internal pure returns (uint8) {
+        uint256 hash = uint256(keccak256(abi.encodePacked(seed, salt)));
+        return uint8((hash % 10) + 1); // 1-10
+    }
+
     /// @notice Convert a string to lowercase for case-insensitive name comparison.
     /// @dev Only handles ASCII characters (A-Z -> a-z). Non-ASCII characters are left unchanged.
     function _toLowerCase(string memory str) internal pure returns (string memory) {
@@ -215,7 +222,7 @@ contract GiraffeNFT is ERC721, Ownable {
         hustle = _clampStat(_hustle[tokenId]);
     }
 
-    function _mintGiraffe(address to, string memory giraffeName, uint8 zip) internal returns (uint256 tokenId) {
+    function _mintGiraffe(address to, string memory giraffeName) internal returns (uint256 tokenId) {
         tokenId = nextTokenId++;
         
         // Name is required - validate and check for collisions
@@ -229,41 +236,32 @@ contract GiraffeNFT is ERC721, Ownable {
         _giraffeNames[tokenId] = giraffeName;
         _usedNames[nameHash] = true;
         
-        // On-chain entropy seed (gameable, but deterministic and reproducible).
+        // On-chain entropy seed (gameable for direct mint, but OK for local testing / owner mints).
         // Uses previous blockhash so it's always available.
         bytes32 bh = block.number > 0 ? blockhash(block.number - 1) : bytes32(0);
         bytes32 seed = keccak256(abi.encodePacked(bh, address(this), tokenId, to, "GIRAFFE_SEED_V1"));
         _seeds[tokenId] = seed;
-        // All stats are [1..10] (0 treated as 10 for backwards compatibility).
-        // New mints should be full stats (10), but we keep an explicit zip parameter for local testing.
-        _zip[tokenId] = _clampStat(zip);
-        _moxie[tokenId] = 10;
-        _hustle[tokenId] = 10;
+        // Derive random stats (1-10) from seed
+        _zip[tokenId] = _randomStat(seed, "ZIP");
+        _moxie[tokenId] = _randomStat(seed, "MOXIE");
+        _hustle[tokenId] = _randomStat(seed, "HUSTLE");
         _safeMint(to, tokenId);
         emit GiraffeMinted(tokenId, to, seed, giraffeName);
     }
 
     /// @notice Direct mint for local testing only (bypasses commit-reveal).
     /// @dev On production networks, use commitMint + revealMint instead.
+    ///      Stats are randomly assigned based on blockhash seed.
     function mint(string calldata giraffeName) external onlyLocalTesting returns (uint256 tokenId) {
-        return _mintGiraffe(msg.sender, giraffeName, 10);
+        return _mintGiraffe(msg.sender, giraffeName);
     }
 
     /// @notice Owner-only mint to a specific address (for deployment/house giraffes).
     /// @dev Only the contract owner can mint to arbitrary addresses.
     ///      This bypasses commit-reveal since owner is trusted.
+    ///      Stats are randomly assigned based on blockhash seed.
     function mintTo(address to, string calldata giraffeName) external onlyOwner returns (uint256 tokenId) {
-        return _mintGiraffe(to, giraffeName, 10);
-    }
-
-    /// @notice Mint an GiraffeNFT with an explicit zip (testing helper).
-    /// @dev Permissionless on local chain only (chainid 31337).
-    function mintWithZip(address to, uint8 zip, string calldata giraffeName)
-        external
-        onlyLocalTesting
-        returns (uint256 tokenId)
-    {
-        return _mintGiraffe(to, giraffeName, zip);
+        return _mintGiraffe(to, giraffeName);
     }
 
     /// @notice Permissionless local testing helper to set zip directly on an existing token.
@@ -358,9 +356,10 @@ contract GiraffeNFT is ERC721, Ownable {
         _seeds[tokenId] = seed;
         
         _giraffeNames[tokenId] = commit.name;
-        _zip[tokenId] = 10;
-        _moxie[tokenId] = 10;
-        _hustle[tokenId] = 10;
+        // Derive random stats (1-10) from the commit-reveal seed
+        _zip[tokenId] = _randomStat(seed, "ZIP");
+        _moxie[tokenId] = _randomStat(seed, "MOXIE");
+        _hustle[tokenId] = _randomStat(seed, "HUSTLE");
         
         _safeMint(msg.sender, tokenId);
         
