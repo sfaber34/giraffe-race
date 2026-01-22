@@ -54,7 +54,6 @@ contract GiraffeRace {
     uint8 public constant SPEED_RANGE = 10; // speeds per tick: 1-10
 
     address public treasuryOwner;  // Owns house NFTs + controls admin functions (should be multisig)
-    address public oddsAdmin;  // Can set odds (can be hot wallet for operations)
     IGiraffeNFT public giraffeNft;
     GiraffeRaceSimulator public simulator;
     HouseTreasury public treasury;
@@ -166,7 +165,6 @@ contract GiraffeRace {
     error GiraffesAlreadyFinalized();
     error PreviousRaceNotSettled();
     error NotTreasuryOwner();
-    error NotOddsAdmin();
     error OddsNotSet();
     error OddsAlreadySet();
     error InvalidOdds();
@@ -177,23 +175,16 @@ contract GiraffeRace {
         _;
     }
 
-    modifier onlyOddsAdmin() {
-        if (msg.sender != oddsAdmin) revert NotOddsAdmin();
-        _;
-    }
-
     constructor(
         address _giraffeNft,
-        address _house,
-        address _oddsAdmin,
+        address _treasuryOwner,
         uint256[LANE_COUNT] memory _houseGiraffeTokenIds,
         address _simulator,
         address _treasury,
         address _winProbTable
     ) {
         giraffeNft = IGiraffeNFT(_giraffeNft);
-        treasuryOwner = _house;
-        oddsAdmin = _oddsAdmin;
+        treasuryOwner = _treasuryOwner;
         simulator = GiraffeRaceSimulator(_simulator);
         treasury = HouseTreasury(_treasury);
         winProbTable = IWinProbTable6(_winProbTable);
@@ -326,7 +317,7 @@ contract GiraffeRace {
      * Using basis points, we enforce:
      *   sum(ODDS_SCALE^2 / O_i_bps) >= ceil(ODDS_SCALE*ODDS_SCALE / (ODDS_SCALE - HOUSE_EDGE_BPS))
      */
-    function setRaceOdds(uint256 raceId, uint32[LANE_COUNT] calldata decimalOddsBps) external onlyOddsAdmin {
+    function setRaceOdds(uint256 raceId, uint32[LANE_COUNT] calldata decimalOddsBps) external onlyTreasuryOwner {
         Race storage r = races[raceId];
         if (r.closeBlock == 0) revert InvalidRace();
         if (r.settled) revert AlreadySettled();

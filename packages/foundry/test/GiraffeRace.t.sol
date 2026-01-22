@@ -21,7 +21,6 @@ contract GiraffeRaceTest is Test {
     MockUSDC public usdc;
     
     address public owner = address(0xBEEF);      // Treasury owner + house NFT owner
-    address public oddsAdmin = address(0x0DD5);  // Odds admin (hot wallet)
     address public alice = address(0xA11CE);
     address public bob = address(0xB0B);
     uint256[6] internal houseTokenIds;
@@ -59,7 +58,7 @@ contract GiraffeRaceTest is Test {
 
         // Deploy race contract (address(0) for winProbTable = fallback to fixed odds)
         GiraffeRaceSimulator simulator = new GiraffeRaceSimulator();
-        race = new GiraffeRace(address(giraffeNft), owner, oddsAdmin, houseTokenIds, address(simulator), address(treasury), address(0));
+        race = new GiraffeRace(address(giraffeNft), owner, houseTokenIds, address(simulator), address(treasury), address(0));
         giraffeNft.setRaceContract(address(race));
         
         // Authorize race contract in treasury

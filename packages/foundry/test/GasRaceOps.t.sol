@@ -18,8 +18,7 @@ contract GasRaceOpsTest is Test {
     HouseTreasury internal treasury;
     MockUSDC internal usdc;
 
-    address internal treasuryOwner = address(0xBEEF);  // Treasury owner + house NFT owner  
-    address internal oddsAdmin = address(0x0DD5);   // Odds admin
+    address internal treasuryOwner = address(0xBEEF);  // Treasury owner + house NFT owner
     address internal alice = address(0xA11CE);
     uint256[6] internal houseTokenIds;
 
@@ -37,7 +36,7 @@ contract GasRaceOpsTest is Test {
         }
 
         simulator = new GiraffeRaceSimulator();
-        race = new GiraffeRace(address(giraffeNft), treasuryOwner, oddsAdmin, houseTokenIds, address(simulator), address(treasury), address(0));
+        race = new GiraffeRace(address(giraffeNft), treasuryOwner, houseTokenIds, address(simulator), address(treasury), address(0));
         giraffeNft.setRaceContract(address(race));
 
         // Authorize race contract in treasury

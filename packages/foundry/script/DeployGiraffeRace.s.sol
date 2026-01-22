@@ -23,8 +23,6 @@ import "../contracts/libraries/WinProbTable6.sol";
  * Environment variables:
  *   TREASURY_OWNER   - Controls treasury withdrawals AND owns house NFTs.
  *                      Should be a multisig in production.
- *   ODDS_ADMIN       - Can set race odds. Can be a hot wallet for frequent operations.
- *                      Defaults to TREASURY_OWNER for local testing.
  *   USDC_ADDRESS     - USDC contract address. If not set, deploys MockUSDC (local testing only).
  */
 contract DeployGiraffeRace is ScaffoldETHDeploy {
@@ -32,10 +30,6 @@ contract DeployGiraffeRace is ScaffoldETHDeploy {
         // Treasury owner: controls treasury AND owns house NFTs.
         // In production, this should be a multisig (e.g., Gnosis Safe).
         address treasuryOwner = vm.envOr("TREASURY_OWNER", address(0x668887c62AF23E42aB10105CB4124CF2C656F331));
-        
-        // Odds admin: can set race odds (can be a hot wallet for frequent operations).
-        // Defaults to treasuryOwner for local testing simplicity.
-        address oddsAdmin = vm.envOr("ODDS_ADMIN", treasuryOwner);
 
         // USDC address - if not set, deploy MockUSDC for local testing.
         address usdcAddress = vm.envOr("USDC_ADDRESS", address(0));
@@ -90,7 +84,6 @@ contract DeployGiraffeRace is ScaffoldETHDeploy {
         GiraffeRace race = new GiraffeRace(
             address(giraffeNft),
             treasuryOwner,  // treasuryOwner: owns house NFTs (multisig)
-            oddsAdmin,      // oddsAdmin: can set odds (hot wallet)
             houseTokenIds,
             address(simulator),
             address(treasury),
