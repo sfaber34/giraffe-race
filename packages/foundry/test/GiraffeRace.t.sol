@@ -75,14 +75,21 @@ contract GiraffeRaceTest is Test {
         usdc.approve(address(treasury), type(uint256).max);
     }
 
-    function _finalize(uint256 raceId, uint64 closeBlock, bytes32 forcedLineupBh) internal {
-        uint64 submissionCloseBlock = closeBlock - 10;
+    // Helper to finalize a race and return the bettingCloseBlock
+    function _finalize(uint256 raceId, bytes32 forcedLineupBh) internal returns (uint64 bettingCloseBlock) {
+        // Get the schedule - submissionCloseBlock is set at creation
+        (uint64 bettingCloseBlockBefore, uint64 submissionCloseBlock) = race.getRaceScheduleById(raceId);
+        require(bettingCloseBlockBefore == 0, "test: race already finalized");
+        
         // Finalization entropy uses blockhash(submissionCloseBlock - 1).
         vm.roll(uint256(submissionCloseBlock - 1));
         vm.setBlockhash(uint256(submissionCloseBlock - 1), forcedLineupBh);
         vm.roll(uint256(submissionCloseBlock));
         race.finalizeRaceGiraffes();
-        raceId; // silence unused warning (odds auto-set during finalization)
+        
+        // After finalization, bettingCloseBlock is now set
+        (bettingCloseBlock,) = race.getRaceScheduleById(raceId);
+        require(bettingCloseBlock > 0, "test: finalization did not set bettingCloseBlock");
     }
 
     function testStatsRemainUnchangedAfterRace() public {
@@ -99,16 +106,9 @@ contract GiraffeRaceTest is Test {
         
         uint256 raceId = race.createRace();
 
-        uint64 closeBlock;
-        (closeBlock,,,,,) = race.getRace();
-        uint64 submissionCloseBlock = closeBlock - 10;
-
-        // Finalization entropy uses blockhash(submissionCloseBlock - 1).
+        // Finalize the race and get the betting close block
         bytes32 forcedLineupBh = keccak256("forced lineup blockhash stats");
-        vm.roll(uint256(submissionCloseBlock - 1));
-        vm.setBlockhash(uint256(submissionCloseBlock - 1), forcedLineupBh);
-        vm.roll(uint256(submissionCloseBlock));
-        race.finalizeRaceGiraffes();
+        uint64 bettingCloseBlock = _finalize(raceId, forcedLineupBh);
 
         // Snapshot should show effective score (average of random stats).
         uint8[LANE_COUNT] memory snap = race.getRaceScoreById(raceId);
@@ -118,11 +118,11 @@ contract GiraffeRaceTest is Test {
             assertLe(snap[i], 10);
         }
 
-        // Settlement entropy uses blockhash(closeBlock).
+        // Settlement entropy uses blockhash(bettingCloseBlock).
         bytes32 forcedBh = keccak256("forced settle blockhash stats");
-        vm.roll(uint256(closeBlock));
-        vm.setBlockhash(uint256(closeBlock), forcedBh);
-        vm.roll(uint256(closeBlock) + 1);
+        vm.roll(uint256(bettingCloseBlock));
+        vm.setBlockhash(uint256(bettingCloseBlock), forcedBh);
+        vm.roll(uint256(bettingCloseBlock) + 1);
         race.settleRace();
 
         // Stats remain unchanged after racing (no decay).
@@ -140,10 +140,8 @@ contract GiraffeRaceTest is Test {
         }
         
         uint256 raceId = race.createRace();
-        uint64 closeBlock;
-        (closeBlock,,,,,) = race.getRace();
         bytes32 forcedLineupBh = keccak256("forced lineup blockhash odds equal");
-        _finalize(raceId, closeBlock, forcedLineupBh);
+        _finalize(raceId, forcedLineupBh);
 
         (bool oddsSet, uint32[LANE_COUNT] memory oddsBps) = race.getRaceOddsById(raceId);
         assertTrue(oddsSet);
@@ -208,21 +206,24 @@ contract GiraffeRaceTest is Test {
 
     function testSettleIsDeterministicFromSeed() public {
         vm.roll(100);
+        
+        // Set all house giraffes to equal stats so _expectedWinner prediction works
+        for (uint256 i = 0; i < LANE_COUNT; i++) {
+            giraffeNft.setForTesting(houseTokenIds[i], 10, 10, 10);
+        }
+        
         uint256 raceId = race.createRace();
 
-        uint64 closeBlock;
-        (closeBlock,,,,,) = race.getRace();
-
         bytes32 forcedLineupBh = keccak256("forced lineup blockhash");
-        _finalize(raceId, closeBlock, forcedLineupBh);
+        uint64 bettingCloseBlock = _finalize(raceId, forcedLineupBh);
 
-        _placeBet(alice, raceId, 0, 100 * ONE_USDC);
-        _placeBet(bob, raceId, 1, 200 * ONE_USDC);
+        _placeBet(alice, raceId, 0, 1 * ONE_USDC);
+        _placeBet(bob, raceId, 1, 2 * ONE_USDC);
 
         bytes32 forcedBh = keccak256("forced blockhash");
-        vm.roll(uint256(closeBlock));
-        vm.setBlockhash(uint256(closeBlock), forcedBh);
-        vm.roll(uint256(closeBlock) + 1);
+        vm.roll(uint256(bettingCloseBlock));
+        vm.setBlockhash(uint256(bettingCloseBlock), forcedBh);
+        vm.roll(uint256(bettingCloseBlock) + 1);
 
         bytes32 baseSeed = keccak256(abi.encodePacked(forcedBh, raceId, address(race)));
         bytes32 simSeed = keccak256(abi.encodePacked(baseSeed, "RACE_SIM"));
@@ -239,29 +240,31 @@ contract GiraffeRaceTest is Test {
     function testCannotBetTwice() public {
         vm.roll(10);
         uint256 raceId = race.createRace();
-        uint64 closeBlock;
-        (closeBlock,,,,,) = race.getRace();
         bytes32 forcedLineupBh = keccak256("forced lineup blockhash 2");
-        _finalize(raceId, closeBlock, forcedLineupBh);
+        _finalize(raceId, forcedLineupBh);
 
-        _placeBet(alice, raceId, 2, 100 * ONE_USDC);
+        _placeBet(alice, raceId, 2, 1 * ONE_USDC);
 
         vm.expectRevert(GiraffeRace.AlreadyBet.selector);
-        _placeBet(alice, raceId, 3, 100 * ONE_USDC);
+        _placeBet(alice, raceId, 3, 1 * ONE_USDC);
     }
 
     function testClaimPayout_FixedOdds() public {
         vm.roll(200);
+        
+        // Set all house giraffes to equal stats so _expectedWinner prediction works
+        for (uint256 i = 0; i < LANE_COUNT; i++) {
+            giraffeNft.setForTesting(houseTokenIds[i], 10, 10, 10);
+        }
+        
         uint256 raceId = race.createRace();
 
-        uint64 closeBlock;
-        (closeBlock,,,,,) = race.getRace();
         bytes32 forcedLineupBh = keccak256("forced lineup blockhash 3");
-        _finalize(raceId, closeBlock, forcedLineupBh);
+        uint64 bettingCloseBlock = _finalize(raceId, forcedLineupBh);
 
-        // Alice and Bob both bet on giraffe 0, different amounts
-        _placeBet(alice, raceId, 0, 100 * ONE_USDC);
-        _placeBet(bob, raceId, 0, 300 * ONE_USDC);
+        // Alice and Bob both bet on giraffe 0, different amounts (within max bet limit of 5 USDC)
+        _placeBet(alice, raceId, 0, 2 * ONE_USDC);
+        _placeBet(bob, raceId, 0, 4 * ONE_USDC);
 
         // Force winner = 0 by forcing a seed that yields winner 0.
         // We'll brute-force by trying a few forced blockhashes (small loop acceptable in test).
@@ -276,9 +279,9 @@ contract GiraffeRaceTest is Test {
         }
         assertEq(w, 0);
 
-        vm.roll(uint256(closeBlock));
-        vm.setBlockhash(uint256(closeBlock), forcedBh);
-        vm.roll(uint256(closeBlock) + 1);
+        vm.roll(uint256(bettingCloseBlock));
+        vm.setBlockhash(uint256(bettingCloseBlock), forcedBh);
+        vm.roll(uint256(bettingCloseBlock) + 1);
         race.settleRace();
 
         uint256 aliceBalBefore = usdc.balanceOf(alice);
@@ -292,8 +295,8 @@ contract GiraffeRaceTest is Test {
         // Fixed odds are auto-quoted from the effective score snapshot using the lookup table.
         (bool oddsSet, uint32[LANE_COUNT] memory oddsBps) = race.getRaceOddsById(raceId);
         assertTrue(oddsSet);
-        uint256 expectedAlice = (100 * ONE_USDC * uint256(oddsBps[0])) / 10_000;
-        uint256 expectedBob = (300 * ONE_USDC * uint256(oddsBps[0])) / 10_000;
+        uint256 expectedAlice = (2 * ONE_USDC * uint256(oddsBps[0])) / 10_000;
+        uint256 expectedBob = (4 * ONE_USDC * uint256(oddsBps[0])) / 10_000;
         assertEq(alicePayout, expectedAlice);
         assertEq(bobPayout, expectedBob);
         assertEq(usdc.balanceOf(alice), aliceBalBefore + expectedAlice);
@@ -304,11 +307,12 @@ contract GiraffeRaceTest is Test {
         vm.roll(1000);
         uint256 raceId = race.createRace();
 
-        uint64 closeBlock;
-        (closeBlock,,,,,) = race.getRace();
+        // Finalize the race first (required before settlement)
+        bytes32 forcedLineupBh = keccak256("forced lineup blockhash unavailable");
+        uint64 bettingCloseBlock = _finalize(raceId, forcedLineupBh);
 
         // Move far ahead so blockhash is unavailable (returns 0)
-        vm.roll(uint256(closeBlock) + 300);
+        vm.roll(uint256(bettingCloseBlock) + 300);
 
         vm.expectRevert(GiraffeRace.BlockhashUnavailable.selector);
         race.settleRace();
@@ -318,9 +322,8 @@ contract GiraffeRaceTest is Test {
         vm.roll(500);
         uint256 raceId = race.createRace();
 
-        uint64 closeBlock;
-        (closeBlock,,,,,) = race.getRace();
-        uint64 submissionCloseBlock = closeBlock - 10;
+        // Get the schedule - submissionCloseBlock is set at creation
+        (, uint64 submissionCloseBlock) = race.getRaceScheduleById(raceId);
 
         vm.prank(alice);
         uint256 aliceTokenId = giraffeNft.mint("alice");
@@ -331,15 +334,15 @@ contract GiraffeRaceTest is Test {
         race.submitGiraffe(aliceTokenId);
     }
 
-    function testCannotBetBeforeSubmissionsClose() public {
+    function testCannotBetBeforeFinalization() public {
         vm.roll(600);
         uint256 raceId = race.createRace();
 
-        uint64 closeBlock;
-        (closeBlock,,,,,) = race.getRace();
-        uint64 submissionCloseBlock = closeBlock - 10;
+        // Get the schedule - submissionCloseBlock is set at creation
+        (, uint64 submissionCloseBlock) = race.getRaceScheduleById(raceId);
 
-        vm.roll(uint256(submissionCloseBlock - 1));
+        // Try to bet before finalization (betting window not open yet)
+        vm.roll(uint256(submissionCloseBlock));
         vm.expectRevert(GiraffeRace.BettingNotOpen.selector);
         vm.prank(alice);
         race.placeBet(0, 100 * ONE_USDC);
@@ -357,9 +360,8 @@ contract GiraffeRaceTest is Test {
         vm.roll(1000);
         uint256 raceId = race.createRace();
 
-        uint64 closeBlock;
-        (closeBlock,,,,,) = race.getRace();
-        uint64 submissionCloseBlock = closeBlock - 10;
+        // Get the schedule - submissionCloseBlock is set at creation
+        (, uint64 submissionCloseBlock) = race.getRaceScheduleById(raceId);
 
         // Finalization entropy uses blockhash(submissionCloseBlock - 1).
         bytes32 forcedLineupBh = keccak256("forced lineup blockhash 50 entrants");
@@ -378,12 +380,15 @@ contract GiraffeRaceTest is Test {
         // Betting opens after submissions close, so finalize at submissionCloseBlock.
         vm.roll(uint256(submissionCloseBlock));
         race.finalizeRaceGiraffes();
+        
+        // Get the bettingCloseBlock which is now set after finalization
+        (uint64 bettingCloseBlock,) = race.getRaceScheduleById(raceId);
 
-        // Settlement entropy uses blockhash(closeBlock).
+        // Settlement entropy uses blockhash(bettingCloseBlock).
         bytes32 forcedBh = keccak256("forced settle blockhash 50 entrants");
-        vm.roll(uint256(closeBlock));
-        vm.setBlockhash(uint256(closeBlock), forcedBh);
-        vm.roll(uint256(closeBlock) + 1);
+        vm.roll(uint256(bettingCloseBlock));
+        vm.setBlockhash(uint256(bettingCloseBlock), forcedBh);
+        vm.roll(uint256(bettingCloseBlock) + 1);
         race.settleRace();
     }
 
@@ -405,7 +410,7 @@ contract GiraffeRaceTest is Test {
         internal
         returns (uint256[LANE_COUNT] memory laneWins, uint256[LANE_COUNT] memory tokenWins)
     {
-        // Keep blocks close together so `blockhash()` remains available for closeBlock and submissionClose-1.
+        // Keep blocks close together so `blockhash()` remains available for bettingCloseBlock and submissionClose-1.
         uint256 startBlock = 1_000_000 + batchIndex * 10_000;
 
         for (uint256 i = 0; i < racesInBatch; i++) {
@@ -413,9 +418,8 @@ contract GiraffeRaceTest is Test {
             vm.roll(startBlock + i * 50);
             uint256 raceId = race.createRace();
 
-            uint64 closeBlock;
-            (closeBlock,,,,,) = race.getRace();
-            uint64 submissionCloseBlock = closeBlock - 10;
+            // Get the schedule - submissionCloseBlock is set at creation
+            (, uint64 submissionCloseBlock) = race.getRaceScheduleById(raceId);
 
             // Finalization entropy uses blockhash(submissionCloseBlock - 1).
             bytes32 forcedLineupBh = keccak256(abi.encodePacked("lineup", globalI));
@@ -423,14 +427,17 @@ contract GiraffeRaceTest is Test {
             vm.setBlockhash(uint256(submissionCloseBlock - 1), forcedLineupBh);
             vm.roll(uint256(submissionCloseBlock));
             race.finalizeRaceGiraffes();
+            
+            // Get the bettingCloseBlock which is now set after finalization
+            (uint64 bettingCloseBlock,) = race.getRaceScheduleById(raceId);
 
             (, uint256[LANE_COUNT] memory tokenIds,) = race.getRaceGiraffes();
 
-            // Settlement entropy uses blockhash(closeBlock).
+            // Settlement entropy uses blockhash(bettingCloseBlock).
             bytes32 forcedBh = keccak256(abi.encodePacked("settle", globalI));
-            vm.roll(uint256(closeBlock));
-            vm.setBlockhash(uint256(closeBlock), forcedBh);
-            vm.roll(uint256(closeBlock) + 1);
+            vm.roll(uint256(bettingCloseBlock));
+            vm.setBlockhash(uint256(bettingCloseBlock), forcedBh);
+            vm.roll(uint256(bettingCloseBlock) + 1);
             race.settleRace();
 
             (, bool settled, uint8 winner,,,) = race.getRace();
@@ -440,7 +447,7 @@ contract GiraffeRaceTest is Test {
             laneWins[winner] += 1;
 
             uint256 winningTokenId = tokenIds[winner];
-            // With house-only races, these should always be one of the 4 configured house tokens.
+            // With house-only races, these should always be one of the 6 configured house tokens.
             for (uint256 t = 0; t < LANE_COUNT; t++) {
                 if (winningTokenId == houseTokenIds[t]) {
                     tokenWins[t] += 1;

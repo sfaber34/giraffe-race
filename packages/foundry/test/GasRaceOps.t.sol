@@ -44,47 +44,48 @@ contract GasRaceOpsTest is Test {
         treasury.authorize(address(race));
     }
 
-    function _prepFinalize(uint64 closeBlock, bytes32 forcedLineupBh) internal {
-        uint64 submissionCloseBlock = closeBlock - 10;
+    function _prepFinalize(uint256 raceId, bytes32 forcedLineupBh) internal returns (uint64 submissionCloseBlock) {
+        // Get submissionCloseBlock from schedule
+        (, submissionCloseBlock) = race.getRaceScheduleById(raceId);
         // Finalization entropy uses blockhash(submissionCloseBlock - 1).
         vm.roll(uint256(submissionCloseBlock - 1));
         vm.setBlockhash(uint256(submissionCloseBlock - 1), forcedLineupBh);
         vm.roll(uint256(submissionCloseBlock));
     }
 
-    function _prepSettle(uint64 closeBlock, bytes32 forcedBh) internal {
-        // Settlement entropy uses blockhash(closeBlock).
-        vm.roll(uint256(closeBlock));
-        vm.setBlockhash(uint256(closeBlock), forcedBh);
-        vm.roll(uint256(closeBlock) + 1);
+    function _prepSettle(uint256 raceId, bytes32 forcedBh) internal returns (uint64 bettingCloseBlock) {
+        // Get bettingCloseBlock from schedule (should be set after finalization)
+        (bettingCloseBlock,) = race.getRaceScheduleById(raceId);
+        require(bettingCloseBlock > 0, "bettingCloseBlock not set - finalization required first");
+        // Settlement entropy uses blockhash(bettingCloseBlock).
+        vm.roll(uint256(bettingCloseBlock));
+        vm.setBlockhash(uint256(bettingCloseBlock), forcedBh);
+        vm.roll(uint256(bettingCloseBlock) + 1);
     }
 
-    function _gasCallCreateRace() internal returns (uint256 gasUsed, uint256 raceId, uint64 closeBlock) {
+    function _gasCallCreateRace() internal returns (uint256 gasUsed, uint256 raceId) {
         uint256 g0 = gasleft();
         raceId = race.createRace();
         gasUsed = g0 - gasleft();
-        (closeBlock,,,,,) = race.getRaceById(raceId);
     }
 
-    function _gasCallFinalize() internal returns (uint256 gasUsed, uint256 raceId, uint64 closeBlock) {
-        (uint256 gCreate, uint256 rid, uint64 cb) = _gasCallCreateRace();
+    function _gasCallFinalize() internal returns (uint256 gasUsed, uint256 raceId) {
+        (uint256 gCreate, uint256 rid) = _gasCallCreateRace();
         gCreate; // caller can log create separately if desired
         raceId = rid;
-        closeBlock = cb;
 
-        _prepFinalize(closeBlock, keccak256("forced lineup blockhash gas"));
+        _prepFinalize(raceId, keccak256("forced lineup blockhash gas"));
         uint256 g0 = gasleft();
         race.finalizeRaceGiraffes();
         gasUsed = g0 - gasleft();
     }
 
-    function _gasCallSettleHouseOnly() internal returns (uint256 gasUsed, uint256 raceId, uint64 closeBlock) {
-        (uint256 gFinalize, uint256 rid, uint64 cb) = _gasCallFinalize();
+    function _gasCallSettleHouseOnly() internal returns (uint256 gasUsed, uint256 raceId) {
+        (uint256 gFinalize, uint256 rid) = _gasCallFinalize();
         gFinalize;
         raceId = rid;
-        closeBlock = cb;
 
-        _prepSettle(closeBlock, keccak256("forced settle blockhash gas"));
+        _prepSettle(raceId, keccak256("forced settle blockhash gas"));
         uint256 g0 = gasleft();
         race.settleRace();
         gasUsed = g0 - gasleft();
@@ -93,13 +94,13 @@ contract GasRaceOpsTest is Test {
     function testGas_RaceOps_HouseOnly() public {
         vm.roll(1000);
 
-        (uint256 gCreate,, uint64 closeBlock) = _gasCallCreateRace();
-        _prepFinalize(closeBlock, keccak256("forced lineup blockhash gas house"));
+        (uint256 gCreate, uint256 raceId) = _gasCallCreateRace();
+        _prepFinalize(raceId, keccak256("forced lineup blockhash gas house"));
         uint256 g0 = gasleft();
         race.finalizeRaceGiraffes();
         uint256 gFinalize = g0 - gasleft();
 
-        _prepSettle(closeBlock, keccak256("forced settle blockhash gas house"));
+        _prepSettle(raceId, keccak256("forced settle blockhash gas house"));
         g0 = gasleft();
         race.settleRace();
         uint256 gSettle = g0 - gasleft();
@@ -114,8 +115,10 @@ contract GasRaceOpsTest is Test {
     function testGas_RaceOps_50Entrants() public {
         vm.roll(2000);
 
-        (uint256 gCreate, uint256 raceId, uint64 closeBlock) = _gasCallCreateRace();
-        uint64 submissionCloseBlock = closeBlock - 10;
+        (uint256 gCreate, uint256 raceId) = _gasCallCreateRace();
+        
+        // Get the schedule - submissionCloseBlock is set at creation
+        (, uint64 submissionCloseBlock) = race.getRaceScheduleById(raceId);
 
         // 50 unique entrants submit one token each.
         for (uint256 i = 0; i < 50; i++) {
@@ -135,7 +138,7 @@ contract GasRaceOpsTest is Test {
         race.finalizeRaceGiraffes();
         uint256 gFinalize = g0 - gasleft();
 
-        _prepSettle(closeBlock, keccak256("forced settle blockhash gas 50"));
+        _prepSettle(raceId, keccak256("forced settle blockhash gas 50"));
         g0 = gasleft();
         race.settleRace();
         uint256 gSettle = g0 - gasleft();

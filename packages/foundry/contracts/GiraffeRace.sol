@@ -42,12 +42,13 @@ contract GiraffeRace {
     // Fallback fixed odds when no probability table is deployed.
     // For 6 equal racers with 5% house edge: 6.0 * 0.95 = 5.70x => 57000 bps
     uint32 internal constant TEMP_FIXED_DECIMAL_ODDS_BPS = 57000;
-    // Phase schedule (v2):
-    // - Submissions close at (bettingCloseBlock - SUBMISSION_CLOSE_OFFSET_BLOCKS)
-    // - Betting is only open after submissions close (inclusive) and before bettingCloseBlock (exclusive)
-    // This ensures bettors can see the finalized lane lineup before betting.
-    uint64 internal constant SUBMISSION_CLOSE_OFFSET_BLOCKS = 10;
-    uint64 internal constant DEFAULT_BETTING_CLOSE_OFFSET_BLOCKS = 20;
+    // Phase schedule (v3 - sequential triggers):
+    // - Submissions close at submissionCloseBlock (set when race is created)
+    // - Betting opens when finalizeRaceGiraffes() is called, and closes at bettingCloseBlock
+    //   (bettingCloseBlock is set at finalization time, NOT at race creation)
+    // This ensures bettors always get a full betting window after lineup is finalized.
+    uint64 internal constant SUBMISSION_WINDOW_BLOCKS = 10;
+    uint64 internal constant BETTING_WINDOW_BLOCKS = 10;
     // Cap entrant pool size to keep `settleRace` gas bounded. Can be increased later.
     uint16 public constant MAX_ENTRIES_PER_RACE = 128;
     uint16 public constant TRACK_LENGTH = 1000;
@@ -63,8 +64,11 @@ contract GiraffeRace {
     IWinProbTable6 public winProbTable; // On-chain probability table for odds calculation
 
     struct Race {
-        // Betting close block (formerly "closeBlock" in v1).
-        uint64 closeBlock;
+        // Block when submissions close (set at race creation).
+        uint64 submissionCloseBlock;
+        // Block when betting closes (set when finalizeRaceGiraffes() is called, NOT at race creation).
+        // This ensures the betting window only starts after finalization actually happens.
+        uint64 bettingCloseBlock;
         // Lane lineup finalized from entrant pool + house fill.
         bool giraffesFinalized;
         // Fixed odds quoted for lanes (locked once set; required before betting).
@@ -108,7 +112,7 @@ contract GiraffeRace {
         uint128 betAmount;
         uint8 winner;
         uint256 payout;
-        uint64 closeBlock;
+        uint64 bettingCloseBlock;
     }
 
     uint256 public nextRaceId;
@@ -134,7 +138,8 @@ contract GiraffeRace {
     // These are NOT escrowed by default (no approvals required); we just reference them as house-owned racers.
     uint256[LANE_COUNT] public houseGiraffeTokenIds;
 
-    event RaceCreated(uint256 indexed raceId, uint64 closeBlock);
+    event RaceCreated(uint256 indexed raceId, uint64 submissionCloseBlock);
+    event BettingWindowOpened(uint256 indexed raceId, uint64 bettingCloseBlock);
     event RaceOddsSet(uint256 indexed raceId, uint32[LANE_COUNT] decimalOddsBps);
     event BetPlaced(uint256 indexed raceId, address indexed bettor, uint8 indexed lane, uint256 amount);
     event RaceSettled(uint256 indexed raceId, bytes32 seed, uint8 winner);
@@ -281,14 +286,15 @@ contract GiraffeRace {
             if (!prev.settled) revert PreviousRaceNotSettled();
         }
 
-        // Fixed schedule: prevents griefers from setting a far-future close block.
-        uint64 closeBlock = uint64(block.number + DEFAULT_BETTING_CLOSE_OFFSET_BLOCKS);
+        // Set submission deadline. Betting deadline will be set when finalizeRaceGiraffes() is called.
+        uint64 submissionCloseBlock = uint64(block.number + SUBMISSION_WINDOW_BLOCKS);
 
         raceId = nextRaceId++;
         Race storage r = races[raceId];
-        r.closeBlock = closeBlock;
+        r.submissionCloseBlock = submissionCloseBlock;
+        // bettingCloseBlock is intentionally NOT set here - it will be set in finalizeRaceGiraffes()
 
-        emit RaceCreated(raceId, closeBlock);
+        emit RaceCreated(raceId, submissionCloseBlock);
     }
 
     function placeBet(uint8 lane, uint256 amount) external {
@@ -296,14 +302,16 @@ contract GiraffeRace {
 
         uint256 raceId = _activeRaceId();
         Race storage r = races[raceId];
-        if (block.number >= r.closeBlock) revert BettingClosed();
-        if (block.number < _submissionCloseBlock(r.closeBlock)) revert BettingNotOpen();
+        
+        // Betting requires finalization to have happened (which sets bettingCloseBlock)
+        if (!r.giraffesFinalized) revert BettingNotOpen();
+        if (r.bettingCloseBlock == 0) revert BettingNotOpen();
+        if (block.number >= r.bettingCloseBlock) revert BettingClosed();
 
         if (amount == 0) revert ZeroBet();
         if (amount > maxBetAmount) revert BetTooLarge();
 
-        // Ensure the lane lineup is finalized before accepting bets (so bettors can see who is racing).
-        _ensureGiraffesFinalized(raceId);
+        // Odds should be set during finalization
         if (!r.oddsSet) revert OddsNotSet();
 
         Bet storage b = bets[raceId][msg.sender];
@@ -344,15 +352,14 @@ contract GiraffeRace {
      */
     function setRaceOdds(uint256 raceId, uint32[LANE_COUNT] calldata decimalOddsBps) external onlyTreasuryOwner {
         Race storage r = races[raceId];
-        if (r.closeBlock == 0) revert InvalidRace();
+        if (r.submissionCloseBlock == 0) revert InvalidRace();
         if (r.settled) revert AlreadySettled();
         if (!r.giraffesFinalized) revert RaceNotReady();
         if (r.oddsSet) revert OddsAlreadySet();
 
-        // Must be within the betting window (submissions closed, betting not closed).
-        uint64 submissionCloseBlock = _submissionCloseBlock(r.closeBlock);
-        if (block.number < submissionCloseBlock) revert BettingNotOpen();
-        if (block.number >= r.closeBlock) revert BettingClosed();
+        // Must be within the betting window (finalization done, betting not closed).
+        if (r.bettingCloseBlock == 0) revert BettingNotOpen();
+        if (block.number >= r.bettingCloseBlock) revert BettingClosed();
 
         uint256 invSumBps = 0;
         for (uint8 i = 0; i < LANE_COUNT; i++) {
@@ -397,8 +404,8 @@ contract GiraffeRace {
 
         uint256 raceId = _activeRaceId();
         Race storage r = races[raceId];
-        // Submissions close earlier than betting.
-        if (block.number >= _submissionCloseBlock(r.closeBlock)) revert SubmissionsClosed();
+        // Submissions close at submissionCloseBlock (before finalization/betting).
+        if (block.number >= r.submissionCloseBlock) revert SubmissionsClosed();
         if (r.settled) revert AlreadySettled();
 
         if (hasSubmittedGiraffe[raceId][msg.sender]) revert AlreadySubmitted();
@@ -426,6 +433,9 @@ contract GiraffeRace {
      *
      *      Entropy uses `blockhash(submissionCloseBlock - 1)` so it's available starting at
      *      `submissionCloseBlock` (the first block where submissions are closed).
+     *
+     *      IMPORTANT: This function also sets the betting close block, starting the betting window.
+     *      The betting window is BETTING_WINDOW_BLOCKS from when this function is called.
      */
     function finalizeRaceGiraffes() external {
         uint256 raceId = _activeRaceId();
@@ -433,10 +443,14 @@ contract GiraffeRace {
         if (r.settled) revert AlreadySettled();
         if (r.giraffesFinalized) revert GiraffesAlreadyFinalized();
 
-        uint64 submissionCloseBlock = _submissionCloseBlock(r.closeBlock);
-        if (block.number < submissionCloseBlock) revert BettingNotOpen();
+        // Submissions must be closed before we can finalize
+        if (block.number < r.submissionCloseBlock) revert BettingNotOpen();
 
         _finalizeGiraffes(raceId);
+        
+        // Set the betting close block NOW - this starts the betting window
+        r.bettingCloseBlock = uint64(block.number) + BETTING_WINDOW_BLOCKS;
+        emit BettingWindowOpened(raceId, r.bettingCloseBlock);
     }
 
     function settleRace() external {
@@ -446,22 +460,23 @@ contract GiraffeRace {
 
     function _settleRace(uint256 raceId) internal {
         Race storage r = races[raceId];
-        if (r.closeBlock == 0) revert InvalidRace();
+        if (r.submissionCloseBlock == 0) revert InvalidRace();
         if (r.settled) revert AlreadySettled();
-        if (block.number <= r.closeBlock) revert RaceNotReady();
+        
+        // Race must be finalized before it can be settled
+        if (!r.giraffesFinalized) revert RaceNotReady();
+        if (r.bettingCloseBlock == 0) revert RaceNotReady();
+        if (block.number <= r.bettingCloseBlock) revert RaceNotReady();
+        
         // Fixed odds are required only if there were bets for this race.
         if (r.totalPot != 0 && !r.oddsSet) revert OddsNotSet();
 
-        bytes32 bh = blockhash(r.closeBlock);
+        bytes32 bh = blockhash(r.bettingCloseBlock);
         if (bh == bytes32(0)) revert BlockhashUnavailable();
 
         // Derive independent seeds for independent decisions to avoid correlation.
         bytes32 baseSeed = keccak256(abi.encodePacked(bh, raceId, address(this)));
         bytes32 simSeed = keccak256(abi.encodePacked(baseSeed, "RACE_SIM"));
-
-        // Make sure lineup is finalized (it should have been finalized during betting window,
-        // but keep settlement robust).
-        _ensureGiraffesFinalized(raceId);
         
         // Get ALL winners (supports dead heat)
         (uint8[LANE_COUNT] memory winners, uint8 winnerCount,) = simulator.winnersWithScore(simSeed, raceScore[raceId]);
@@ -611,37 +626,38 @@ contract GiraffeRace {
     // -----------------------
 
     /// @notice Bot/UI helper: return the key state flags for a race.
-    /// @dev For non-existent races (closeBlock == 0), returns all false.
+    /// @dev For non-existent races (submissionCloseBlock == 0), returns all false.
     function getRaceFlagsById(uint256 raceId)
         external
         view
         returns (bool settled, bool giraffesFinalized, bool oddsSet)
     {
         Race storage r = races[raceId];
-        if (r.closeBlock == 0) return (false, false, false);
+        if (r.submissionCloseBlock == 0) return (false, false, false);
         return (r.settled, r.giraffesFinalized, r.oddsSet);
     }
 
     /// @notice Bot/UI helper: return the schedule blocks for a race.
-    /// @dev For non-existent races (closeBlock == 0), returns (0, 0).
-    function getRaceScheduleById(uint256 raceId) external view returns (uint64 closeBlock, uint64 submissionCloseBlock) {
+    /// @dev For non-existent races (submissionCloseBlock == 0), returns (0, 0).
+    ///      Note: bettingCloseBlock is 0 until finalizeRaceGiraffes() is called.
+    function getRaceScheduleById(uint256 raceId) external view returns (uint64 bettingCloseBlock, uint64 submissionCloseBlock) {
         Race storage r = races[raceId];
-        closeBlock = r.closeBlock;
-        if (closeBlock == 0) return (0, 0);
-        submissionCloseBlock = _submissionCloseBlock(closeBlock);
-        return (closeBlock, submissionCloseBlock);
+        submissionCloseBlock = r.submissionCloseBlock;
+        if (submissionCloseBlock == 0) return (0, 0);
+        bettingCloseBlock = r.bettingCloseBlock; // May be 0 if not yet finalized
+        return (bettingCloseBlock, submissionCloseBlock);
     }
 
     /// @notice Bot helper: return whether key permissionless ops are currently executable, plus blockhash windows.
     /// @dev Mirrors `finalizeRaceGiraffes` and `settleRace` preconditions, including blockhash availability checks.
-    /// For non-existent races (closeBlock == 0), returns all zeros/false.
+    /// For non-existent races (submissionCloseBlock == 0), returns all zeros/false.
     function getRaceActionabilityById(uint256 raceId)
         external
         view
         returns (
             bool canFinalizeNow,
             bool canSettleNow,
-            uint64 closeBlock,
+            uint64 bettingCloseBlock,
             uint64 submissionCloseBlock,
             uint64 finalizeEntropyBlock,
             uint64 finalizeBlockhashExpiresAt,
@@ -651,16 +667,17 @@ contract GiraffeRace {
         )
     {
         Race storage r = races[raceId];
-        closeBlock = r.closeBlock;
-        if (closeBlock == 0) {
+        submissionCloseBlock = r.submissionCloseBlock;
+        if (submissionCloseBlock == 0) {
             return (false, false, 0, 0, 0, 0, 0, 0, 0);
         }
 
-        submissionCloseBlock = _submissionCloseBlock(closeBlock);
+        bettingCloseBlock = r.bettingCloseBlock; // May be 0 if not yet finalized
         finalizeEntropyBlock = submissionCloseBlock > 0 ? (submissionCloseBlock - 1) : 0;
 
         finalizeBlockhashExpiresAt = finalizeEntropyBlock == 0 ? 0 : uint64(uint256(finalizeEntropyBlock) + 256);
-        settleBlockhashExpiresAt = uint64(uint256(closeBlock) + 256);
+        // Settlement blockhash expiry depends on bettingCloseBlock (which may not be set yet)
+        settleBlockhashExpiresAt = bettingCloseBlock == 0 ? 0 : uint64(uint256(bettingCloseBlock) + 256);
 
         // Clamp at 0 for convenience (bots can treat 0 as "expired or invalid").
         if (finalizeBlockhashExpiresAt != 0 && block.number < finalizeBlockhashExpiresAt) {
@@ -668,7 +685,7 @@ contract GiraffeRace {
         } else {
             blocksUntilFinalizeExpiry = 0;
         }
-        if (block.number < settleBlockhashExpiresAt) {
+        if (settleBlockhashExpiresAt != 0 && block.number < settleBlockhashExpiresAt) {
             blocksUntilSettleExpiry = uint64(uint256(settleBlockhashExpiresAt) - block.number);
         } else {
             blocksUntilSettleExpiry = 0;
@@ -677,17 +694,15 @@ contract GiraffeRace {
         // Finalize: same gates as finalizeRaceGiraffes + blockhash(submissionCloseBlock - 1) availability.
         bool finalizeBlockReached = block.number >= submissionCloseBlock;
         bool finalizeBhAvailable = finalizeEntropyBlock != 0 && blockhash(uint256(finalizeEntropyBlock)) != bytes32(0);
-        canFinalizeNow = closeBlock != 0 && !r.settled && !r.giraffesFinalized && finalizeBlockReached && finalizeBhAvailable;
+        canFinalizeNow = submissionCloseBlock != 0 && !r.settled && !r.giraffesFinalized && finalizeBlockReached && finalizeBhAvailable;
 
-        // Settle: same gates as _settleRace + blockhash(closeBlock) availability.
-        // Additionally, if lineup isn't finalized yet, settlement will attempt finalization and can fail if
-        // finalize entropy blockhash is already unavailable.
-        bool settleBhAvailable = blockhash(uint256(closeBlock)) != bytes32(0);
-        bool settleTimeReached = block.number > closeBlock;
+        // Settle: same gates as _settleRace + blockhash(bettingCloseBlock) availability.
+        // Settlement now REQUIRES finalization to have happened first (bettingCloseBlock must be set).
+        bool settleBhAvailable = bettingCloseBlock != 0 && blockhash(uint256(bettingCloseBlock)) != bytes32(0);
+        bool settleTimeReached = bettingCloseBlock != 0 && block.number > bettingCloseBlock;
         bool oddsOk = r.totalPot == 0 || r.oddsSet;
-        bool finalizationOk = r.giraffesFinalized || (finalizeBlockReached && finalizeBhAvailable);
 
-        canSettleNow = closeBlock != 0 && !r.settled && settleTimeReached && settleBhAvailable && oddsOk && finalizationOk;
+        canSettleNow = r.giraffesFinalized && !r.settled && settleTimeReached && settleBhAvailable && oddsOk;
     }
 
     /// @notice Bot/UI helper: returns the current active (unsettled) race id, or 0 if none exists.
@@ -702,7 +717,7 @@ contract GiraffeRace {
         external
         view
         returns (
-            uint64 closeBlock,
+            uint64 bettingCloseBlock,
             bool settled,
             uint8 winner,
             bytes32 seed,
@@ -712,7 +727,7 @@ contract GiraffeRace {
     {
         uint256 raceId = latestRaceId();
         Race storage r = races[raceId];
-        return (r.closeBlock, r.settled, r.winner, r.seed, r.totalPot, r.totalOnLane);
+        return (r.bettingCloseBlock, r.settled, r.winner, r.seed, r.totalPot, r.totalOnLane);
     }
 
     /// @notice Read a specific race by id (UI helper for browsing history / replay).
@@ -720,7 +735,7 @@ contract GiraffeRace {
         external
         view
         returns (
-            uint64 closeBlock,
+            uint64 bettingCloseBlock,
             bool settled,
             uint8 winner,
             bytes32 seed,
@@ -729,7 +744,7 @@ contract GiraffeRace {
         )
     {
         Race storage r = races[raceId];
-        return (r.closeBlock, r.settled, r.winner, r.seed, r.totalPot, r.totalOnLane);
+        return (r.bettingCloseBlock, r.settled, r.winner, r.seed, r.totalPot, r.totalOnLane);
     }
 
     function getRaceOddsById(uint256 raceId) external view returns (bool oddsSet, uint32[LANE_COUNT] memory decimalOddsBps) {
@@ -853,7 +868,7 @@ contract GiraffeRace {
             out.betAmount = b.amount;
             out.winner = r.winner;
             out.payout = p;
-            out.closeBlock = r.closeBlock;
+            out.bettingCloseBlock = r.bettingCloseBlock;
             return out;
         }
     }
@@ -884,7 +899,7 @@ contract GiraffeRace {
             }
 
             Race storage r = races[rid];
-            uint64 cb = r.closeBlock;
+            uint64 cb = r.bettingCloseBlock;
 
             if (!r.settled) {
                 // Would `claim()` be able to settle right now?
@@ -899,7 +914,7 @@ contract GiraffeRace {
                 out.betAmount = b.amount;
                 out.winner = 0;
                 out.payout = 0;
-                out.closeBlock = cb;
+                out.bettingCloseBlock = cb;
                 return out;
             }
 
@@ -914,7 +929,7 @@ contract GiraffeRace {
                 out.betAmount = b.amount;
                 out.winner = w;
                 out.payout = 0;
-                out.closeBlock = cb;
+                out.bettingCloseBlock = cb;
                 return out;
             }
 
@@ -930,16 +945,11 @@ contract GiraffeRace {
             out.betAmount = b.amount;
             out.winner = w;
             out.payout = p;
-            out.closeBlock = cb;
+            out.bettingCloseBlock = cb;
             return out;
         }
 
         return out;
-    }
-
-    function _submissionCloseBlock(uint64 bettingCloseBlock) internal pure returns (uint64) {
-        // bettingCloseBlock is validated at creation to be >= SUBMISSION_CLOSE_OFFSET_BLOCKS.
-        return bettingCloseBlock - SUBMISSION_CLOSE_OFFSET_BLOCKS;
     }
 
     /// @dev Check if a lane is among the winners (supports dead heat).
@@ -950,22 +960,11 @@ contract GiraffeRace {
         return false;
     }
 
-    function _ensureGiraffesFinalized(uint256 raceId) internal {
-        Race storage r = races[raceId];
-        if (r.giraffesFinalized) return;
-
-        uint64 submissionCloseBlock = _submissionCloseBlock(r.closeBlock);
-        if (block.number < submissionCloseBlock) revert BettingNotOpen();
-
-        _finalizeGiraffes(raceId);
-    }
-
     function _finalizeGiraffes(uint256 raceId) internal {
         Race storage r = races[raceId];
-        uint64 submissionCloseBlock = _submissionCloseBlock(r.closeBlock);
 
         // We use (submissionCloseBlock - 1) so the hash is available starting at submissionCloseBlock.
-        bytes32 bh = blockhash(uint256(submissionCloseBlock - 1));
+        bytes32 bh = blockhash(uint256(r.submissionCloseBlock - 1));
         if (bh == bytes32(0)) revert BlockhashUnavailable();
 
         bytes32 baseSeed = keccak256(abi.encodePacked(bh, raceId, address(this)));

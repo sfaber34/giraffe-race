@@ -18,13 +18,19 @@ const USDC_DECIMALS = 6;
 
 const LANE_COUNT = 6 as const;
 // Keep in sync with `GiraffeRace.sol`
-const SUBMISSION_CLOSE_OFFSET_BLOCKS = 10n;
-const BETTING_CLOSE_OFFSET_BLOCKS = 20n;
+// Note: This is now a WINDOW size, not offset from race creation
+const SUBMISSION_WINDOW_BLOCKS = 10n;
 const SPEED_RANGE = 10;
 const TRACK_LENGTH = 1000;
 const MAX_TICKS = 500;
 
-type RaceStatus = "no_race" | "submissions_open" | "betting_open" | "betting_closed" | "settled";
+type RaceStatus =
+  | "no_race"
+  | "submissions_open"
+  | "awaiting_finalization"
+  | "betting_open"
+  | "betting_closed"
+  | "settled";
 
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
@@ -330,6 +336,14 @@ export const RaceDashboard = () => {
     query: { enabled: hasAnyRace && viewingRaceId !== null },
   });
 
+  // Get the schedule (separate submission and betting close blocks)
+  const { data: raceScheduleData } = useScaffoldReadContract({
+    contractName: "GiraffeRace",
+    functionName: "getRaceScheduleById" as any,
+    args: [viewingRaceId ?? 0n],
+    query: { enabled: hasAnyRace && viewingRaceId !== null },
+  } as any);
+
   const { data: raceGiraffesData } = useScaffoldReadContract({
     contractName: "GiraffeRace",
     functionName: "getRaceGiraffesById",
@@ -363,9 +377,9 @@ export const RaceDashboard = () => {
 
   const parsed = useMemo(() => {
     if (!raceData) return null;
-    const [closeBlock, settled, winner, seed, totalPot, totalOnLane] = raceData;
+    const [bettingCloseBlock, settled, winner, seed, totalPot, totalOnLane] = raceData;
     return {
-      closeBlock: closeBlock as bigint,
+      bettingCloseBlock: bettingCloseBlock as bigint,
       settled: settled as boolean,
       winner: Number(winner as any),
       seed: seed as Hex,
@@ -373,6 +387,16 @@ export const RaceDashboard = () => {
       totalOnLane: (totalOnLane as readonly bigint[]).map(x => BigInt(x)),
     };
   }, [raceData]);
+
+  // Parse the schedule data (separate submission and betting deadlines)
+  const parsedSchedule = useMemo(() => {
+    if (!raceScheduleData) return null;
+    const [bettingCloseBlock, submissionCloseBlock] = raceScheduleData as [bigint, bigint];
+    return {
+      bettingCloseBlock,
+      submissionCloseBlock,
+    };
+  }, [raceScheduleData]);
 
   const parsedGiraffes = useMemo(() => {
     if (!raceGiraffesData) return null;
@@ -502,27 +526,53 @@ export const RaceDashboard = () => {
     ];
   }, [lane0StatsData, lane1StatsData, lane2StatsData, lane3StatsData, lane4StatsData, lane5StatsData]);
 
+  // Submission close block is now stored directly (not calculated as offset)
   const submissionCloseBlock = useMemo(() => {
-    if (!parsed) return null;
-    if (parsed.closeBlock < SUBMISSION_CLOSE_OFFSET_BLOCKS) return null;
-    return parsed.closeBlock - SUBMISSION_CLOSE_OFFSET_BLOCKS;
-  }, [parsed]);
+    return parsedSchedule?.submissionCloseBlock ?? null;
+  }, [parsedSchedule]);
 
+  // Betting close block is set when finalizeRaceGiraffes() is called (may be 0/null before finalization)
+  const bettingCloseBlock = useMemo(() => {
+    // Use schedule data first (more authoritative), fall back to parsed race data
+    const fromSchedule = parsedSchedule?.bettingCloseBlock;
+    const fromRace = parsed?.bettingCloseBlock;
+    const value = fromSchedule ?? fromRace ?? null;
+    // 0n means "not yet set" (finalization hasn't happened)
+    return value && value > 0n ? value : null;
+  }, [parsedSchedule, parsed]);
+
+  // For the submission countdown, we calculate the start as race creation block
+  // startBlock = submissionCloseBlock - SUBMISSION_WINDOW_BLOCKS
   const startBlock = useMemo(() => {
-    if (!parsed) return null;
-    if (parsed.closeBlock < BETTING_CLOSE_OFFSET_BLOCKS) return null;
-    return parsed.closeBlock - BETTING_CLOSE_OFFSET_BLOCKS;
-  }, [parsed]);
+    if (!submissionCloseBlock) return null;
+    if (submissionCloseBlock < SUBMISSION_WINDOW_BLOCKS) return null;
+    return submissionCloseBlock - SUBMISSION_WINDOW_BLOCKS;
+  }, [submissionCloseBlock]);
 
   const status: RaceStatus = useMemo(() => {
     if (!giraffeRaceContract) return "no_race";
     if (!hasAnyRace || !parsed) return "no_race";
     if (parsed.settled) return "settled";
     if (blockNumber === undefined) return "betting_closed";
-    if (submissionCloseBlock !== null && blockNumber < submissionCloseBlock) return "submissions_open";
-    if (blockNumber < parsed.closeBlock) return "betting_open";
+
+    // Check submissions phase
+    if (submissionCloseBlock !== null && blockNumber < submissionCloseBlock) {
+      return "submissions_open";
+    }
+
+    // Submissions are closed - check if finalization has happened
+    // (bettingCloseBlock is only set when finalizeRaceGiraffes() is called)
+    if (!bettingCloseBlock) {
+      return "awaiting_finalization";
+    }
+
+    // Finalization has happened - check betting phase
+    if (blockNumber < bettingCloseBlock) {
+      return "betting_open";
+    }
+
     return "betting_closed";
-  }, [giraffeRaceContract, hasAnyRace, parsed, blockNumber, submissionCloseBlock]);
+  }, [giraffeRaceContract, hasAnyRace, parsed, blockNumber, submissionCloseBlock, bettingCloseBlock]);
 
   // Reset the local "submitted token" lock when we change race or wallet.
   useEffect(() => {
@@ -581,10 +631,16 @@ export const RaceDashboard = () => {
       finalizeRevealTimeoutRef.current = null;
     };
   }, [lineupFinalized, status]);
-  const canFinalize = status === "betting_open" && !lineupFinalized;
+  // Finalization can happen when submissions are closed but not yet finalized
+  const canFinalize = (status === "awaiting_finalization" || status === "betting_open") && !lineupFinalized;
   // Contract requires oddsSet (auto-derived at finalization), so avoid enabling bets until odds are loaded+set.
   const canBet = status === "betting_open" && lineupFinalized && parsedOdds?.oddsSet === true;
-  const canSettle = !!parsed && !parsed.settled && blockNumber !== undefined && blockNumber > parsed.closeBlock;
+  const canSettle =
+    !!parsed &&
+    !parsed.settled &&
+    bettingCloseBlock !== null &&
+    blockNumber !== undefined &&
+    blockNumber > bettingCloseBlock;
   const canSubmit =
     status === "submissions_open" ||
     status === "no_race" || // will auto-create a race
@@ -731,7 +787,7 @@ export const RaceDashboard = () => {
       betAmount: BigInt(out?.betAmount ?? 0),
       winner: Number(out?.winner ?? 0),
       payout: BigInt(out?.payout ?? 0),
-      closeBlock: BigInt(out?.closeBlock ?? 0),
+      bettingCloseBlock: BigInt(out?.bettingCloseBlock ?? 0),
     };
   }, [nextWinningClaimData]);
 
@@ -1348,7 +1404,7 @@ export const RaceDashboard = () => {
                               label="Betting closes in"
                               current={blockNumber}
                               start={submissionCloseBlock ?? undefined}
-                              end={parsed?.closeBlock ?? undefined}
+                              end={bettingCloseBlock ?? undefined}
                             />
                           </div>
                         </div>
@@ -1604,7 +1660,7 @@ export const RaceDashboard = () => {
                   </div>
                   <div className="flex justify-between">
                     <span className="opacity-70">Betting closes</span>
-                    <span className="font-mono">{parsed?.closeBlock?.toString() ?? "-"}</span>
+                    <span className="font-mono">{bettingCloseBlock?.toString() ?? "(awaiting finalization)"}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="opacity-70">Lineup</span>
@@ -1630,13 +1686,13 @@ export const RaceDashboard = () => {
                   label="Until betting closes"
                   current={blockNumber}
                   start={submissionCloseBlock ?? undefined}
-                  end={parsed?.closeBlock ?? undefined}
+                  end={bettingCloseBlock ?? undefined}
                 />
                 <BlockCountdownBar
                   label="Until settlement available"
                   current={blockNumber}
-                  start={parsed?.closeBlock ?? undefined}
-                  end={parsed ? parsed.closeBlock + 1n : undefined}
+                  start={bettingCloseBlock ?? undefined}
+                  end={bettingCloseBlock ? bettingCloseBlock + 1n : undefined}
                 />
               </div>
 

@@ -760,7 +760,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 5,
+      deployedOnBlock: 2,
     },
     GiraffeNFT: {
       address: "0x8ce361602b935680e8dec218b820ff5056beb7af",
@@ -2110,7 +2110,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 5,
+      deployedOnBlock: 2,
     },
     GiraffeRaceSimulator: {
       address: "0xe1aa25618fa0c7a1cfdab5d6b456af611873b629",
@@ -2272,7 +2272,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 5,
+      deployedOnBlock: 2,
     },
     WinProbTableShard1: {
       address: "0x0c8e79f3534b00d9a3d4a856b665bf4ebc22f2ba",
@@ -2316,7 +2316,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 5,
+      deployedOnBlock: 3,
     },
     WinProbTableShard2: {
       address: "0xed1db453c3156ff3155a97ad217b3087d5dc5f6e",
@@ -2360,7 +2360,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 5,
+      deployedOnBlock: 3,
     },
     WinProbTableShard3: {
       address: "0xf7cd8fa9b94db2aa972023b379c7f72c65e4de9d",
@@ -2404,7 +2404,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 5,
+      deployedOnBlock: 2,
     },
     WinProbTableShard4: {
       address: "0x12975173b87f7595ee45dffb2ab812ece596bf84",
@@ -2448,7 +2448,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 5,
+      deployedOnBlock: 3,
     },
     WinProbTableShard5: {
       address: "0x82dc47734901ee7d4f4232f398752cb9dd5daccc",
@@ -2492,7 +2492,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 5,
+      deployedOnBlock: 3,
     },
     WinProbTable6: {
       address: "0x196dbcbb54b8ec4958c959d8949ebfe87ac2aaaf",
@@ -2676,7 +2676,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 4,
+      deployedOnBlock: 3,
     },
     GiraffeRace: {
       address: "0x6379ebd504941f50d5bfde9348b37593bd29c835",
@@ -2993,7 +2993,7 @@ const deployedContracts = {
                   internalType: "uint256",
                 },
                 {
-                  name: "closeBlock",
+                  name: "bettingCloseBlock",
                   type: "uint64",
                   internalType: "uint64",
                 },
@@ -3059,7 +3059,7 @@ const deployedContracts = {
                   internalType: "uint256",
                 },
                 {
-                  name: "closeBlock",
+                  name: "bettingCloseBlock",
                   type: "uint64",
                   internalType: "uint64",
                 },
@@ -3074,7 +3074,7 @@ const deployedContracts = {
           inputs: [],
           outputs: [
             {
-              name: "closeBlock",
+              name: "bettingCloseBlock",
               type: "uint64",
               internalType: "uint64",
             },
@@ -3128,7 +3128,7 @@ const deployedContracts = {
               internalType: "bool",
             },
             {
-              name: "closeBlock",
+              name: "bettingCloseBlock",
               type: "uint64",
               internalType: "uint64",
             },
@@ -3177,7 +3177,7 @@ const deployedContracts = {
           ],
           outputs: [
             {
-              name: "closeBlock",
+              name: "bettingCloseBlock",
               type: "uint64",
               internalType: "uint64",
             },
@@ -3350,7 +3350,7 @@ const deployedContracts = {
           ],
           outputs: [
             {
-              name: "closeBlock",
+              name: "bettingCloseBlock",
               type: "uint64",
               internalType: "uint64",
             },
@@ -3795,6 +3795,25 @@ const deployedContracts = {
         },
         {
           type: "event",
+          name: "BettingWindowOpened",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "bettingCloseBlock",
+              type: "uint64",
+              indexed: false,
+              internalType: "uint64",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
           name: "Claimed",
           inputs: [
             {
@@ -3954,7 +3973,7 @@ const deployedContracts = {
               internalType: "uint256",
             },
             {
-              name: "closeBlock",
+              name: "submissionCloseBlock",
               type: "uint64",
               indexed: false,
               internalType: "uint64",
@@ -4197,7 +4216,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 5,
+      deployedOnBlock: 3,
     },
   },
 } as const;
