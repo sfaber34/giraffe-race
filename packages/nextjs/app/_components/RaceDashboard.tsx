@@ -244,6 +244,20 @@ export const RaceDashboard = () => {
     }
   }, [settledLiabilityData]);
 
+  // Read the max bet amount from the contract
+  const { data: maxBetAmountData } = useScaffoldReadContract({
+    contractName: "GiraffeRace",
+    functionName: "maxBetAmount" as any,
+    query: { enabled: !!giraffeRaceContract },
+  } as any);
+  const maxBetAmount = useMemo(() => {
+    try {
+      return maxBetAmountData === undefined || maxBetAmountData === null ? null : BigInt(maxBetAmountData as any);
+    } catch {
+      return null;
+    }
+  }, [maxBetAmountData]);
+
   // Intentionally keep the setter around (plumbing for future "view past races" UI),
   // but don't use the state value right now since the UI is always pinned to latest.
   const [, setViewRaceId] = useState<bigint | null>(null);
@@ -633,6 +647,13 @@ export const RaceDashboard = () => {
     if (userUsdcBalance === undefined || userUsdcBalance === null) return true;
     return (userUsdcBalance as unknown as bigint) >= placeBetValue;
   }, [placeBetValue, userUsdcBalance]);
+
+  // Check if bet exceeds max bet amount
+  const exceedsMaxBet = useMemo(() => {
+    if (!placeBetValue) return false;
+    if (maxBetAmount === null) return false; // Don't block if we can't read the max bet yet
+    return placeBetValue > maxBetAmount;
+  }, [placeBetValue, maxBetAmount]);
 
   const { data: myBetData } = useScaffoldReadContract({
     contractName: "GiraffeRace",
@@ -2048,9 +2069,9 @@ export const RaceDashboard = () => {
                           })}
                         </div>
 
-                        {lineupFinalized ? (
+                        {lineupFinalized && maxBetAmount !== null ? (
                           <div className="text-xs opacity-70">
-                            {"Odds are fixed and enforced on-chain (derived from the locked effective score snapshot)."}
+                            Max bet: {formatUnits(maxBetAmount, USDC_DECIMALS)} USDC
                           </div>
                         ) : null}
 
@@ -2113,6 +2134,13 @@ export const RaceDashboard = () => {
                           </div>
                         </div>
 
+                        {/* Show warning if bet exceeds max bet */}
+                        {exceedsMaxBet && maxBetAmount !== null && (
+                          <div className="text-xs text-error">
+                            Bet exceeds max bet of {formatUnits(maxBetAmount, USDC_DECIMALS)} USDC
+                          </div>
+                        )}
+
                         {/* Show warning if insufficient balance (only when we know the balance) */}
                         {placeBetValue &&
                           userUsdcBalance !== undefined &&
@@ -2124,7 +2152,12 @@ export const RaceDashboard = () => {
                           <button
                             className="btn btn-primary"
                             disabled={
-                              isApproving || !treasuryContract || !placeBetValue || !hasEnoughUsdc || !!myBet?.hasBet
+                              isApproving ||
+                              !treasuryContract ||
+                              !placeBetValue ||
+                              !hasEnoughUsdc ||
+                              !!myBet?.hasBet ||
+                              exceedsMaxBet
                             }
                             onClick={async () => {
                               if (!placeBetValue || !treasuryContract?.address) return;
@@ -2153,7 +2186,8 @@ export const RaceDashboard = () => {
                               !placeBetValue ||
                               !!myBet?.hasBet ||
                               !isViewingLatest ||
-                              !hasEnoughUsdc
+                              !hasEnoughUsdc ||
+                              exceedsMaxBet
                             }
                             onClick={async () => {
                               if (!placeBetValue) return;

@@ -56,6 +56,7 @@ contract GiraffeRace {
 
     address public treasuryOwner;  // Owns house NFTs + controls admin functions (should be multisig)
     uint16 public houseEdgeBps = 500; // 5% default, configurable by treasuryOwner
+    uint256 public maxBetAmount = 5_000_000; // 5 USDC (6 decimals) default, configurable by treasuryOwner
     IGiraffeNFT public giraffeNft;
     GiraffeRaceSimulator public simulator;
     HouseTreasury public treasury;
@@ -144,8 +145,10 @@ contract GiraffeRace {
     event GiraffeAssigned(uint256 indexed raceId, uint256 indexed tokenId, address indexed originalOwner, uint8 lane);
     event HouseGiraffeAssigned(uint256 indexed raceId, uint256 indexed tokenId, uint8 lane);
     event HouseEdgeUpdated(uint16 oldEdgeBps, uint16 newEdgeBps);
+    event MaxBetUpdated(uint256 oldMaxBet, uint256 newMaxBet);
 
     error InvalidRace();
+    error BetTooLarge();
     error HouseEdgeTooHigh();
     error NoClaimableBets();
     error BettingClosed();
@@ -226,6 +229,14 @@ contract GiraffeRace {
         emit HouseEdgeUpdated(oldEdgeBps, newEdgeBps);
     }
 
+    /// @notice Update the maximum bet amount (in USDC, 6 decimals).
+    /// @param newMaxBet The new max bet amount (e.g., 5_000_000 = 5 USDC).
+    function setMaxBetAmount(uint256 newMaxBet) external onlyTreasuryOwner {
+        uint256 oldMaxBet = maxBetAmount;
+        maxBetAmount = newMaxBet;
+        emit MaxBetUpdated(oldMaxBet, newMaxBet);
+    }
+
     /**
      * @notice Deterministically simulate a race from a seed.
      * @dev Pure function so it can be re-run off-chain for verification / animation.
@@ -289,6 +300,7 @@ contract GiraffeRace {
         if (block.number < _submissionCloseBlock(r.closeBlock)) revert BettingNotOpen();
 
         if (amount == 0) revert ZeroBet();
+        if (amount > maxBetAmount) revert BetTooLarge();
 
         // Ensure the lane lineup is finalized before accepting bets (so bettors can see who is racing).
         _ensureGiraffesFinalized(raceId);
