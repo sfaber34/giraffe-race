@@ -95,19 +95,26 @@ function getDeploymentHistory(broadcastPath) {
 }
 
 function getArtifactOfContract(contractName) {
-  const current_path_to_artifacts = join(
-    __dirname,
-    "..",
-    `out/${contractName}.sol`
-  );
+  // First try the standard path: out/{contractName}.sol/{contractName}.json
+  const standardPath = join(__dirname, "..", `out/${contractName}.sol/${contractName}.json`);
+  if (existsSync(standardPath)) {
+    return JSON.parse(readFileSync(standardPath));
+  }
 
-  if (!existsSync(current_path_to_artifacts)) return null;
+  // If not found, search all .sol folders for the contract
+  // This handles cases where contract name differs from file name (e.g., Diamond.sol contains GiraffeRaceDiamond)
+  const outDir = join(__dirname, "..", "out");
+  if (!existsSync(outDir)) return null;
 
-  const artifactJson = JSON.parse(
-    readFileSync(`${current_path_to_artifacts}/${contractName}.json`)
-  );
+  const solFolders = readdirSync(outDir).filter(f => f.endsWith('.sol'));
+  for (const folder of solFolders) {
+    const artifactPath = join(outDir, folder, `${contractName}.json`);
+    if (existsSync(artifactPath)) {
+      return JSON.parse(readFileSync(artifactPath));
+    }
+  }
 
-  return artifactJson;
+  return null;
 }
 
 function getInheritedFromContracts(artifact) {
@@ -216,13 +223,19 @@ function main() {
   const deployments = {};
 
   // Load existing deployments from deployments directory
+  // Normalize addresses to lowercase for case-insensitive matching
   Deploymentchains.forEach((chain) => {
     if (!chain.endsWith(".json")) return;
     chain = chain.slice(0, -5);
     var deploymentObject = JSON.parse(
       readFileSync(`${current_path_to_deployments}/${chain}.json`)
     );
-    deployments[chain] = deploymentObject;
+    // Normalize addresses to lowercase
+    const normalizedDeployments = {};
+    Object.entries(deploymentObject).forEach(([key, value]) => {
+      normalizedDeployments[key.toLowerCase()] = value;
+    });
+    deployments[chain] = normalizedDeployments;
   });
 
   // Process all deployments from all script folders
@@ -233,11 +246,22 @@ function main() {
   // Update contract keys based on deployments if they exist
   Object.entries(allGeneratedContracts).forEach(([chainId, contracts]) => {
     Object.entries(contracts).forEach(([contractName, contractData]) => {
-      const deployedName = deployments[chainId]?.[contractData.address];
+      // Use lowercase address for lookup (addresses are normalized above)
+      const deployedName = deployments[chainId]?.[contractData.address.toLowerCase()];
       if (deployedName) {
         // If we have a deployment name, use it instead of the contract name
-        allGeneratedContracts[chainId][deployedName] = contractData;
-        delete allGeneratedContracts[chainId][contractName];
+        // Also try to use the ABI from the deployment name if it exists
+        // (useful for Diamond pattern where proxy is deployed but interface ABI is preferred)
+        const deployedNameArtifact = getArtifactOfContract(deployedName);
+        if (deployedNameArtifact) {
+          contractData.abi = deployedNameArtifact.abi;
+          contractData.inheritedFunctions = getInheritedFunctions(deployedNameArtifact);
+        }
+        // Only rename if the names are different
+        if (deployedName !== contractName) {
+          allGeneratedContracts[chainId][deployedName] = contractData;
+          delete allGeneratedContracts[chainId][contractName];
+        }
       }
     });
   });

@@ -357,413 +357,8 @@ const deployedContracts = {
       inheritedFunctions: {},
       deployedOnBlock: 1,
     },
-    HouseTreasury: {
-      address: "0xb19b36b1456e65e3a6d514d3f715f204bd59f431",
-      abi: [
-        {
-          type: "constructor",
-          inputs: [
-            {
-              name: "_usdc",
-              type: "address",
-              internalType: "address",
-            },
-            {
-              name: "_owner",
-              type: "address",
-              internalType: "address",
-            },
-          ],
-          stateMutability: "nonpayable",
-        },
-        {
-          type: "function",
-          name: "authorize",
-          inputs: [
-            {
-              name: "contractAddr",
-              type: "address",
-              internalType: "address",
-            },
-          ],
-          outputs: [],
-          stateMutability: "nonpayable",
-        },
-        {
-          type: "function",
-          name: "authorizedContracts",
-          inputs: [
-            {
-              name: "",
-              type: "address",
-              internalType: "address",
-            },
-          ],
-          outputs: [
-            {
-              name: "",
-              type: "bool",
-              internalType: "bool",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "balance",
-          inputs: [],
-          outputs: [
-            {
-              name: "",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "collectBet",
-          inputs: [
-            {
-              name: "from",
-              type: "address",
-              internalType: "address",
-            },
-            {
-              name: "amount",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          outputs: [],
-          stateMutability: "nonpayable",
-        },
-        {
-          type: "function",
-          name: "deauthorize",
-          inputs: [
-            {
-              name: "contractAddr",
-              type: "address",
-              internalType: "address",
-            },
-          ],
-          outputs: [],
-          stateMutability: "nonpayable",
-        },
-        {
-          type: "function",
-          name: "deposit",
-          inputs: [
-            {
-              name: "amount",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          outputs: [],
-          stateMutability: "nonpayable",
-        },
-        {
-          type: "function",
-          name: "owner",
-          inputs: [],
-          outputs: [
-            {
-              name: "",
-              type: "address",
-              internalType: "address",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "pause",
-          inputs: [],
-          outputs: [],
-          stateMutability: "nonpayable",
-        },
-        {
-          type: "function",
-          name: "paused",
-          inputs: [],
-          outputs: [
-            {
-              name: "",
-              type: "bool",
-              internalType: "bool",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "payWinner",
-          inputs: [
-            {
-              name: "to",
-              type: "address",
-              internalType: "address",
-            },
-            {
-              name: "amount",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          outputs: [],
-          stateMutability: "nonpayable",
-        },
-        {
-          type: "function",
-          name: "transferOwnership",
-          inputs: [
-            {
-              name: "newOwner",
-              type: "address",
-              internalType: "address",
-            },
-          ],
-          outputs: [],
-          stateMutability: "nonpayable",
-        },
-        {
-          type: "function",
-          name: "unpause",
-          inputs: [],
-          outputs: [],
-          stateMutability: "nonpayable",
-        },
-        {
-          type: "function",
-          name: "usdc",
-          inputs: [],
-          outputs: [
-            {
-              name: "",
-              type: "address",
-              internalType: "contract IERC20",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "withdraw",
-          inputs: [
-            {
-              name: "amount",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          outputs: [],
-          stateMutability: "nonpayable",
-        },
-        {
-          type: "function",
-          name: "withdrawAll",
-          inputs: [],
-          outputs: [],
-          stateMutability: "nonpayable",
-        },
-        {
-          type: "event",
-          name: "BetCollected",
-          inputs: [
-            {
-              name: "from",
-              type: "address",
-              indexed: true,
-              internalType: "address",
-            },
-            {
-              name: "amount",
-              type: "uint256",
-              indexed: false,
-              internalType: "uint256",
-            },
-            {
-              name: "collector",
-              type: "address",
-              indexed: true,
-              internalType: "address",
-            },
-          ],
-          anonymous: false,
-        },
-        {
-          type: "event",
-          name: "ContractAuthorized",
-          inputs: [
-            {
-              name: "contractAddr",
-              type: "address",
-              indexed: true,
-              internalType: "address",
-            },
-          ],
-          anonymous: false,
-        },
-        {
-          type: "event",
-          name: "ContractDeauthorized",
-          inputs: [
-            {
-              name: "contractAddr",
-              type: "address",
-              indexed: true,
-              internalType: "address",
-            },
-          ],
-          anonymous: false,
-        },
-        {
-          type: "event",
-          name: "Deposited",
-          inputs: [
-            {
-              name: "from",
-              type: "address",
-              indexed: true,
-              internalType: "address",
-            },
-            {
-              name: "amount",
-              type: "uint256",
-              indexed: false,
-              internalType: "uint256",
-            },
-          ],
-          anonymous: false,
-        },
-        {
-          type: "event",
-          name: "OwnershipTransferred",
-          inputs: [
-            {
-              name: "previousOwner",
-              type: "address",
-              indexed: true,
-              internalType: "address",
-            },
-            {
-              name: "newOwner",
-              type: "address",
-              indexed: true,
-              internalType: "address",
-            },
-          ],
-          anonymous: false,
-        },
-        {
-          type: "event",
-          name: "Paused",
-          inputs: [
-            {
-              name: "by",
-              type: "address",
-              indexed: true,
-              internalType: "address",
-            },
-          ],
-          anonymous: false,
-        },
-        {
-          type: "event",
-          name: "Unpaused",
-          inputs: [
-            {
-              name: "by",
-              type: "address",
-              indexed: true,
-              internalType: "address",
-            },
-          ],
-          anonymous: false,
-        },
-        {
-          type: "event",
-          name: "WinnerPaid",
-          inputs: [
-            {
-              name: "to",
-              type: "address",
-              indexed: true,
-              internalType: "address",
-            },
-            {
-              name: "amount",
-              type: "uint256",
-              indexed: false,
-              internalType: "uint256",
-            },
-            {
-              name: "payer",
-              type: "address",
-              indexed: true,
-              internalType: "address",
-            },
-          ],
-          anonymous: false,
-        },
-        {
-          type: "event",
-          name: "Withdrawn",
-          inputs: [
-            {
-              name: "to",
-              type: "address",
-              indexed: true,
-              internalType: "address",
-            },
-            {
-              name: "amount",
-              type: "uint256",
-              indexed: false,
-              internalType: "uint256",
-            },
-          ],
-          anonymous: false,
-        },
-        {
-          type: "error",
-          name: "IsPaused",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "NotAuthorized",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "NotOwner",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "TransferFailed",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "ZeroAddress",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "ZeroAmount",
-          inputs: [],
-        },
-      ],
-      inheritedFunctions: {},
-      deployedOnBlock: 3,
-    },
     GiraffeNFT: {
-      address: "0x8ce361602b935680e8dec218b820ff5056beb7af",
+      address: "0xb19b36b1456e65e3a6d514d3f715f204bd59f431",
       abi: [
         {
           type: "constructor",
@@ -2110,10 +1705,10 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 6,
+      deployedOnBlock: 4,
     },
     GiraffeRaceSimulator: {
-      address: "0xe1aa25618fa0c7a1cfdab5d6b456af611873b629",
+      address: "0x8ce361602b935680e8dec218b820ff5056beb7af",
       abi: [
         {
           type: "function",
@@ -2230,6 +1825,411 @@ const deployedContracts = {
       inheritedFunctions: {},
       deployedOnBlock: 4,
     },
+    HouseTreasury: {
+      address: "0xe1aa25618fa0c7a1cfdab5d6b456af611873b629",
+      abi: [
+        {
+          type: "constructor",
+          inputs: [
+            {
+              name: "_usdc",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "_owner",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "authorize",
+          inputs: [
+            {
+              name: "contractAddr",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "authorizedContracts",
+          inputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "bool",
+              internalType: "bool",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "balance",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "collectBet",
+          inputs: [
+            {
+              name: "from",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "amount",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "deauthorize",
+          inputs: [
+            {
+              name: "contractAddr",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "deposit",
+          inputs: [
+            {
+              name: "amount",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "owner",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "pause",
+          inputs: [],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "paused",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "bool",
+              internalType: "bool",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "payWinner",
+          inputs: [
+            {
+              name: "to",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "amount",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "transferOwnership",
+          inputs: [
+            {
+              name: "newOwner",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "unpause",
+          inputs: [],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "usdc",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "contract IERC20",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "withdraw",
+          inputs: [
+            {
+              name: "amount",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "withdrawAll",
+          inputs: [],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "event",
+          name: "BetCollected",
+          inputs: [
+            {
+              name: "from",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "amount",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+            {
+              name: "collector",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "ContractAuthorized",
+          inputs: [
+            {
+              name: "contractAddr",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "ContractDeauthorized",
+          inputs: [
+            {
+              name: "contractAddr",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "Deposited",
+          inputs: [
+            {
+              name: "from",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "amount",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "OwnershipTransferred",
+          inputs: [
+            {
+              name: "previousOwner",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "newOwner",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "Paused",
+          inputs: [
+            {
+              name: "by",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "Unpaused",
+          inputs: [
+            {
+              name: "by",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "WinnerPaid",
+          inputs: [
+            {
+              name: "to",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "amount",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+            {
+              name: "payer",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "Withdrawn",
+          inputs: [
+            {
+              name: "to",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "amount",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "error",
+          name: "IsPaused",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "NotAuthorized",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "NotOwner",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "TransferFailed",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "ZeroAddress",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "ZeroAmount",
+          inputs: [],
+        },
+      ],
+      inheritedFunctions: {},
+      deployedOnBlock: 4,
+    },
     WinProbTableShard0: {
       address: "0xe1da8919f262ee86f9be05059c9280142cf23f48",
       abi: [
@@ -2272,7 +2272,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 6,
+      deployedOnBlock: 4,
     },
     WinProbTableShard1: {
       address: "0x0c8e79f3534b00d9a3d4a856b665bf4ebc22f2ba",
@@ -2316,7 +2316,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 6,
+      deployedOnBlock: 4,
     },
     WinProbTableShard2: {
       address: "0xed1db453c3156ff3155a97ad217b3087d5dc5f6e",
@@ -2360,7 +2360,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 6,
+      deployedOnBlock: 4,
     },
     WinProbTableShard3: {
       address: "0xf7cd8fa9b94db2aa972023b379c7f72c65e4de9d",
@@ -2404,7 +2404,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 6,
+      deployedOnBlock: 3,
     },
     WinProbTableShard4: {
       address: "0x12975173b87f7595ee45dffb2ab812ece596bf84",
@@ -2448,7 +2448,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 3,
+      deployedOnBlock: 4,
     },
     WinProbTableShard5: {
       address: "0x82dc47734901ee7d4f4232f398752cb9dd5daccc",
@@ -2676,151 +2676,433 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 6,
+      deployedOnBlock: 3,
     },
-    GiraffeRace: {
+    DiamondCutFacet: {
       address: "0x6379ebd504941f50d5bfde9348b37593bd29c835",
       abi: [
         {
-          type: "constructor",
+          type: "function",
+          name: "diamondCut",
           inputs: [
             {
-              name: "_giraffeNft",
+              name: "_diamondCut",
+              type: "tuple[]",
+              internalType: "struct LibDiamond.FacetCut[]",
+              components: [
+                {
+                  name: "facetAddress",
+                  type: "address",
+                  internalType: "address",
+                },
+                {
+                  name: "action",
+                  type: "uint8",
+                  internalType: "enum LibDiamond.FacetCutAction",
+                },
+                {
+                  name: "functionSelectors",
+                  type: "bytes4[]",
+                  internalType: "bytes4[]",
+                },
+              ],
+            },
+            {
+              name: "_init",
               type: "address",
               internalType: "address",
             },
             {
-              name: "_treasuryOwner",
+              name: "_calldata",
+              type: "bytes",
+              internalType: "bytes",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "event",
+          name: "DiamondCut",
+          inputs: [
+            {
+              name: "_diamondCut",
+              type: "tuple[]",
+              indexed: false,
+              internalType: "struct LibDiamond.FacetCut[]",
+              components: [
+                {
+                  name: "facetAddress",
+                  type: "address",
+                  internalType: "address",
+                },
+                {
+                  name: "action",
+                  type: "uint8",
+                  internalType: "enum LibDiamond.FacetCutAction",
+                },
+                {
+                  name: "functionSelectors",
+                  type: "bytes4[]",
+                  internalType: "bytes4[]",
+                },
+              ],
+            },
+            {
+              name: "_init",
               type: "address",
+              indexed: false,
               internalType: "address",
             },
             {
-              name: "_houseGiraffeTokenIds",
+              name: "_calldata",
+              type: "bytes",
+              indexed: false,
+              internalType: "bytes",
+            },
+          ],
+          anonymous: false,
+        },
+      ],
+      inheritedFunctions: {},
+      deployedOnBlock: 3,
+    },
+    DiamondLoupeFacet: {
+      address: "0x5b3120d0da5fdcba7aef87a9c3c64829c1c0d76b",
+      abi: [
+        {
+          type: "function",
+          name: "facetAddress",
+          inputs: [
+            {
+              name: "_functionSelector",
+              type: "bytes4",
+              internalType: "bytes4",
+            },
+          ],
+          outputs: [
+            {
+              name: "facetAddress_",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "facetAddresses",
+          inputs: [],
+          outputs: [
+            {
+              name: "facetAddresses_",
+              type: "address[]",
+              internalType: "address[]",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "facetFunctionSelectors",
+          inputs: [
+            {
+              name: "_facet",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "facetFunctionSelectors_",
+              type: "bytes4[]",
+              internalType: "bytes4[]",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "facets",
+          inputs: [],
+          outputs: [
+            {
+              name: "facets_",
+              type: "tuple[]",
+              internalType: "struct DiamondLoupeFacet.Facet[]",
+              components: [
+                {
+                  name: "facetAddress",
+                  type: "address",
+                  internalType: "address",
+                },
+                {
+                  name: "functionSelectors",
+                  type: "bytes4[]",
+                  internalType: "bytes4[]",
+                },
+              ],
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "supportsInterface",
+          inputs: [
+            {
+              name: "_interfaceId",
+              type: "bytes4",
+              internalType: "bytes4",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "bool",
+              internalType: "bool",
+            },
+          ],
+          stateMutability: "view",
+        },
+      ],
+      inheritedFunctions: {},
+      deployedOnBlock: 4,
+    },
+    AdminFacet: {
+      address: "0x33b1b5aa9aa4da83a332f0bc5cac6a903fde5d92",
+      abi: [
+        {
+          type: "function",
+          name: "houseEdgeBps",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint16",
+              internalType: "uint16",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "houseGiraffeTokenIds",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
               type: "uint256[6]",
               internalType: "uint256[6]",
             },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "maxBetAmount",
+          inputs: [],
+          outputs: [
             {
-              name: "_simulator",
-              type: "address",
-              internalType: "address",
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "setHouseEdgeBps",
+          inputs: [
+            {
+              name: "newEdgeBps",
+              type: "uint16",
+              internalType: "uint16",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "setMaxBetAmount",
+          inputs: [
+            {
+              name: "newMaxBet",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "setRaceOdds",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
             },
             {
-              name: "_treasury",
-              type: "address",
-              internalType: "address",
+              name: "decimalOddsBps",
+              type: "uint32[6]",
+              internalType: "uint32[6]",
             },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "setWinProbTable",
+          inputs: [
             {
               name: "_winProbTable",
               type: "address",
               internalType: "address",
             },
           ],
+          outputs: [],
           stateMutability: "nonpayable",
         },
         {
           type: "function",
-          name: "LANE_COUNT",
+          name: "treasuryOwner",
           inputs: [],
           outputs: [
             {
               name: "",
-              type: "uint8",
-              internalType: "uint8",
+              type: "address",
+              internalType: "address",
             },
           ],
           stateMutability: "view",
         },
         {
-          type: "function",
-          name: "MAX_ENTRIES_PER_RACE",
-          inputs: [],
-          outputs: [
+          type: "event",
+          name: "HouseEdgeUpdated",
+          inputs: [
             {
-              name: "",
+              name: "oldEdgeBps",
               type: "uint16",
+              indexed: false,
+              internalType: "uint16",
+            },
+            {
+              name: "newEdgeBps",
+              type: "uint16",
+              indexed: false,
               internalType: "uint16",
             },
           ],
-          stateMutability: "view",
+          anonymous: false,
         },
         {
-          type: "function",
-          name: "MAX_HOUSE_EDGE_BPS",
-          inputs: [],
-          outputs: [
+          type: "event",
+          name: "MaxBetUpdated",
+          inputs: [
             {
-              name: "",
-              type: "uint16",
-              internalType: "uint16",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "MAX_TICKS",
-          inputs: [],
-          outputs: [
-            {
-              name: "",
-              type: "uint16",
-              internalType: "uint16",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "SPEED_RANGE",
-          inputs: [],
-          outputs: [
-            {
-              name: "",
-              type: "uint8",
-              internalType: "uint8",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "TRACK_LENGTH",
-          inputs: [],
-          outputs: [
-            {
-              name: "",
-              type: "uint16",
-              internalType: "uint16",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "claim",
-          inputs: [],
-          outputs: [
-            {
-              name: "payout",
+              name: "oldMaxBet",
               type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+            {
+              name: "newMaxBet",
+              type: "uint256",
+              indexed: false,
               internalType: "uint256",
             },
           ],
-          stateMutability: "nonpayable",
+          anonymous: false,
         },
         {
-          type: "function",
-          name: "claimNextWinningPayout",
-          inputs: [],
-          outputs: [
+          type: "event",
+          name: "RaceOddsSet",
+          inputs: [
             {
-              name: "payout",
+              name: "raceId",
               type: "uint256",
+              indexed: true,
               internalType: "uint256",
             },
+            {
+              name: "decimalOddsBps",
+              type: "uint32[6]",
+              indexed: false,
+              internalType: "uint32[6]",
+            },
           ],
-          stateMutability: "nonpayable",
+          anonymous: false,
         },
+        {
+          type: "event",
+          name: "WinProbTableUpdated",
+          inputs: [
+            {
+              name: "newTable",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "error",
+          name: "AlreadySettled",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "BettingClosed",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "BettingNotOpen",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "HouseEdgeTooHigh",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "InvalidOdds",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "InvalidRace",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "NotTreasuryOwner",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "OddsAlreadySet",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "RaceNotReady",
+          inputs: [],
+        },
+      ],
+      inheritedFunctions: {},
+      deployedOnBlock: 4,
+    },
+    RaceLifecycleFacet: {
+      address: "0x19a1c09fe3399c4daaa2c98b936a8e460fc5eaa4",
+      abi: [
         {
           type: "function",
           name: "createRace",
@@ -2856,32 +3138,311 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "getBet",
-          inputs: [
-            {
-              name: "bettor",
-              type: "address",
-              internalType: "address",
-            },
-          ],
+          name: "getCreateRaceCooldown",
+          inputs: [],
           outputs: [
             {
-              name: "amount",
-              type: "uint128",
-              internalType: "uint128",
+              name: "canCreate",
+              type: "bool",
+              internalType: "bool",
+            },
+            {
+              name: "blocksRemaining",
+              type: "uint64",
+              internalType: "uint64",
+            },
+            {
+              name: "cooldownEndsAtBlock",
+              type: "uint64",
+              internalType: "uint64",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "latestRaceId",
+          inputs: [],
+          outputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "nextRaceId",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "settleRace",
+          inputs: [],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "event",
+          name: "BettingWindowOpened",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "bettingCloseBlock",
+              type: "uint64",
+              indexed: false,
+              internalType: "uint64",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "GiraffeAssigned",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "tokenId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "originalOwner",
+              type: "address",
+              indexed: true,
+              internalType: "address",
             },
             {
               name: "lane",
               type: "uint8",
+              indexed: false,
+              internalType: "uint8",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "HouseGiraffeAssigned",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "tokenId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "lane",
+              type: "uint8",
+              indexed: false,
+              internalType: "uint8",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "RaceCreated",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "submissionCloseBlock",
+              type: "uint64",
+              indexed: false,
+              internalType: "uint64",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "RaceOddsSet",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "decimalOddsBps",
+              type: "uint32[6]",
+              indexed: false,
+              internalType: "uint32[6]",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "RaceSettled",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "seed",
+              type: "bytes32",
+              indexed: false,
+              internalType: "bytes32",
+            },
+            {
+              name: "winner",
+              type: "uint8",
+              indexed: false,
+              internalType: "uint8",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "RaceSettledDeadHeat",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "seed",
+              type: "bytes32",
+              indexed: false,
+              internalType: "bytes32",
+            },
+            {
+              name: "deadHeatCount",
+              type: "uint8",
+              indexed: false,
               internalType: "uint8",
             },
             {
-              name: "claimed",
-              type: "bool",
-              internalType: "bool",
+              name: "winners",
+              type: "uint8[6]",
+              indexed: false,
+              internalType: "uint8[6]",
             },
           ],
-          stateMutability: "view",
+          anonymous: false,
+        },
+        {
+          type: "error",
+          name: "AlreadySettled",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "BettingNotOpen",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "BlockhashUnavailable",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "CooldownNotElapsed",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "GiraffesAlreadyFinalized",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "InvalidHouseGiraffe",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "InvalidRace",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "OddsNotSet",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "PreviousRaceNotSettled",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "RaceNotReady",
+          inputs: [],
+        },
+      ],
+      inheritedFunctions: {},
+      deployedOnBlock: 4,
+    },
+    BettingFacet: {
+      address: "0x49b8e3b089d4ebf9f37b1da9b839ec013c2cd8c9",
+      abi: [
+        {
+          type: "function",
+          name: "claim",
+          inputs: [],
+          outputs: [
+            {
+              name: "payout",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "claimNextWinningPayout",
+          inputs: [],
+          outputs: [
+            {
+              name: "payout",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "nonpayable",
         },
         {
           type: "function",
@@ -2938,29 +3499,6 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "getCreateRaceCooldown",
-          inputs: [],
-          outputs: [
-            {
-              name: "canCreate",
-              type: "bool",
-              internalType: "bool",
-            },
-            {
-              name: "blocksRemaining",
-              type: "uint64",
-              internalType: "uint64",
-            },
-            {
-              name: "cooldownEndsAtBlock",
-              type: "uint64",
-              internalType: "uint64",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
           name: "getNextClaim",
           inputs: [
             {
@@ -2973,7 +3511,7 @@ const deployedContracts = {
             {
               name: "out",
               type: "tuple",
-              internalType: "struct GiraffeRace.NextClaimView",
+              internalType: "struct GiraffeRaceStorage.NextClaimView",
               components: [
                 {
                   name: "hasClaim",
@@ -3039,7 +3577,7 @@ const deployedContracts = {
             {
               name: "out",
               type: "tuple",
-              internalType: "struct GiraffeRace.NextClaimView",
+              internalType: "struct GiraffeRaceStorage.NextClaimView",
               components: [
                 {
                   name: "hasClaim",
@@ -3093,42 +3631,425 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "getRace",
-          inputs: [],
+          name: "getWinningClaimRemaining",
+          inputs: [
+            {
+              name: "bettor",
+              type: "address",
+              internalType: "address",
+            },
+          ],
           outputs: [
             {
-              name: "bettingCloseBlock",
-              type: "uint64",
-              internalType: "uint64",
-            },
-            {
-              name: "settled",
-              type: "bool",
-              internalType: "bool",
-            },
-            {
-              name: "winner",
-              type: "uint8",
-              internalType: "uint8",
-            },
-            {
-              name: "seed",
-              type: "bytes32",
-              internalType: "bytes32",
-            },
-            {
-              name: "totalPot",
+              name: "remaining",
               type: "uint256",
               internalType: "uint256",
-            },
-            {
-              name: "totalOnLane",
-              type: "uint256[6]",
-              internalType: "uint256[6]",
             },
           ],
           stateMutability: "view",
         },
+        {
+          type: "function",
+          name: "placeBet",
+          inputs: [
+            {
+              name: "lane",
+              type: "uint8",
+              internalType: "uint8",
+            },
+            {
+              name: "amount",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "settledLiability",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "event",
+          name: "BetPlaced",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "bettor",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "lane",
+              type: "uint8",
+              indexed: true,
+              internalType: "uint8",
+            },
+            {
+              name: "amount",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "Claimed",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "bettor",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "payout",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "RaceSettled",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "seed",
+              type: "bytes32",
+              indexed: false,
+              internalType: "bytes32",
+            },
+            {
+              name: "winner",
+              type: "uint8",
+              indexed: false,
+              internalType: "uint8",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "RaceSettledDeadHeat",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "seed",
+              type: "bytes32",
+              indexed: false,
+              internalType: "bytes32",
+            },
+            {
+              name: "deadHeatCount",
+              type: "uint8",
+              indexed: false,
+              internalType: "uint8",
+            },
+            {
+              name: "winners",
+              type: "uint8[6]",
+              indexed: false,
+              internalType: "uint8[6]",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "error",
+          name: "AlreadyBet",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "AlreadySettled",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "BetTooLarge",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "BettingClosed",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "BettingNotOpen",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "BlockhashUnavailable",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "InsufficientBankroll",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "InvalidLane",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "InvalidRace",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "NoClaimableBets",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "OddsNotSet",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "RaceNotReady",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "ZeroBet",
+          inputs: [],
+        },
+      ],
+      inheritedFunctions: {},
+      deployedOnBlock: 3,
+    },
+    GiraffeSubmissionFacet: {
+      address: "0x067c804bb006836469379d4a2a69a81803bd1f45",
+      abi: [
+        {
+          type: "function",
+          name: "getRaceEntry",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "index",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "tokenId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "submitter",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getRaceEntryCount",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "hasSubmitted",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "user",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "bool",
+              internalType: "bool",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "isTokenEntered",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "tokenId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "bool",
+              internalType: "bool",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "submitGiraffe",
+          inputs: [
+            {
+              name: "tokenId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "event",
+          name: "GiraffeSubmitted",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "owner",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "tokenId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "lane",
+              type: "uint8",
+              indexed: false,
+              internalType: "uint8",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "error",
+          name: "AlreadySettled",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "AlreadySubmitted",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "EntryPoolFull",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "InvalidHouseGiraffe",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "InvalidRace",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "NotTokenOwner",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "SubmissionsClosed",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "TokenAlreadyEntered",
+          inputs: [],
+        },
+      ],
+      inheritedFunctions: {},
+      deployedOnBlock: 4,
+    },
+    RaceViewsFacet: {
+      address: "0x45009dd3abbe29db54fc5d893ceaa98a624882df",
+      abi: [
         {
           type: "function",
           name: "getRaceActionabilityById",
@@ -3287,8 +4208,14 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "getRaceGiraffes",
-          inputs: [],
+          name: "getRaceGiraffesById",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
           outputs: [
             {
               name: "assignedCount",
@@ -3304,6 +4231,777 @@ const deployedContracts = {
               name: "originalOwners",
               type: "address[6]",
               internalType: "address[6]",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getRaceOddsById",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "oddsSet",
+              type: "bool",
+              internalType: "bool",
+            },
+            {
+              name: "decimalOddsBps",
+              type: "uint32[6]",
+              internalType: "uint32[6]",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getRaceScheduleById",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "bettingCloseBlock",
+              type: "uint64",
+              internalType: "uint64",
+            },
+            {
+              name: "submissionCloseBlock",
+              type: "uint64",
+              internalType: "uint64",
+            },
+            {
+              name: "settledAtBlock",
+              type: "uint64",
+              internalType: "uint64",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getRaceScoreById",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "score",
+              type: "uint8[6]",
+              internalType: "uint8[6]",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "giraffeNft",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "laneCount",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint8",
+              internalType: "uint8",
+            },
+          ],
+          stateMutability: "pure",
+        },
+        {
+          type: "function",
+          name: "simulate",
+          inputs: [
+            {
+              name: "seed",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+          ],
+          outputs: [
+            {
+              name: "winner",
+              type: "uint8",
+              internalType: "uint8",
+            },
+            {
+              name: "distances",
+              type: "uint16[6]",
+              internalType: "uint16[6]",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "simulateWithScore",
+          inputs: [
+            {
+              name: "seed",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+            {
+              name: "score",
+              type: "uint8[6]",
+              internalType: "uint8[6]",
+            },
+          ],
+          outputs: [
+            {
+              name: "winner",
+              type: "uint8",
+              internalType: "uint8",
+            },
+            {
+              name: "distances",
+              type: "uint16[6]",
+              internalType: "uint16[6]",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "simulator",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "speedRange",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint8",
+              internalType: "uint8",
+            },
+          ],
+          stateMutability: "pure",
+        },
+        {
+          type: "function",
+          name: "tickCount",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint16",
+              internalType: "uint16",
+            },
+          ],
+          stateMutability: "pure",
+        },
+        {
+          type: "function",
+          name: "trackLength",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint16",
+              internalType: "uint16",
+            },
+          ],
+          stateMutability: "pure",
+        },
+        {
+          type: "function",
+          name: "treasury",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "winProbTable",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          stateMutability: "view",
+        },
+      ],
+      inheritedFunctions: {},
+      deployedOnBlock: 4,
+    },
+    GiraffeRace: {
+      address: "0xf56aa3aceddf88ab12e494d0b96da3c09a5d264e",
+      abi: [
+        {
+          type: "function",
+          name: "claim",
+          inputs: [],
+          outputs: [
+            {
+              name: "payout",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "claimNextWinningPayout",
+          inputs: [],
+          outputs: [
+            {
+              name: "payout",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "createRace",
+          inputs: [],
+          outputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "facetAddress",
+          inputs: [
+            {
+              name: "_functionSelector",
+              type: "bytes4",
+              internalType: "bytes4",
+            },
+          ],
+          outputs: [
+            {
+              name: "facetAddress_",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "facetAddresses",
+          inputs: [],
+          outputs: [
+            {
+              name: "facetAddresses_",
+              type: "address[]",
+              internalType: "address[]",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "facetFunctionSelectors",
+          inputs: [
+            {
+              name: "_facet",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "facetFunctionSelectors_",
+              type: "bytes4[]",
+              internalType: "bytes4[]",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "facets",
+          inputs: [],
+          outputs: [
+            {
+              name: "facetAddresses",
+              type: "address[]",
+              internalType: "address[]",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "finalizeRaceGiraffes",
+          inputs: [],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "getActiveRaceIdOrZero",
+          inputs: [],
+          outputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getBetById",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "bettor",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "amount",
+              type: "uint128",
+              internalType: "uint128",
+            },
+            {
+              name: "lane",
+              type: "uint8",
+              internalType: "uint8",
+            },
+            {
+              name: "claimed",
+              type: "bool",
+              internalType: "bool",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getClaimRemaining",
+          inputs: [
+            {
+              name: "bettor",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "remaining",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getCreateRaceCooldown",
+          inputs: [],
+          outputs: [
+            {
+              name: "canCreate",
+              type: "bool",
+              internalType: "bool",
+            },
+            {
+              name: "blocksRemaining",
+              type: "uint64",
+              internalType: "uint64",
+            },
+            {
+              name: "cooldownEndsAtBlock",
+              type: "uint64",
+              internalType: "uint64",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getNextClaim",
+          inputs: [
+            {
+              name: "bettor",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "out",
+              type: "tuple",
+              internalType: "struct GiraffeRaceStorage.NextClaimView",
+              components: [
+                {
+                  name: "hasClaim",
+                  type: "bool",
+                  internalType: "bool",
+                },
+                {
+                  name: "raceId",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "status",
+                  type: "uint8",
+                  internalType: "uint8",
+                },
+                {
+                  name: "betLane",
+                  type: "uint8",
+                  internalType: "uint8",
+                },
+                {
+                  name: "betTokenId",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "betAmount",
+                  type: "uint128",
+                  internalType: "uint128",
+                },
+                {
+                  name: "winner",
+                  type: "uint8",
+                  internalType: "uint8",
+                },
+                {
+                  name: "payout",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "bettingCloseBlock",
+                  type: "uint64",
+                  internalType: "uint64",
+                },
+              ],
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getNextWinningClaim",
+          inputs: [
+            {
+              name: "bettor",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "out",
+              type: "tuple",
+              internalType: "struct GiraffeRaceStorage.NextClaimView",
+              components: [
+                {
+                  name: "hasClaim",
+                  type: "bool",
+                  internalType: "bool",
+                },
+                {
+                  name: "raceId",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "status",
+                  type: "uint8",
+                  internalType: "uint8",
+                },
+                {
+                  name: "betLane",
+                  type: "uint8",
+                  internalType: "uint8",
+                },
+                {
+                  name: "betTokenId",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "betAmount",
+                  type: "uint128",
+                  internalType: "uint128",
+                },
+                {
+                  name: "winner",
+                  type: "uint8",
+                  internalType: "uint8",
+                },
+                {
+                  name: "payout",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "bettingCloseBlock",
+                  type: "uint64",
+                  internalType: "uint64",
+                },
+              ],
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getRaceActionabilityById",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "canFinalizeNow",
+              type: "bool",
+              internalType: "bool",
+            },
+            {
+              name: "canSettleNow",
+              type: "bool",
+              internalType: "bool",
+            },
+            {
+              name: "bettingCloseBlock",
+              type: "uint64",
+              internalType: "uint64",
+            },
+            {
+              name: "submissionCloseBlock",
+              type: "uint64",
+              internalType: "uint64",
+            },
+            {
+              name: "finalizeEntropyBlock",
+              type: "uint64",
+              internalType: "uint64",
+            },
+            {
+              name: "finalizeBlockhashExpiresAt",
+              type: "uint64",
+              internalType: "uint64",
+            },
+            {
+              name: "settleBlockhashExpiresAt",
+              type: "uint64",
+              internalType: "uint64",
+            },
+            {
+              name: "blocksUntilFinalizeExpiry",
+              type: "uint64",
+              internalType: "uint64",
+            },
+            {
+              name: "blocksUntilSettleExpiry",
+              type: "uint64",
+              internalType: "uint64",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getRaceById",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "bettingCloseBlock",
+              type: "uint64",
+              internalType: "uint64",
+            },
+            {
+              name: "settled",
+              type: "bool",
+              internalType: "bool",
+            },
+            {
+              name: "winner",
+              type: "uint8",
+              internalType: "uint8",
+            },
+            {
+              name: "seed",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+            {
+              name: "totalPot",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "totalOnLane",
+              type: "uint256[6]",
+              internalType: "uint256[6]",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getRaceDeadHeatById",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "deadHeatCount",
+              type: "uint8",
+              internalType: "uint8",
+            },
+            {
+              name: "winners",
+              type: "uint8[6]",
+              internalType: "uint8[6]",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getRaceEntry",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "index",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "tokenId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "submitter",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getRaceEntryCount",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getRaceFlagsById",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "settled",
+              type: "bool",
+              internalType: "bool",
+            },
+            {
+              name: "giraffesFinalized",
+              type: "bool",
+              internalType: "bool",
+            },
+            {
+              name: "oddsSet",
+              type: "bool",
+              internalType: "bool",
             },
           ],
           stateMutability: "view",
@@ -3392,19 +5090,6 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "getRaceScore",
-          inputs: [],
-          outputs: [
-            {
-              name: "score",
-              type: "uint8[6]",
-              internalType: "uint8[6]",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
           name: "getRaceScoreById",
           inputs: [
             {
@@ -3449,7 +5134,31 @@ const deployedContracts = {
             {
               name: "",
               type: "address",
-              internalType: "contract IGiraffeNFT",
+              internalType: "address",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "hasSubmitted",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "user",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "bool",
+              internalType: "bool",
             },
           ],
           stateMutability: "view",
@@ -3470,9 +5179,27 @@ const deployedContracts = {
         {
           type: "function",
           name: "houseGiraffeTokenIds",
-          inputs: [
+          inputs: [],
+          outputs: [
             {
               name: "",
+              type: "uint256[6]",
+              internalType: "uint256[6]",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "isTokenEntered",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "tokenId",
               type: "uint256",
               internalType: "uint256",
             },
@@ -3480,8 +5207,8 @@ const deployedContracts = {
           outputs: [
             {
               name: "",
-              type: "uint256",
-              internalType: "uint256",
+              type: "bool",
+              internalType: "bool",
             },
           ],
           stateMutability: "view",
@@ -3694,7 +5421,7 @@ const deployedContracts = {
             {
               name: "",
               type: "address",
-              internalType: "contract GiraffeRaceSimulator",
+              internalType: "address",
             },
           ],
           stateMutability: "view",
@@ -3724,6 +5451,25 @@ const deployedContracts = {
           ],
           outputs: [],
           stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "supportsInterface",
+          inputs: [
+            {
+              name: "_interfaceId",
+              type: "bytes4",
+              internalType: "bytes4",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "bool",
+              internalType: "bool",
+            },
+          ],
+          stateMutability: "view",
         },
         {
           type: "function",
@@ -3759,7 +5505,7 @@ const deployedContracts = {
             {
               name: "",
               type: "address",
-              internalType: "contract HouseTreasury",
+              internalType: "address",
             },
           ],
           stateMutability: "view",
@@ -3785,7 +5531,7 @@ const deployedContracts = {
             {
               name: "",
               type: "address",
-              internalType: "contract IWinProbTable6",
+              internalType: "address",
             },
           ],
           stateMutability: "view",
@@ -4097,159 +5843,9 @@ const deployedContracts = {
           ],
           anonymous: false,
         },
-        {
-          type: "error",
-          name: "AlreadyBet",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "AlreadyClaimed",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "AlreadySettled",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "AlreadySubmitted",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "BetTooLarge",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "BettingClosed",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "BettingNotOpen",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "BlockhashUnavailable",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "CooldownNotElapsed",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "EntryPoolFull",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "GiraffeNotAssigned",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "GiraffesAlreadyFinalized",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "HouseEdgeTooHigh",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "InsufficientBankroll",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "InvalidHouseGiraffe",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "InvalidLane",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "InvalidOdds",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "InvalidRace",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "NoClaimableBets",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "NotSettled",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "NotTokenOwner",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "NotTreasuryOwner",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "NotWinner",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "OddsAlreadySet",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "OddsNotSet",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "PreviousRaceNotSettled",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "RaceNotReady",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "SubmissionsClosed",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "TokenAlreadyEntered",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "ZeroBet",
-          inputs: [],
-        },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 3,
+      deployedOnBlock: 4,
     },
   },
 } as const;

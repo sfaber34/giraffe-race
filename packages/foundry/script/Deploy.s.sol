@@ -1,7 +1,6 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "./DeployHelpers.s.sol";
 import { DeployDiamond } from "./DeployDiamond.s.sol";
 
 /**
@@ -9,13 +8,10 @@ import { DeployDiamond } from "./DeployDiamond.s.sol";
  * @dev Run this when you want to deploy multiple contracts at once
  *
  * Example: yarn deploy # runs this script(without`--file` flag)
+ *
+ * This script inherits from DeployDiamond to deploy the GiraffeRace Diamond.
+ * The run() function is inherited from DeployDiamond.
  */
-contract DeployScript is ScaffoldETHDeploy {
-    function run() external {
-        // Deploys all your contracts sequentially
-        // Add new deployments here when needed
-
-        DeployDiamond deployDiamond = new DeployDiamond();
-        deployDiamond.run();
-    }
+contract DeployScript is DeployDiamond {
+    // Inherits run() from DeployDiamond which uses ScaffoldEthDeployerRunner modifier
 }
