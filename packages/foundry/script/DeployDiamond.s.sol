@@ -238,15 +238,14 @@ contract DeployDiamond is ScaffoldETHDeploy {
     }
 
     function _getAdminSelectors() internal pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](8);
+        bytes4[] memory selectors = new bytes4[](7);
         selectors[0] = AdminFacet.setHouseEdgeBps.selector;
         selectors[1] = AdminFacet.setMaxBetAmount.selector;
         selectors[2] = AdminFacet.setWinProbTable.selector;
-        selectors[3] = AdminFacet.setRaceOdds.selector;
-        selectors[4] = AdminFacet.treasuryOwner.selector;
-        selectors[5] = AdminFacet.houseEdgeBps.selector;
-        selectors[6] = AdminFacet.maxBetAmount.selector;
-        selectors[7] = AdminFacet.houseGiraffeTokenIds.selector;
+        selectors[3] = AdminFacet.treasuryOwner.selector;
+        selectors[4] = AdminFacet.houseEdgeBps.selector;
+        selectors[5] = AdminFacet.maxBetAmount.selector;
+        selectors[6] = AdminFacet.houseGiraffeTokenIds.selector;
         return selectors;
     }
 

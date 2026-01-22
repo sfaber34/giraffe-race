@@ -30,7 +30,6 @@ interface IGiraffeRace {
     function setHouseEdgeBps(uint16 newEdgeBps) external;
     function setMaxBetAmount(uint256 newMaxBet) external;
     function setWinProbTable(address _winProbTable) external;
-    function setRaceOdds(uint256 raceId, uint32[6] calldata decimalOddsBps) external;
     function treasuryOwner() external view returns (address);
     function houseEdgeBps() external view returns (uint16);
     function maxBetAmount() external view returns (uint256);

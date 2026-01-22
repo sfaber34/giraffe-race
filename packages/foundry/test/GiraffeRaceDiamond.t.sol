@@ -148,15 +148,14 @@ contract GiraffeRaceDiamondTest is Test {
         });
 
         // AdminFacet
-        bytes4[] memory adminSelectors = new bytes4[](8);
+        bytes4[] memory adminSelectors = new bytes4[](7);
         adminSelectors[0] = AdminFacet.setHouseEdgeBps.selector;
         adminSelectors[1] = AdminFacet.setMaxBetAmount.selector;
         adminSelectors[2] = AdminFacet.setWinProbTable.selector;
-        adminSelectors[3] = AdminFacet.setRaceOdds.selector;
-        adminSelectors[4] = AdminFacet.treasuryOwner.selector;
-        adminSelectors[5] = AdminFacet.houseEdgeBps.selector;
-        adminSelectors[6] = AdminFacet.maxBetAmount.selector;
-        adminSelectors[7] = AdminFacet.houseGiraffeTokenIds.selector;
+        adminSelectors[3] = AdminFacet.treasuryOwner.selector;
+        adminSelectors[4] = AdminFacet.houseEdgeBps.selector;
+        adminSelectors[5] = AdminFacet.maxBetAmount.selector;
+        adminSelectors[6] = AdminFacet.houseGiraffeTokenIds.selector;
         cut[1] = LibDiamond.FacetCut({
             facetAddress: address(adminFacet),
             action: LibDiamond.FacetCutAction.Add,
