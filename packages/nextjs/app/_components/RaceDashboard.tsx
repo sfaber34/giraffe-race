@@ -793,6 +793,11 @@ export const RaceDashboard = () => {
   }, [parsed?.seed]);
 
   // Start-delay logic (3s hold at start line)
+  // Use a ref to read the current startDelayRemainingMs value without adding it to deps,
+  // preventing an infinite loop where cleanup sets state that triggers the effect again.
+  const startDelayRemainingMsRef = useRef(startDelayRemainingMs);
+  startDelayRemainingMsRef.current = startDelayRemainingMs;
+
   useEffect(() => {
     if (!simulation) return;
     if (!isPlaying) return;
@@ -804,7 +809,7 @@ export const RaceDashboard = () => {
       startDelayTimeoutRef.current = null;
     }
 
-    const remaining = Math.max(0, Math.floor(startDelayRemainingMs));
+    const remaining = Math.max(0, Math.floor(startDelayRemainingMsRef.current));
     startDelayEndAtRef.current = Date.now() + remaining;
 
     startDelayTimeoutRef.current = window.setTimeout(() => {
@@ -826,7 +831,7 @@ export const RaceDashboard = () => {
         startDelayEndAtRef.current = null;
       }
     };
-  }, [simulation, isPlaying, raceStarted, frame, startDelayRemainingMs]);
+  }, [simulation, isPlaying, raceStarted, frame]);
 
   // While the start-delay is active, tick remaining ms so the UI can show 3..2..1 smoothly.
   useEffect(() => {

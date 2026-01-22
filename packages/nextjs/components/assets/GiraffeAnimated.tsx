@@ -422,6 +422,10 @@ export function GiraffeAnimated({
       ["--giraffe-anim-state" as any]: playing ? "running" : "paused",
       width: `${sizePx}px`,
       height: `${sizePx}px`,
+      // Force GPU compositing to fix Chrome bug where CSS animations don't start
+      // until the page is scrolled. This creates a compositor layer immediately.
+      willChange: "transform",
+      transform: "translateZ(0)",
     } as React.CSSProperties;
   }, [playing, sizePx]);
 
