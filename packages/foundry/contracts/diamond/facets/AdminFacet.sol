@@ -66,12 +66,13 @@ contract AdminFacet {
 
         // Validate overround
         uint256 invSumBps = 0;
-        for (uint8 i = 0; i < GiraffeRaceStorage.LANE_COUNT; i++) {
+        for (uint8 i = 0; i < GiraffeRaceStorage.LANE_COUNT; ) {
             uint32 o = decimalOddsBps[i];
             if (o < GiraffeRaceStorage.MIN_DECIMAL_ODDS_BPS) revert GiraffeRaceStorage.InvalidOdds();
             
             uint256 num = uint256(GiraffeRaceStorage.ODDS_SCALE) * uint256(GiraffeRaceStorage.ODDS_SCALE);
             invSumBps += (num + uint256(o) - 1) / uint256(o);
+            unchecked { ++i; }
         }
 
         uint256 minOverroundBps = (

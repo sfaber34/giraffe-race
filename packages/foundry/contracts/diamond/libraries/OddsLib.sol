@@ -7,12 +7,9 @@ import { GiraffeRaceStorage } from "./GiraffeRaceStorage.sol";
  * @title OddsLib
  * @notice Library for odds calculation and validation
  * @dev Extracted from GiraffeRace to reduce contract size and improve reusability
+ *      Uses constants from GiraffeRaceStorage (except for array sizes which require literals)
  */
 library OddsLib {
-    uint16 internal constant ODDS_SCALE = 10000;
-    uint32 internal constant MIN_DECIMAL_ODDS_BPS = 10100; // 1.01x minimum
-    uint8 internal constant LANE_COUNT = 6;
-
     /// @notice Convert win probability (in bps) to decimal odds with house edge
     /// @param probBps Win probability in basis points (e.g., 1667 = 16.67%)
     /// @param houseEdgeBps House edge in basis points (e.g., 500 = 5%)
@@ -26,11 +23,11 @@ library OddsLib {
         
         // Decimal odds formula: (1 - houseEdge) / probability
         // In basis points: (ODDS_SCALE * (ODDS_SCALE - houseEdgeBps)) / probBps
-        uint256 odds = (uint256(ODDS_SCALE) * uint256(ODDS_SCALE - houseEdgeBps)) / uint256(probBps);
+        uint256 odds = (uint256(GiraffeRaceStorage.ODDS_SCALE) * uint256(GiraffeRaceStorage.ODDS_SCALE - houseEdgeBps)) / uint256(probBps);
         
         // Apply minimum odds floor
-        if (odds < MIN_DECIMAL_ODDS_BPS) {
-            odds = MIN_DECIMAL_ODDS_BPS;
+        if (odds < GiraffeRaceStorage.MIN_DECIMAL_ODDS_BPS) {
+            odds = GiraffeRaceStorage.MIN_DECIMAL_ODDS_BPS;
         }
         
         return uint32(odds);
@@ -42,23 +39,24 @@ library OddsLib {
     /// @param houseEdgeBps House edge in basis points
     /// @return valid True if odds meet the overround requirement
     function validateOverround(
-        uint32[LANE_COUNT] memory decimalOddsBps,
+        uint32[6] memory decimalOddsBps, // Literal 6 required by Solidity for array size
         uint16 houseEdgeBps
     ) internal pure returns (bool valid) {
         uint256 invSumBps = 0;
         
-        for (uint8 i = 0; i < LANE_COUNT; i++) {
+        for (uint8 i = 0; i < GiraffeRaceStorage.LANE_COUNT; ) {
             uint32 o = decimalOddsBps[i];
-            if (o < MIN_DECIMAL_ODDS_BPS) return false;
+            if (o < GiraffeRaceStorage.MIN_DECIMAL_ODDS_BPS) return false;
             
             // inv in bps: (ODDS_SCALE^2 / o) with ceil division
-            uint256 num = uint256(ODDS_SCALE) * uint256(ODDS_SCALE);
+            uint256 num = uint256(GiraffeRaceStorage.ODDS_SCALE) * uint256(GiraffeRaceStorage.ODDS_SCALE);
             invSumBps += (num + uint256(o) - 1) / uint256(o);
+            unchecked { ++i; }
         }
         
         // Minimum overround: ODDS_SCALE^2 / (ODDS_SCALE - houseEdgeBps) with ceil
-        uint256 minOverroundBps = (uint256(ODDS_SCALE) * uint256(ODDS_SCALE) + (ODDS_SCALE - houseEdgeBps) - 1)
-            / (ODDS_SCALE - houseEdgeBps);
+        uint256 minOverroundBps = (uint256(GiraffeRaceStorage.ODDS_SCALE) * uint256(GiraffeRaceStorage.ODDS_SCALE) + (GiraffeRaceStorage.ODDS_SCALE - houseEdgeBps) - 1)
+            / (GiraffeRaceStorage.ODDS_SCALE - houseEdgeBps);
         
         return invSumBps >= minOverroundBps;
     }
@@ -69,28 +67,30 @@ library OddsLib {
     /// @param scores Lane scores (1-10)
     /// @return adjusted Adjusted probabilities with averaged values for same-score groups
     function adjustProbabilitiesForSymmetry(
-        uint16[LANE_COUNT] memory probsBps,
-        uint8[LANE_COUNT] memory scores
-    ) internal pure returns (uint16[LANE_COUNT] memory adjusted) {
+        uint16[6] memory probsBps, // Literal 6 required by Solidity for array size
+        uint8[6] memory scores
+    ) internal pure returns (uint16[6] memory adjusted) {
         adjusted = probsBps;
         
         // Group lanes by score and average their probabilities
-        for (uint8 i = 0; i < LANE_COUNT; i++) {
+        for (uint8 i = 0; i < GiraffeRaceStorage.LANE_COUNT; ) {
             uint256 sum = uint256(probsBps[i]);
             uint8 count = 1;
             
             // Find all lanes with the same score
-            for (uint8 j = 0; j < LANE_COUNT; j++) {
+            for (uint8 j = 0; j < GiraffeRaceStorage.LANE_COUNT; ) {
                 if (j != i && scores[j] == scores[i]) {
                     sum += uint256(probsBps[j]);
-                    count++;
+                    unchecked { ++count; }
                 }
+                unchecked { ++j; }
             }
             
             // Average the probabilities for this score group
             if (count > 1) {
                 adjusted[i] = uint16((sum + (count / 2)) / count);
             }
+            unchecked { ++i; }
         }
     }
 
@@ -99,11 +99,12 @@ library OddsLib {
     /// @param houseEdgeBps House edge in basis points
     /// @return oddsDecimalBps Array of decimal odds in basis points
     function probabilitiesToOdds(
-        uint16[LANE_COUNT] memory probsBps,
+        uint16[6] memory probsBps, // Literal 6 required by Solidity for array size
         uint16 houseEdgeBps
-    ) internal pure returns (uint32[LANE_COUNT] memory oddsDecimalBps) {
-        for (uint8 i = 0; i < LANE_COUNT; i++) {
+    ) internal pure returns (uint32[6] memory oddsDecimalBps) {
+        for (uint8 i = 0; i < GiraffeRaceStorage.LANE_COUNT; ) {
             oddsDecimalBps[i] = probabilityToOdds(probsBps[i], houseEdgeBps);
+            unchecked { ++i; }
         }
     }
 

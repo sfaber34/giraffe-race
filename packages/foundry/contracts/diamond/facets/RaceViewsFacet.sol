@@ -7,14 +7,16 @@ import { GiraffeRaceStorage } from "../libraries/GiraffeRaceStorage.sol";
  * @title RaceViewsFacet
  * @notice Read-only functions for race state, giraffe assignments, and simulation
  * @dev Consolidates all view functions for UI/bot consumption
+ *      Note: Local LANE_COUNT constant required for array size in return types (Solidity limitation)
  */
 contract RaceViewsFacet {
-    uint8 internal constant LANE_COUNT = 6;
+    // Local constant required for array sizes in function return types (Solidity limitation)
+    uint8 private constant LANE_COUNT = 6;
 
     // ============ Constants ============
 
     function laneCount() external pure returns (uint8) {
-        return LANE_COUNT;
+        return GiraffeRaceStorage.LANE_COUNT;
     }
 
     function tickCount() external pure returns (uint16) {

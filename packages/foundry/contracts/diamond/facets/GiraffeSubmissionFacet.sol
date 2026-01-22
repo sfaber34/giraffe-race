@@ -14,11 +14,7 @@ contract GiraffeSubmissionFacet {
     function submitGiraffe(uint256 tokenId) external {
         GiraffeRaceStorage.Layout storage s = GiraffeRaceStorage.layout();
         
-        // Races must be explicitly created
-        if (s.nextRaceId == 0) revert GiraffeRaceStorage.InvalidRace();
-        if (s.races[s.nextRaceId - 1].settled) revert GiraffeRaceStorage.InvalidRace();
-
-        uint256 raceId = _activeRaceId(s);
+        uint256 raceId = GiraffeRaceStorage.activeRaceId();
         GiraffeRaceStorage.Race storage r = s.races[raceId];
         
         // Submissions close before finalization/betting
@@ -29,8 +25,9 @@ contract GiraffeSubmissionFacet {
         if (s.giraffeNft.ownerOf(tokenId) != msg.sender) revert GiraffeRaceStorage.NotTokenOwner();
         
         // Prevent submitting house giraffes
-        for (uint256 i = 0; i < GiraffeRaceStorage.LANE_COUNT; i++) {
+        for (uint256 i = 0; i < GiraffeRaceStorage.LANE_COUNT; ) {
             if (s.houseGiraffeTokenIds[i] == tokenId) revert GiraffeRaceStorage.InvalidHouseGiraffe();
+            unchecked { ++i; }
         }
         
         if (s.tokenEntered[raceId][tokenId]) revert GiraffeRaceStorage.TokenAlreadyEntered();
@@ -71,13 +68,5 @@ contract GiraffeSubmissionFacet {
     function getRaceEntry(uint256 raceId, uint256 index) external view returns (uint256 tokenId, address submitter) {
         GiraffeRaceStorage.RaceEntry storage entry = GiraffeRaceStorage.layout().raceEntries[raceId][index];
         return (entry.tokenId, entry.submitter);
-    }
-
-    // ============ Internal Helpers ============
-
-    function _activeRaceId(GiraffeRaceStorage.Layout storage s) internal view returns (uint256 raceId) {
-        if (s.nextRaceId == 0) revert GiraffeRaceStorage.InvalidRace();
-        raceId = s.nextRaceId - 1;
-        if (s.races[raceId].settled) revert GiraffeRaceStorage.InvalidRace();
     }
 }

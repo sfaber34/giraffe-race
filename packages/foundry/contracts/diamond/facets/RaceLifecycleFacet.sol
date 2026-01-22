@@ -2,7 +2,7 @@
 pragma solidity ^0.8.19;
 
 import { GiraffeRaceStorage } from "../libraries/GiraffeRaceStorage.sol";
-import { ClaimLib } from "../libraries/ClaimLib.sol";
+import { SettlementLib } from "../libraries/SettlementLib.sol";
 import { OddsLib } from "../libraries/OddsLib.sol";
 import { DeterministicDice } from "../../libraries/DeterministicDice.sol";
 
@@ -46,7 +46,7 @@ contract RaceLifecycleFacet {
     /// @dev Sets the betting window and assigns giraffes to lanes
     function finalizeRaceGiraffes() external {
         GiraffeRaceStorage.Layout storage s = GiraffeRaceStorage.layout();
-        uint256 raceId = _activeRaceId(s);
+        uint256 raceId = GiraffeRaceStorage.activeRaceId();
         GiraffeRaceStorage.Race storage r = s.races[raceId];
         
         if (r.settled) revert GiraffeRaceStorage.AlreadySettled();
@@ -65,59 +65,11 @@ contract RaceLifecycleFacet {
     /// @notice Settle the current active race
     function settleRace() external {
         GiraffeRaceStorage.Layout storage s = GiraffeRaceStorage.layout();
-        uint256 raceId = _activeRaceId(s);
-        _settleRace(s, raceId);
-    }
-
-    /// @notice Internal settlement logic (also called by claim functions)
-    function _settleRace(GiraffeRaceStorage.Layout storage s, uint256 raceId) internal {
-        GiraffeRaceStorage.Race storage r = s.races[raceId];
-        
-        if (r.submissionCloseBlock == 0) revert GiraffeRaceStorage.InvalidRace();
-        if (r.settled) revert GiraffeRaceStorage.AlreadySettled();
-        if (!r.giraffesFinalized) revert GiraffeRaceStorage.RaceNotReady();
-        if (r.bettingCloseBlock == 0) revert GiraffeRaceStorage.RaceNotReady();
-        if (block.number <= r.bettingCloseBlock) revert GiraffeRaceStorage.RaceNotReady();
-        
-        // Fixed odds required only if there were bets
-        if (r.totalPot != 0 && !r.oddsSet) revert GiraffeRaceStorage.OddsNotSet();
-
-        bytes32 bh = blockhash(r.bettingCloseBlock);
-        if (bh == bytes32(0)) revert GiraffeRaceStorage.BlockhashUnavailable();
-
-        bytes32 baseSeed = keccak256(abi.encodePacked(bh, raceId, address(this)));
-        bytes32 simSeed = keccak256(abi.encodePacked(baseSeed, "RACE_SIM"));
-        
-        // Get ALL winners (supports dead heat)
-        (uint8[6] memory winners, uint8 winnerCount,) = 
-            s.simulator.winnersWithScore(simSeed, s.raceScore[raceId]);
-
-        r.settled = true;
-        r.settledAtBlock = uint64(block.number);
-        r.winner = winners[0];
-        r.deadHeatCount = winnerCount;
-        r.winners = winners;
-        r.seed = simSeed;
-
-        // Record liability
-        if (r.totalPot != 0) {
-            s.settledLiability += ClaimLib.calculateRaceLiability(r);
-        }
-
-        if (winnerCount > 1) {
-            emit GiraffeRaceStorage.RaceSettledDeadHeat(raceId, simSeed, winnerCount, winners);
-        } else {
-            emit GiraffeRaceStorage.RaceSettled(raceId, simSeed, r.winner);
-        }
+        uint256 raceId = GiraffeRaceStorage.activeRaceId();
+        SettlementLib.settleRace(s, raceId);
     }
 
     // ============ Internal Helpers ============
-
-    function _activeRaceId(GiraffeRaceStorage.Layout storage s) internal view returns (uint256 raceId) {
-        if (s.nextRaceId == 0) revert GiraffeRaceStorage.InvalidRace();
-        raceId = s.nextRaceId - 1;
-        if (s.races[raceId].settled) revert GiraffeRaceStorage.InvalidRace();
-    }
 
     function _finalizeGiraffes(GiraffeRaceStorage.Layout storage s, uint256 raceId) internal {
         GiraffeRaceStorage.Race storage r = s.races[raceId];
@@ -132,9 +84,10 @@ contract RaceLifecycleFacet {
 
         // Snapshot effective score for each lane
         GiraffeRaceStorage.RaceGiraffes storage raSnapshot = s.raceGiraffes[raceId];
-        for (uint8 lane = 0; lane < GiraffeRaceStorage.LANE_COUNT; lane++) {
+        for (uint8 lane = 0; lane < GiraffeRaceStorage.LANE_COUNT; ) {
             (uint8 r0, uint8 c0, uint8 s0) = s.giraffeNft.statsOf(raSnapshot.tokenIds[lane]);
             s.raceScore[raceId][lane] = OddsLib.calculateEffectiveScore(r0, c0, s0);
+            unchecked { ++lane; }
         }
 
         // Auto-quote fixed odds
@@ -143,8 +96,9 @@ contract RaceLifecycleFacet {
 
         // Emit assignment events
         GiraffeRaceStorage.RaceGiraffes storage ra = s.raceGiraffes[raceId];
-        for (uint8 lane = 0; lane < GiraffeRaceStorage.LANE_COUNT; lane++) {
+        for (uint8 lane = 0; lane < GiraffeRaceStorage.LANE_COUNT; ) {
             emit GiraffeRaceStorage.GiraffeAssigned(raceId, ra.tokenIds[lane], ra.originalOwners[lane], lane);
+            unchecked { ++lane; }
         }
     }
 
@@ -156,8 +110,9 @@ contract RaceLifecycleFacet {
 
         // Fallback if no probability table
         if (address(s.winProbTable) == address(0)) {
-            for (uint8 lane = 0; lane < GiraffeRaceStorage.LANE_COUNT; lane++) {
+            for (uint8 lane = 0; lane < GiraffeRaceStorage.LANE_COUNT; ) {
                 r.decimalOddsBps[lane] = GiraffeRaceStorage.TEMP_FIXED_DECIMAL_ODDS_BPS;
+                unchecked { ++lane; }
             }
             r.oddsSet = true;
             emit GiraffeRaceStorage.RaceOddsSet(raceId, r.decimalOddsBps);
@@ -171,8 +126,9 @@ contract RaceLifecycleFacet {
         uint16[6] memory probsAdj = OddsLib.adjustProbabilitiesForSymmetry(probsBps, scores);
 
         // Convert to odds
-        for (uint8 i = 0; i < GiraffeRaceStorage.LANE_COUNT; i++) {
+        for (uint8 i = 0; i < GiraffeRaceStorage.LANE_COUNT; ) {
             r.decimalOddsBps[i] = OddsLib.probabilityToOdds(probsAdj[i], s.houseEdgeBps);
+            unchecked { ++i; }
         }
 
         r.oddsSet = true;
@@ -198,27 +154,29 @@ contract RaceLifecycleFacet {
         // Build valid entrants list
         uint256[] memory validIdx = new uint256[](n);
         uint256 validCount = 0;
-        for (uint256 i = 0; i < n; i++) {
+        for (uint256 i = 0; i < n; ) {
             GiraffeRaceStorage.RaceEntry storage e = entries[i];
             if (s.giraffeNft.ownerOf(e.tokenId) == e.submitter) {
                 validIdx[validCount++] = i;
             }
+            unchecked { ++i; }
         }
 
         // Select racers
         if (validCount <= GiraffeRaceStorage.LANE_COUNT) {
             uint8 lane = 0;
-            for (uint256 i = 0; i < n && lane < GiraffeRaceStorage.LANE_COUNT; i++) {
+            for (uint256 i = 0; i < n && lane < GiraffeRaceStorage.LANE_COUNT; ) {
                 GiraffeRaceStorage.RaceEntry storage e = entries[i];
                 if (s.giraffeNft.ownerOf(e.tokenId) == e.submitter) {
                     ra.tokenIds[lane] = e.tokenId;
                     ra.originalOwners[lane] = e.submitter;
-                    lane++;
+                    unchecked { ++lane; }
                 }
+                unchecked { ++i; }
             }
             ra.assignedCount = lane;
         } else {
-            for (uint8 lane = 0; lane < GiraffeRaceStorage.LANE_COUNT; lane++) {
+            for (uint8 lane = 0; lane < GiraffeRaceStorage.LANE_COUNT; ) {
                 uint256 remaining = validCount - uint256(lane);
                 (uint256 pick, DeterministicDice.Dice memory updatedDice) = dice.roll(remaining);
                 dice = updatedDice;
@@ -231,12 +189,13 @@ contract RaceLifecycleFacet {
                 GiraffeRaceStorage.RaceEntry storage e = entries[entryIdx];
                 ra.tokenIds[lane] = e.tokenId;
                 ra.originalOwners[lane] = e.submitter;
+                unchecked { ++lane; }
             }
             ra.assignedCount = GiraffeRaceStorage.LANE_COUNT;
         }
 
         // Fill remaining lanes with house giraffes
-        for (uint8 lane = ra.assignedCount; lane < GiraffeRaceStorage.LANE_COUNT; lane++) {
+        for (uint8 lane = ra.assignedCount; lane < GiraffeRaceStorage.LANE_COUNT; ) {
             if (availableCount == 0) revert GiraffeRaceStorage.InvalidHouseGiraffe();
             (uint256 pick, DeterministicDice.Dice memory updatedDice) = dice.roll(availableCount);
             dice = updatedDice;
@@ -253,6 +212,7 @@ contract RaceLifecycleFacet {
             ra.tokenIds[lane] = houseTokenId;
             ra.originalOwners[lane] = s.treasuryOwner;
             emit GiraffeRaceStorage.HouseGiraffeAssigned(raceId, houseTokenId, lane);
+            unchecked { ++lane; }
         }
 
         ra.assignedCount = GiraffeRaceStorage.LANE_COUNT;

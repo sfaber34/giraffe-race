@@ -44,6 +44,12 @@ library GiraffeRaceStorage {
     uint16 internal constant MAX_TICKS = 500;
     uint8 internal constant SPEED_RANGE = 10;
 
+    // ============ Claim Status Constants ============
+    uint8 internal constant CLAIM_STATUS_BLOCKHASH_UNAVAILABLE = 0;
+    uint8 internal constant CLAIM_STATUS_READY_TO_SETTLE = 1;
+    uint8 internal constant CLAIM_STATUS_LOSS = 2;
+    uint8 internal constant CLAIM_STATUS_WIN = 3;
+
     // ============ Structs ============
     
     struct Race {
@@ -195,5 +201,17 @@ library GiraffeRaceStorage {
     
     function enforceIsTreasuryOwner() internal view {
         if (msg.sender != layout().treasuryOwner) revert NotTreasuryOwner();
+    }
+
+    // ============ Shared Helpers ============
+
+    /// @notice Get the current active (unsettled) race ID
+    /// @dev Reverts if no races exist or the latest race is already settled
+    /// @return raceId The active race ID
+    function activeRaceId() internal view returns (uint256 raceId) {
+        Layout storage s = layout();
+        if (s.nextRaceId == 0) revert InvalidRace();
+        raceId = s.nextRaceId - 1;
+        if (s.races[raceId].settled) revert InvalidRace();
     }
 }
