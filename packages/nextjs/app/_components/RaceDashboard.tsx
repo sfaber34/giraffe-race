@@ -18,8 +18,9 @@ const USDC_DECIMALS = 6;
 
 const LANE_COUNT = 6 as const;
 // Keep in sync with `GiraffeRace.sol`
-// Note: This is now a WINDOW size, not offset from race creation
+// Note: These are WINDOW sizes, not offsets from race creation
 const SUBMISSION_WINDOW_BLOCKS = 10n;
+const BETTING_WINDOW_BLOCKS = 10n;
 const SPEED_RANGE = 10;
 const TRACK_LENGTH = 1000;
 const MAX_TICKS = 500;
@@ -1500,7 +1501,7 @@ export const RaceDashboard = () => {
                             <BlockCountdownBar
                               label="Betting closes in"
                               current={blockNumber}
-                              start={submissionCloseBlock ?? undefined}
+                              start={bettingCloseBlock ? bettingCloseBlock - BETTING_WINDOW_BLOCKS : undefined}
                               end={bettingCloseBlock ?? undefined}
                             />
                           </div>
