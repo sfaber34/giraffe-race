@@ -137,17 +137,6 @@ contract GiraffeRaceTest is Test {
         }
     }
 
-    function testReadinessFloorsAt1() public {
-        // Directly exercise the floor behavior via the authorized race address.
-        vm.startPrank(address(race));
-        for (uint256 i = 0; i < 20; i++) {
-            giraffeNft.decreaseReadiness(houseTokenIds[0]);
-        }
-        vm.stopPrank();
-
-        assertEq(uint256(giraffeNft.readinessOf(houseTokenIds[0])), 1);
-    }
-
     function _expectedWinner(bytes32 seed) internal pure returns (uint8) {
         DeterministicDice.Dice memory dice = DeterministicDice.create(seed);
 

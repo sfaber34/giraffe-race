@@ -16,7 +16,6 @@ interface IGiraffeNFT is IERC721 {
     function conditioningOf(uint256 tokenId) external view returns (uint8);
     function speedOf(uint256 tokenId) external view returns (uint8);
     function statsOf(uint256 tokenId) external view returns (uint8 readiness, uint8 conditioning, uint8 speed);
-    function decreaseReadiness(uint256 tokenId) external;
 }
 
 /**
@@ -60,9 +59,6 @@ contract GiraffeRace {
     GiraffeRaceSimulator public simulator;
     HouseTreasury public treasury;
     IWinProbTable6 public winProbTable; // On-chain probability table for odds calculation
-    
-    // NOTE (testing): readiness decay after races is currently disabled in code.
-    // When deploying a live version where readiness should always decay, uncomment the call in `_settleRace`.
 
     struct Race {
         // Betting close block (formerly "closeBlock" in v1).
@@ -474,9 +470,6 @@ contract GiraffeRace {
             }
             settledLiability += raceLiability;
         }
-
-        // TEMP (testing): disable readiness decay after races.
-        // _decreaseReadinessAfterRace(raceId);
 
         if (winnerCount > 1) {
             emit RaceSettledDeadHeat(raceId, simSeed, winnerCount, winners);
@@ -1135,16 +1128,6 @@ contract GiraffeRace {
         }
 
         ra.assignedCount = LANE_COUNT;
-    }
-
-    function _decreaseReadinessAfterRace(uint256 raceId) internal {
-        RaceGiraffes storage ra = raceGiraffes[raceId];
-        for (uint8 lane = 0; lane < LANE_COUNT; lane++) {
-            uint256 tokenId = ra.tokenIds[lane];
-            if (tokenId != 0) {
-                giraffeNft.decreaseReadiness(tokenId);
-            }
-        }
     }
 
     // (Simulation logic moved to `GiraffeRaceSimulator` to stay under the 24KB EIP-170 size limit.)

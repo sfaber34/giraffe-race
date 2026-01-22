@@ -156,13 +156,6 @@ contract GasRaceOpsTest is Test {
         giraffeNft.statsOf(houseTokenIds[0]);
         uint256 gStats = g0 - gasleft();
 
-        // decreaseReadiness() cost (state write). Must be called by race contract address.
-        vm.startPrank(address(race));
-        g0 = gasleft();
-        giraffeNft.decreaseReadiness(houseTokenIds[0]);
-        uint256 gDec = g0 - gasleft();
-        vm.stopPrank();
-
         // simulator winner cost (pure computation for 4 lanes).
         uint8[6] memory score = [uint8(10), 10, 10, 10, 10, 10];
         g0 = gasleft();
@@ -171,7 +164,6 @@ contract GasRaceOpsTest is Test {
 
         console2.log("---- Gas micro-benchmarks (6 lanes) ----");
         console2.log("GiraffeNFT.statsOf:", gStats);
-        console2.log("GiraffeNFT.decreaseReadiness:", gDec);
         console2.log("Simulator.winnerWithScore:", gSimWinner);
     }
 }

@@ -30,7 +30,6 @@ contract GiraffeNFT is ERC721, Ownable {
     // Name collision protection: track which name hashes are used
     mapping(bytes32 => bool) private _usedNames; // nameHash => isUsed
     // Readiness is a simple 1-10 attribute that affects race performance.
-    // New mints start at 10 and decrease by 1 (floored at 1) after running a race.
     mapping(uint256 => uint8) private _readiness; // 0 = legacy/uninitialized (treated as 10)
     // Additional 1-10 attributes that affect race performance.
     // Race performance uses the equally-weighted average of (readiness, conditioning, speed) as an effective score.
@@ -214,19 +213,6 @@ contract GiraffeNFT is ERC721, Ownable {
         readiness = _clampStat(_readiness[tokenId]);
         conditioning = _clampStat(_conditioning[tokenId]);
         speed = _clampStat(_speed[tokenId]);
-    }
-
-    /// @notice Decrease readiness after an NFT runs a race (floored at 1).
-    /// @dev Callable only by the configured `raceContract`.
-    function decreaseReadiness(uint256 tokenId) external onlyRace {
-        require(_ownerOf(tokenId) != address(0), "GiraffeNFT: nonexistent token");
-        uint8 r = _clampStat(_readiness[tokenId]);
-        if (r > 1) {
-            unchecked {
-                r -= 1;
-            }
-        }
-        _readiness[tokenId] = r;
     }
 
     function _mintGiraffe(address to, string memory giraffeName, uint8 readiness) internal returns (uint256 tokenId) {
