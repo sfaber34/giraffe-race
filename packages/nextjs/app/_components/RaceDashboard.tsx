@@ -1354,7 +1354,7 @@ export const RaceDashboard = () => {
                       ) : raceIsOver && myBet?.hasBet && revealedWinner !== null ? (
                         // User placed a bet - show win/lose result with cooldown
                         <div
-                          className="flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-base-100/90 backdrop-blur-sm shadow-lg"
+                          className="flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-base-100/90 backdrop-blur-sm shadow-lg pointer-events-auto"
                           style={{ minWidth: 320 }}
                         >
                           {myBet.lane === revealedWinner ? (
@@ -1363,7 +1363,7 @@ export const RaceDashboard = () => {
                               <div className="text-xl font-semibold text-success/80">
                                 {myBet.claimed
                                   ? "Payout claimed"
-                                  : `Claim your ${estimatedPayoutWei ? formatUnits(estimatedPayoutWei, USDC_DECIMALS) : "—"} USDC payout`}
+                                  : `Claim your ${estimatedPayoutWei ? formatUnits(estimatedPayoutWei, USDC_DECIMALS) : "—"} USDC payout below`}
                               </div>
                             </>
                           ) : (
@@ -1383,11 +1383,21 @@ export const RaceDashboard = () => {
                               />
                             </div>
                           )}
+                          {/* Create Next Race button */}
+                          <button
+                            className="btn btn-primary btn-sm mt-2"
+                            disabled={!cooldownStatus?.canCreate}
+                            onClick={async () => {
+                              await writeGiraffeRaceAsync({ functionName: "createRace" } as any);
+                            }}
+                          >
+                            Create Next Race
+                          </button>
                         </div>
                       ) : raceIsOver && revealedWinner !== null ? (
                         // User did NOT place a bet - show race over with cooldown
                         <div
-                          className="flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-base-100/90 backdrop-blur-sm shadow-lg"
+                          className="flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-base-100/90 backdrop-blur-sm shadow-lg pointer-events-auto"
                           style={{ minWidth: 320 }}
                         >
                           <div className="text-3xl font-black text-primary drop-shadow">Race complete</div>
@@ -1416,6 +1426,16 @@ export const RaceDashboard = () => {
                               />
                             </div>
                           )}
+                          {/* Create Next Race button */}
+                          <button
+                            className="btn btn-primary btn-sm mt-2"
+                            disabled={!cooldownStatus?.canCreate}
+                            onClick={async () => {
+                              await writeGiraffeRaceAsync({ functionName: "createRace" } as any);
+                            }}
+                          >
+                            Create Next Race
+                          </button>
                         </div>
                       ) : null}
                     </>
@@ -1540,7 +1560,7 @@ export const RaceDashboard = () => {
                       ) : status === "settled" || status === "cooldown" ? (
                         // Race is settled or in cooldown - show waiting for next race
                         <div
-                          className="flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-base-100/90 backdrop-blur-sm shadow-lg"
+                          className="flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-base-100/90 backdrop-blur-sm shadow-lg pointer-events-auto"
                           style={{ minWidth: 320 }}
                         >
                           <div className="text-3xl font-black text-primary drop-shadow">Race complete</div>
@@ -1571,15 +1591,34 @@ export const RaceDashboard = () => {
                               />
                             </div>
                           )}
+                          {/* Create Next Race button */}
+                          <button
+                            className="btn btn-primary btn-sm mt-2"
+                            disabled={!cooldownStatus?.canCreate}
+                            onClick={async () => {
+                              await writeGiraffeRaceAsync({ functionName: "createRace" } as any);
+                            }}
+                          >
+                            Create Next Race
+                          </button>
                         </div>
                       ) : status === "no_race" ? (
                         // No race exists - prompt to create one
                         <div
-                          className="flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-base-100/90 backdrop-blur-sm shadow-lg"
+                          className="flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-base-100/90 backdrop-blur-sm shadow-lg pointer-events-auto"
                           style={{ minWidth: 320 }}
                         >
                           <div className="text-3xl font-black text-primary drop-shadow">No race active</div>
                           <div className="text-lg font-semibold text-base-content/70">Create a race to get started</div>
+                          {/* Create Race button */}
+                          <button
+                            className="btn btn-primary btn-sm mt-2"
+                            onClick={async () => {
+                              await writeGiraffeRaceAsync({ functionName: "createRace" } as any);
+                            }}
+                          >
+                            Create Race
+                          </button>
                         </div>
                       ) : null}
                     </>
