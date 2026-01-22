@@ -1280,7 +1280,10 @@ export const RaceDashboard = () => {
                     // Pre-race overlay (submissions open, betting open, bet placed)
                     <>
                       {status === "submissions_open" ? (
-                        <div className="flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-base-100/90 backdrop-blur-sm shadow-lg">
+                        <div
+                          className="flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-base-100/90 backdrop-blur-sm shadow-lg"
+                          style={{ minWidth: 320 }}
+                        >
                           <div className="text-3xl font-black text-primary drop-shadow">Submissions open</div>
                           {submittedTokenId ? (
                             <div className="text-xl font-semibold text-base-content/80 flex items-center gap-2">
@@ -1301,9 +1304,20 @@ export const RaceDashboard = () => {
                           ) : (
                             <div className="text-lg font-semibold text-base-content/70">Enter a giraffe</div>
                           )}
+                          <div className="w-full mt-2">
+                            <BlockCountdownBar
+                              label="Submissions close in"
+                              current={blockNumber}
+                              start={startBlock ?? undefined}
+                              end={submissionCloseBlock ?? undefined}
+                            />
+                          </div>
                         </div>
                       ) : status === "betting_open" ? (
-                        <div className="flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-base-100/90 backdrop-blur-sm shadow-lg">
+                        <div
+                          className="flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-base-100/90 backdrop-blur-sm shadow-lg"
+                          style={{ minWidth: 320 }}
+                        >
                           {myBet?.hasBet ? (
                             <>
                               <div className="text-3xl font-black text-primary drop-shadow">Bet placed</div>
@@ -1329,9 +1343,20 @@ export const RaceDashboard = () => {
                               <div className="text-lg font-semibold text-base-content/70">Pick a giraffe to win</div>
                             </>
                           )}
+                          <div className="w-full mt-2">
+                            <BlockCountdownBar
+                              label="Betting closes in"
+                              current={blockNumber}
+                              start={submissionCloseBlock ?? undefined}
+                              end={parsed?.closeBlock ?? undefined}
+                            />
+                          </div>
                         </div>
                       ) : status === "betting_closed" ? (
-                        <div className="flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-base-100/90 backdrop-blur-sm shadow-lg">
+                        <div
+                          className="flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-base-100/90 backdrop-blur-sm shadow-lg"
+                          style={{ minWidth: 320 }}
+                        >
                           {myBet?.hasBet ? (
                             <>
                               <div className="text-3xl font-black text-primary drop-shadow">Bet placed</div>
