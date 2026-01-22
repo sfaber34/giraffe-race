@@ -760,7 +760,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 2,
+      deployedOnBlock: 5,
     },
     GiraffeNFT: {
       address: "0x8ce361602b935680e8dec218b820ff5056beb7af",
@@ -914,19 +914,6 @@ const deployedContracts = {
             },
           ],
           stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "decreaseReadiness",
-          inputs: [
-            {
-              name: "tokenId",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          outputs: [],
-          stateMutability: "nonpayable",
         },
         {
           type: "function",
@@ -2152,7 +2139,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 2,
+      deployedOnBlock: 5,
     },
     GiraffeRaceSimulator: {
       address: "0xe1aa25618fa0c7a1cfdab5d6b456af611873b629",
@@ -2270,7 +2257,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 3,
+      deployedOnBlock: 2,
     },
     WinProbTableShard0: {
       address: "0xe1da8919f262ee86f9be05059c9280142cf23f48",
@@ -2358,7 +2345,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 5,
+      deployedOnBlock: 3,
     },
     WinProbTableShard2: {
       address: "0xed1db453c3156ff3155a97ad217b3087d5dc5f6e",
@@ -2490,7 +2477,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 4,
+      deployedOnBlock: 5,
     },
     WinProbTableShard5: {
       address: "0x82dc47734901ee7d4f4232f398752cb9dd5daccc",
@@ -2534,7 +2521,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 3,
+      deployedOnBlock: 5,
     },
     WinProbTable6: {
       address: "0x196dbcbb54b8ec4958c959d8949ebfe87ac2aaaf",
@@ -2718,7 +2705,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 4,
+      deployedOnBlock: 5,
     },
     GiraffeRace: {
       address: "0x6379ebd504941f50d5bfde9348b37593bd29c835",
@@ -2732,12 +2719,7 @@ const deployedContracts = {
               internalType: "address",
             },
             {
-              name: "_house",
-              type: "address",
-              internalType: "address",
-            },
-            {
-              name: "_oddsAdmin",
+              name: "_treasuryOwner",
               type: "address",
               internalType: "address",
             },
@@ -2766,19 +2748,6 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "HOUSE_EDGE_BPS",
-          inputs: [],
-          outputs: [
-            {
-              name: "",
-              type: "uint16",
-              internalType: "uint16",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
           name: "LANE_COUNT",
           inputs: [],
           outputs: [
@@ -2793,6 +2762,19 @@ const deployedContracts = {
         {
           type: "function",
           name: "MAX_ENTRIES_PER_RACE",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint16",
+              internalType: "uint16",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "MAX_HOUSE_EDGE_BPS",
           inputs: [],
           outputs: [
             {
@@ -3475,6 +3457,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "houseEdgeBps",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint16",
+              internalType: "uint16",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "houseGiraffeTokenIds",
           inputs: [
             {
@@ -3533,19 +3528,6 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "oddsAdmin",
-          inputs: [],
-          outputs: [
-            {
-              name: "",
-              type: "address",
-              internalType: "address",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
           name: "placeBet",
           inputs: [
             {
@@ -3557,6 +3539,19 @@ const deployedContracts = {
               name: "amount",
               type: "uint256",
               internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "setHouseEdgeBps",
+          inputs: [
+            {
+              name: "newEdgeBps",
+              type: "uint16",
+              internalType: "uint16",
             },
           ],
           outputs: [],
@@ -3890,6 +3885,25 @@ const deployedContracts = {
         },
         {
           type: "event",
+          name: "HouseEdgeUpdated",
+          inputs: [
+            {
+              name: "oldEdgeBps",
+              type: "uint16",
+              indexed: false,
+              internalType: "uint16",
+            },
+            {
+              name: "newEdgeBps",
+              type: "uint16",
+              indexed: false,
+              internalType: "uint16",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
           name: "HouseGiraffeAssigned",
           inputs: [
             {
@@ -4072,6 +4086,11 @@ const deployedContracts = {
         },
         {
           type: "error",
+          name: "HouseEdgeTooHigh",
+          inputs: [],
+        },
+        {
+          type: "error",
           name: "InsufficientBankroll",
           inputs: [],
         },
@@ -4098,11 +4117,6 @@ const deployedContracts = {
         {
           type: "error",
           name: "NoClaimableBets",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "NotOddsAdmin",
           inputs: [],
         },
         {
