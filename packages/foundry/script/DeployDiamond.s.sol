@@ -35,8 +35,20 @@ import { WinProbTableShard5 } from "../contracts/libraries/WinProbTableShard5.so
  *   TREASURY_OWNER   - Controls treasury withdrawals AND owns house NFTs.
  *                      Should be a multisig in production.
  *   USDC_ADDRESS     - USDC contract address. If not set, deploys MockUSDC (local testing only).
+ *
+ * Network-specific defaults:
+ *   - Base Mainnet (8453): Uses native USDC at 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913
+ *   - Base Sepolia (84532): Uses USDC at 0x036CbD53842c5426634e7929541eC2318f3dCF7e
+ *   - Local (31337): Deploys MockUSDC
  */
 contract DeployDiamond is ScaffoldETHDeploy {
+    // Known USDC addresses
+    address constant BASE_MAINNET_USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
+    address constant BASE_SEPOLIA_USDC = 0x036CbD53842c5426634e7929541eC2318f3dCF7e;
+    
+    // Production treasury owner (multisig)
+    address constant PRODUCTION_TREASURY_OWNER = 0x6935d26Ba98b86e07Bedf4FFBded0eA8a9eDD5Fb;
+
     // Facet instances
     DiamondCutFacet diamondCutFacet;
     DiamondLoupeFacet diamondLoupeFacet;
@@ -48,12 +60,30 @@ contract DeployDiamond is ScaffoldETHDeploy {
 
     function run() external ScaffoldEthDeployerRunner {
         // Treasury owner: controls treasury AND owns house NFTs.
-        // In production, this should be a multisig (e.g., Gnosis Safe).
-        // Hardcoded for testing - change for production
-        address treasuryOwner = address(0x668887c62AF23E42aB10105CB4124CF2C656F331);
+        // For production networks (Base), use the production multisig.
+        // For local testing, use the deployer address.
+        address treasuryOwner;
+        if (block.chainid == 8453 || block.chainid == 84532) {
+            // Base Mainnet or Base Sepolia - use production treasury owner
+            treasuryOwner = vm.envOr("TREASURY_OWNER", PRODUCTION_TREASURY_OWNER);
+        } else {
+            // Local testing - use deployer by default
+            treasuryOwner = vm.envOr("TREASURY_OWNER", deployer);
+        }
 
-        // USDC address - if not set, deploy MockUSDC for local testing.
+        // USDC address - use network-specific defaults or env override.
         address usdcAddress = vm.envOr("USDC_ADDRESS", address(0));
+        
+        // If no env override, use network-specific defaults
+        if (usdcAddress == address(0)) {
+            if (block.chainid == 8453) {
+                usdcAddress = BASE_MAINNET_USDC;
+                console.log("Using Base Mainnet USDC:", usdcAddress);
+            } else if (block.chainid == 84532) {
+                usdcAddress = BASE_SEPOLIA_USDC;
+                console.log("Using Base Sepolia USDC:", usdcAddress);
+            }
+        }
 
         // 1. Deploy supporting contracts
         MockUSDC mockUsdc;

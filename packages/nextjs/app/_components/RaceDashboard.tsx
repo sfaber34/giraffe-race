@@ -27,6 +27,7 @@ export const RaceDashboard = () => {
     giraffeRaceContract,
     giraffeNftContract,
     usdcContract,
+    usdcContractName,
     treasuryContract,
     isGiraffeRaceLoading,
     ownedTokenIds,
@@ -118,7 +119,10 @@ export const RaceDashboard = () => {
 
   // Write hooks
   const { writeContractAsync: writeGiraffeRaceAsync } = useScaffoldWriteContract({ contractName: "GiraffeRace" });
-  const { writeContractAsync: writeUsdcAsync } = useScaffoldWriteContract({ contractName: "MockUSDC" as any });
+  // Use dynamic USDC contract name (USDC for Base, MockUSDC for local)
+  const { writeContractAsync: writeUsdcAsync } = useScaffoldWriteContract({
+    contractName: usdcContractName as any,
+  });
 
   // Reset state on race/wallet change
   useEffect(() => {

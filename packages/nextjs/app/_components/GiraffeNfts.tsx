@@ -10,6 +10,7 @@ import {
   useScaffoldReadContract,
   useScaffoldWriteContract,
   useTargetNetwork,
+  useUsdcContract,
 } from "~~/hooks/scaffold-eth";
 import { containsProfanity } from "~~/utils/profanityFilter";
 
@@ -153,43 +154,44 @@ export const GiraffeNfts = () => {
     return !!(treasuryAddress && treasuryAddress !== "0x0000000000000000000000000000000000000000");
   }, [treasuryAddress]);
 
-  // Get USDC contract info for allowance check
-  const { data: usdcContract } = useDeployedContractInfo({
-    contractName: "MockUSDC",
-  });
+  // Get USDC contract info for allowance check (USDC for Base, MockUSDC for local)
+  const { data: usdcContract, contractName: usdcContractName } = useUsdcContract();
 
   // Read user's USDC allowance for GiraffeNFT contract
   const { data: usdcAllowance, refetch: refetchAllowance } = useScaffoldReadContract({
-    contractName: "MockUSDC",
+    contractName: usdcContractName as any,
     functionName: "allowance",
     args: [connectedAddress, giraffeNftContract?.address],
-    query: { enabled: !!connectedAddress && !!giraffeNftContract && !!usdcContract && mintFeeRequired },
-  });
+    query: {
+      enabled: !!connectedAddress && !!giraffeNftContract && !!usdcContract && !!usdcContractName && mintFeeRequired,
+    },
+  } as any);
 
   // Check if user has sufficient allowance
   const hasAllowance = useMemo(() => {
     if (!mintFeeRequired) return true;
     if (!usdcAllowance) return false;
-    return usdcAllowance >= MINT_FEE;
+    return (usdcAllowance as unknown as bigint) >= MINT_FEE;
   }, [mintFeeRequired, usdcAllowance]);
 
   // Read user's USDC balance
   const { data: usdcBalance } = useScaffoldReadContract({
-    contractName: "MockUSDC",
+    contractName: usdcContractName as any,
     functionName: "balanceOf",
     args: [connectedAddress],
-    query: { enabled: !!connectedAddress && !!usdcContract && mintFeeRequired },
-  });
+    query: { enabled: !!connectedAddress && !!usdcContract && !!usdcContractName && mintFeeRequired },
+  } as any);
 
   // Check if user has enough USDC balance
   const hasSufficientBalance = useMemo(() => {
     if (!mintFeeRequired) return true;
     if (!usdcBalance) return false;
-    return usdcBalance >= MINT_FEE;
+    return (usdcBalance as unknown as bigint) >= MINT_FEE;
   }, [mintFeeRequired, usdcBalance]);
 
+  // Use dynamic USDC contract name (USDC for Base, MockUSDC for local)
   const { writeContractAsync: writeUsdcAsync } = useScaffoldWriteContract({
-    contractName: "MockUSDC",
+    contractName: usdcContractName as any,
   });
 
   // Fetch pending commits from chain
@@ -400,7 +402,7 @@ export const GiraffeNfts = () => {
 
     setIsApproving(true);
     try {
-      await writeUsdcAsync({
+      await (writeUsdcAsync as any)({
         functionName: "approve",
         args: [giraffeNftContract.address, MINT_FEE], // Approve exactly 1 mint
       });

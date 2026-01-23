@@ -26,7 +26,7 @@ contract VerifyAll is Script {
     function run() external {
         string memory root = vm.projectRoot();
         string memory path =
-            string.concat(root, "/broadcast/Deploy.s.sol/", vm.toString(block.chainid), "/run-latest.json");
+            string.concat(root, "/broadcast/DeployDiamond.s.sol/", vm.toString(block.chainid), "/run-latest.json");
         string memory content = vm.readFile(path);
 
         while (nextTransaction(content)) {

@@ -21,6 +21,7 @@ import {
   useScaffoldEventHistory,
   useScaffoldReadContract,
   useTargetNetwork,
+  useUsdcContract,
 } from "~~/hooks/scaffold-eth";
 
 export const useRaceData = () => {
@@ -37,7 +38,7 @@ export const useRaceData = () => {
     contractName: "GiraffeRace",
   });
   const { data: giraffeNftContract } = useDeployedContractInfo({ contractName: "GiraffeNFT" });
-  const { data: usdcContract } = useDeployedContractInfo({ contractName: "MockUSDC" as any });
+  const { data: usdcContract, contractName: usdcContractName } = useUsdcContract();
   const { data: treasuryContract } = useDeployedContractInfo({ contractName: "HouseTreasury" as any });
 
   // Owned tokens
@@ -164,19 +165,19 @@ export const useRaceData = () => {
     }
   }, [maxBetAmountData]);
 
-  // USDC balances
+  // USDC balances - use the dynamic contract name (USDC for Base, MockUSDC for local)
   const { data: userUsdcBalance } = useScaffoldReadContract({
-    contractName: "MockUSDC" as any,
+    contractName: usdcContractName as any,
     functionName: "balanceOf" as any,
     args: [connectedAddress],
-    query: { enabled: !!usdcContract && !!connectedAddress },
+    query: { enabled: !!usdcContract && !!usdcContractName && !!connectedAddress },
   } as any);
 
   const { data: userUsdcAllowance } = useScaffoldReadContract({
-    contractName: "MockUSDC" as any,
+    contractName: usdcContractName as any,
     functionName: "allowance" as any,
     args: [connectedAddress, treasuryContract?.address],
-    query: { enabled: !!usdcContract && !!treasuryContract && !!connectedAddress },
+    query: { enabled: !!usdcContract && !!usdcContractName && !!treasuryContract && !!connectedAddress },
   } as any);
 
   const { data: treasuryBalance } = useScaffoldReadContract({
@@ -196,6 +197,7 @@ export const useRaceData = () => {
     giraffeRaceContract,
     giraffeNftContract,
     usdcContract,
+    usdcContractName,
     treasuryContract,
     isGiraffeRaceLoading,
 
