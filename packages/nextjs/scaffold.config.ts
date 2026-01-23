@@ -17,8 +17,9 @@ const scaffoldConfig = {
   // The networks on which your DApp is live
   // Use chains.base for Base Mainnet, chains.foundry for local development
   targetNetworks: [chains.base],
-  // The interval at which your front-end polls the RPC servers for new data (it has no effect if you only target the local network (default is 4000))
-  pollingInterval: 30000,
+  // The interval at which your front-end polls the RPC servers for new data
+  // Base has ~2 second block times, so 4 seconds keeps UI responsive
+  pollingInterval: 4000,
   // This is ours Alchemy's default API key.
   // You can get your own at https://dashboard.alchemyapi.io
   // It's recommended to store it in an env variable:
