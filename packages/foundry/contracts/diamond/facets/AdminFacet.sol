@@ -47,10 +47,50 @@ contract AdminFacet {
         emit GiraffeRaceStorage.WinProbTableUpdated(_winProbTable);
     }
 
+    /// @notice Cancel a stuck race and enable refunds for all bettors
+    /// @dev Only callable by treasuryOwner. Use when a race cannot be settled (e.g., blockhash expired).
+    ///      After cancellation, bettors can claim() to receive their original bet back.
+    /// @param raceId The race ID to cancel
+    function adminCancelRace(uint256 raceId) external {
+        GiraffeRaceStorage.enforceIsTreasuryOwner();
+        
+        GiraffeRaceStorage.Layout storage s = GiraffeRaceStorage.layout();
+        
+        // Validate race exists
+        if (raceId >= s.nextRaceId) revert GiraffeRaceStorage.InvalidRace();
+        
+        GiraffeRaceStorage.Race storage r = s.races[raceId];
+        
+        // Cannot cancel already settled race
+        if (r.settled) revert GiraffeRaceStorage.AlreadySettled();
+        
+        // Cannot cancel already cancelled race
+        if (r.cancelled) revert GiraffeRaceStorage.AlreadyCancelled();
+        
+        // Mark as cancelled and settled (so new race can be created)
+        r.cancelled = true;
+        r.settled = true;
+        r.settledAtBlock = uint64(block.number);
+        
+        emit GiraffeRaceStorage.RaceCancelled(raceId);
+    }
+
     // ============ View Functions ============
 
     function treasuryOwner() external view returns (address) {
         return GiraffeRaceStorage.layout().treasuryOwner;
+    }
+
+    // DEBUG: Return raw storage info
+    function debugStorage() external view returns (
+        bytes32 storageSlot,
+        address storedTreasuryOwner,
+        address storedGiraffeNft
+    ) {
+        storageSlot = GiraffeRaceStorage.STORAGE_SLOT;
+        GiraffeRaceStorage.Layout storage s = GiraffeRaceStorage.layout();
+        storedTreasuryOwner = s.treasuryOwner;
+        storedGiraffeNft = address(s.giraffeNft);
     }
 
     function houseEdgeBps() external view returns (uint16) {

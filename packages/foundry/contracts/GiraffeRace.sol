@@ -11,6 +11,40 @@ import { GiraffeRaceStorage } from "./diamond/libraries/GiraffeRaceStorage.sol";
  *      All functions are marked external and have empty bodies to generate the ABI.
  */
 interface IGiraffeRace {
+    // ============ Errors ============
+    error InvalidRace();
+    error BetTooLarge();
+    error HouseEdgeTooHigh();
+    error NoClaimableBets();
+    error BettingClosed();
+    error BettingNotOpen();
+    error SubmissionsClosed();
+    error AlreadyBet();
+    error InvalidLane();
+    error ZeroBet();
+    error AlreadySettled();
+    error NotSettled();
+    error BlockhashUnavailable();
+    error RaceNotReady();
+    error NotWinner();
+    error AlreadyClaimed();
+    error AlreadySubmitted();
+    error InvalidHouseGiraffe();
+    error GiraffeNotAssigned();
+    error NotTokenOwner();
+    error TokenAlreadyEntered();
+    error EntryPoolFull();
+    error GiraffesAlreadyFinalized();
+    error PreviousRaceNotSettled();
+    error CooldownNotElapsed();
+    error NotTreasuryOwner();
+    error OddsNotSet();
+    error OddsAlreadySet();
+    error InvalidOdds();
+    error InsufficientBankroll();
+    error RaceNotCancellable();
+    error AlreadyCancelled();
+
     // ============ Events ============
     event RaceCreated(uint256 indexed raceId, uint64 submissionCloseBlock);
     event BettingWindowOpened(uint256 indexed raceId, uint64 bettingCloseBlock);
@@ -25,11 +59,13 @@ interface IGiraffeRace {
     event HouseGiraffeAssigned(uint256 indexed raceId, uint256 indexed tokenId, uint8 lane);
     event HouseEdgeUpdated(uint16 oldEdgeBps, uint16 newEdgeBps);
     event MaxBetUpdated(uint256 oldMaxBet, uint256 newMaxBet);
+    event RaceCancelled(uint256 indexed raceId);
 
     // ============ AdminFacet ============
     function setHouseEdgeBps(uint16 newEdgeBps) external;
     function setMaxBetAmount(uint256 newMaxBet) external;
     function setWinProbTable(address _winProbTable) external;
+    function adminCancelRace(uint256 raceId) external;
     function treasuryOwner() external view returns (address);
     function houseEdgeBps() external view returns (uint16);
     function maxBetAmount() external view returns (uint256);
@@ -75,7 +111,7 @@ interface IGiraffeRace {
         uint256 totalPot,
         uint256[6] memory totalOnLane
     );
-    function getRaceFlagsById(uint256 raceId) external view returns (bool settled, bool giraffesFinalized, bool oddsSet);
+    function getRaceFlagsById(uint256 raceId) external view returns (bool settled, bool giraffesFinalized, bool oddsSet, bool cancelled);
     function getRaceScheduleById(uint256 raceId) external view returns (uint64 bettingCloseBlock, uint64 submissionCloseBlock, uint64 settledAtBlock);
     function getRaceOddsById(uint256 raceId) external view returns (bool oddsSet, uint32[6] memory decimalOddsBps);
     function getRaceDeadHeatById(uint256 raceId) external view returns (uint8 deadHeatCount, uint8[6] memory winners);

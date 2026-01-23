@@ -96,8 +96,8 @@ contract BettingFacet {
             uint256 raceId = ids[idx];
             GiraffeRaceStorage.Race storage r = s.races[raceId];
 
-            // On-demand settlement
-            if (!r.settled) {
+            // On-demand settlement (skip if cancelled - no settlement needed)
+            if (!r.settled && !r.cancelled) {
                 SettlementLib.settleRace(s, raceId);
             }
 
@@ -107,6 +107,16 @@ contract BettingFacet {
             if (b.amount == 0 || b.claimed) {
                 idx++;
                 continue;
+            }
+
+            // Handle cancelled races: refund original bet
+            if (r.cancelled) {
+                b.claimed = true;
+                s.nextClaimIndex[bettor] = idx + 1;
+                payout = uint256(b.amount);
+                s.treasury.payWinner(bettor, payout);
+                emit GiraffeRaceStorage.Claimed(raceId, bettor, payout);
+                return payout;
             }
 
             bool isWinner = ClaimLib.isWinnerFromRace(r, b.lane);
@@ -256,6 +266,20 @@ contract BettingFacet {
 
             GiraffeRaceStorage.Race storage r = s.races[rid];
             uint64 cb = r.bettingCloseBlock;
+
+            // Handle cancelled races: show refund status
+            if (r.cancelled) {
+                out.hasClaim = true;
+                out.raceId = rid;
+                out.status = GiraffeRaceStorage.CLAIM_STATUS_REFUND;
+                out.betLane = b.lane;
+                out.betTokenId = s.raceGiraffes[rid].tokenIds[b.lane];
+                out.betAmount = b.amount;
+                out.winner = 0;
+                out.payout = uint256(b.amount); // Refund = original bet
+                out.bettingCloseBlock = cb;
+                return out;
+            }
 
             if (!r.settled) {
                 bool ready = cb != 0 && block.number > cb;

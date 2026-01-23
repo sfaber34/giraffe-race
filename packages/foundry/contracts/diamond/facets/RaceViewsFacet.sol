@@ -53,11 +53,11 @@ contract RaceViewsFacet {
     function getRaceFlagsById(uint256 raceId)
         external
         view
-        returns (bool settled, bool giraffesFinalized, bool oddsSet)
+        returns (bool settled, bool giraffesFinalized, bool oddsSet, bool cancelled)
     {
         GiraffeRaceStorage.Race storage r = GiraffeRaceStorage.layout().races[raceId];
-        if (r.submissionCloseBlock == 0) return (false, false, false);
-        return (r.settled, r.giraffesFinalized, r.oddsSet);
+        if (r.submissionCloseBlock == 0) return (false, false, false, false);
+        return (r.settled, r.giraffesFinalized, r.oddsSet, r.cancelled);
     }
 
     function getRaceScheduleById(uint256 raceId)
