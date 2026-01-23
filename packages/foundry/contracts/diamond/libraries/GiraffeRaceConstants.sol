@@ -38,13 +38,13 @@ library GiraffeRaceConstants {
     // ============ Phase Schedule ============
     
     /// @notice Blocks for submission window
-    uint64 internal constant SUBMISSION_WINDOW_BLOCKS = 10;
+    uint64 internal constant SUBMISSION_WINDOW_BLOCKS = 30;
     
     /// @notice Blocks for betting window (after finalization)
-    uint64 internal constant BETTING_WINDOW_BLOCKS = 10;
+    uint64 internal constant BETTING_WINDOW_BLOCKS = 30;
     
     /// @notice Cooldown blocks after settlement before new race
-    uint64 internal constant POST_RACE_COOLDOWN_BLOCKS = 5;
+    uint64 internal constant POST_RACE_COOLDOWN_BLOCKS = 30;
 
     // ============ Limits ============
     

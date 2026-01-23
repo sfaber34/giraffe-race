@@ -68,7 +68,7 @@ export const RaceOverlay = ({
   onCreateRace,
 }: RaceOverlayProps) => {
   const revealedWinner = raceIsOver && parsed?.settled ? parsed.winner : null;
-  const BETTING_WINDOW_BLOCKS = 10n;
+  const BETTING_WINDOW_BLOCKS = 30n;
 
   if (simulation) {
     // Race replay overlay (countdown, GO!, results)

@@ -36,9 +36,9 @@ library GiraffeRaceStorage {
     uint16 internal constant MAX_HOUSE_EDGE_BPS = 3000; // 30% max
     uint32 internal constant MIN_DECIMAL_ODDS_BPS = 10100; // 1.01x
     uint32 internal constant TEMP_FIXED_DECIMAL_ODDS_BPS = 57000; // 5.70x fallback
-    uint64 internal constant SUBMISSION_WINDOW_BLOCKS = 10;
-    uint64 internal constant BETTING_WINDOW_BLOCKS = 10;
-    uint64 internal constant POST_RACE_COOLDOWN_BLOCKS = 5;
+    uint64 internal constant SUBMISSION_WINDOW_BLOCKS = 30;
+    uint64 internal constant BETTING_WINDOW_BLOCKS = 30;
+    uint64 internal constant POST_RACE_COOLDOWN_BLOCKS = 30;
     uint16 internal constant MAX_ENTRIES_PER_RACE = 128;
     uint16 internal constant TRACK_LENGTH = 1000;
     uint16 internal constant MAX_TICKS = 500;
