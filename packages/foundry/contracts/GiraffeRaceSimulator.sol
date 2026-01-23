@@ -2,17 +2,30 @@
 pragma solidity ^0.8.19;
 
 import { DeterministicDice } from "./libraries/DeterministicDice.sol";
+import { GiraffeRaceConstants as C } from "./diamond/libraries/GiraffeRaceConstants.sol";
 
 /// @notice Stateless simulator contract to keep `GiraffeRace` deployed bytecode under the 24KB limit.
 /// @dev Must stay in sync with the on-chain race rules used by GiraffeRace.
 contract GiraffeRaceSimulator {
     using DeterministicDice for DeterministicDice.Dice;
 
+    // NOTE: Solidity requires literal values for array sizes in function signatures.
+    // These MUST match GiraffeRaceConstants - verified by _checkConstants() below.
     uint8 internal constant LANE_COUNT = 6;
     uint16 internal constant TRACK_LENGTH = 1000;
     uint16 internal constant MAX_TICKS = 500;
     uint8 internal constant SPEED_RANGE = 10;
     uint16 internal constant BPS_DENOM = 10000;
+
+    /// @dev Compile-time check that local constants match GiraffeRaceConstants.
+    ///      This function is never called but ensures constants stay in sync.
+    function _checkConstants() internal pure {
+        assert(LANE_COUNT == C.LANE_COUNT);
+        assert(TRACK_LENGTH == C.TRACK_LENGTH);
+        assert(MAX_TICKS == C.MAX_TICKS);
+        assert(SPEED_RANGE == C.SPEED_RANGE);
+        assert(BPS_DENOM == C.ODDS_SCALE);
+    }
 
     /// @notice Deterministically choose a winner given a seed + lane effective score snapshot.
     /// @dev `scores` is a 1-10 value per lane (typically the rounded average of zip/moxie/hustle).
