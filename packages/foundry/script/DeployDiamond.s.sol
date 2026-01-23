@@ -49,7 +49,8 @@ contract DeployDiamond is ScaffoldETHDeploy {
     function run() external ScaffoldEthDeployerRunner {
         // Treasury owner: controls treasury AND owns house NFTs.
         // In production, this should be a multisig (e.g., Gnosis Safe).
-        address treasuryOwner = vm.envOr("TREASURY_OWNER", deployer);
+        // Hardcoded for testing - change for production
+        address treasuryOwner = address(0x668887c62AF23E42aB10105CB4124CF2C656F331);
 
         // USDC address - if not set, deploy MockUSDC for local testing.
         address usdcAddress = vm.envOr("USDC_ADDRESS", address(0));
@@ -238,14 +239,16 @@ contract DeployDiamond is ScaffoldETHDeploy {
     }
 
     function _getAdminSelectors() internal pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](7);
+        bytes4[] memory selectors = new bytes4[](9);
         selectors[0] = AdminFacet.setHouseEdgeBps.selector;
         selectors[1] = AdminFacet.setMaxBetAmount.selector;
         selectors[2] = AdminFacet.setWinProbTable.selector;
-        selectors[3] = AdminFacet.treasuryOwner.selector;
-        selectors[4] = AdminFacet.houseEdgeBps.selector;
-        selectors[5] = AdminFacet.maxBetAmount.selector;
-        selectors[6] = AdminFacet.houseGiraffeTokenIds.selector;
+        selectors[3] = AdminFacet.adminCancelRace.selector;
+        selectors[4] = AdminFacet.treasuryOwner.selector;
+        selectors[5] = AdminFacet.houseEdgeBps.selector;
+        selectors[6] = AdminFacet.maxBetAmount.selector;
+        selectors[7] = AdminFacet.houseGiraffeTokenIds.selector;
+        selectors[8] = AdminFacet.debugStorage.selector;
         return selectors;
     }
 

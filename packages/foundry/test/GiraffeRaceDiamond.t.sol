@@ -148,14 +148,15 @@ contract GiraffeRaceDiamondTest is Test {
         });
 
         // AdminFacet
-        bytes4[] memory adminSelectors = new bytes4[](7);
+        bytes4[] memory adminSelectors = new bytes4[](8);
         adminSelectors[0] = AdminFacet.setHouseEdgeBps.selector;
         adminSelectors[1] = AdminFacet.setMaxBetAmount.selector;
         adminSelectors[2] = AdminFacet.setWinProbTable.selector;
-        adminSelectors[3] = AdminFacet.treasuryOwner.selector;
-        adminSelectors[4] = AdminFacet.houseEdgeBps.selector;
-        adminSelectors[5] = AdminFacet.maxBetAmount.selector;
-        adminSelectors[6] = AdminFacet.houseGiraffeTokenIds.selector;
+        adminSelectors[3] = AdminFacet.adminCancelRace.selector;
+        adminSelectors[4] = AdminFacet.treasuryOwner.selector;
+        adminSelectors[5] = AdminFacet.houseEdgeBps.selector;
+        adminSelectors[6] = AdminFacet.maxBetAmount.selector;
+        adminSelectors[7] = AdminFacet.houseGiraffeTokenIds.selector;
         cut[1] = LibDiamond.FacetCut({
             facetAddress: address(adminFacet),
             action: LibDiamond.FacetCutAction.Add,
@@ -284,11 +285,12 @@ contract GiraffeRaceDiamondTest is Test {
         RaceLifecycleFacet(address(diamond)).finalizeRaceGiraffes();
 
         // Check flags
-        (bool settled, bool giraffesFinalized, bool oddsSet) = 
+        (bool settled, bool giraffesFinalized, bool oddsSet, bool cancelled) = 
             RaceViewsFacet(address(diamond)).getRaceFlagsById(raceId);
         assertFalse(settled);
         assertTrue(giraffesFinalized);
         assertTrue(oddsSet);
+        assertFalse(cancelled);
 
         // Get betting close block
         (uint64 bettingCloseBlock,,) = RaceViewsFacet(address(diamond)).getRaceScheduleById(raceId);
@@ -303,7 +305,7 @@ contract GiraffeRaceDiamondTest is Test {
         // Settle race
         RaceLifecycleFacet(address(diamond)).settleRace();
 
-        (settled,,) = RaceViewsFacet(address(diamond)).getRaceFlagsById(raceId);
+        (settled,,,) = RaceViewsFacet(address(diamond)).getRaceFlagsById(raceId);
         assertTrue(settled);
     }
 

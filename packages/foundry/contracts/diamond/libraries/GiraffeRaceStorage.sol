@@ -49,6 +49,7 @@ library GiraffeRaceStorage {
     uint8 internal constant CLAIM_STATUS_READY_TO_SETTLE = 1;
     uint8 internal constant CLAIM_STATUS_LOSS = 2;
     uint8 internal constant CLAIM_STATUS_WIN = 3;
+    uint8 internal constant CLAIM_STATUS_REFUND = 4;
 
     // ============ Structs ============
     
@@ -59,6 +60,7 @@ library GiraffeRaceStorage {
         bool giraffesFinalized;
         bool oddsSet;
         bool settled;
+        bool cancelled;
         uint8 winner;
         uint8 deadHeatCount;
         bytes32 seed;
@@ -180,6 +182,8 @@ library GiraffeRaceStorage {
     error OddsAlreadySet();
     error InvalidOdds();
     error InsufficientBankroll();
+    error RaceNotCancellable();
+    error AlreadyCancelled();
 
     // ============ Events ============
     
@@ -196,6 +200,7 @@ library GiraffeRaceStorage {
     event HouseGiraffeAssigned(uint256 indexed raceId, uint256 indexed tokenId, uint8 lane);
     event HouseEdgeUpdated(uint16 oldEdgeBps, uint16 newEdgeBps);
     event MaxBetUpdated(uint256 oldMaxBet, uint256 newMaxBet);
+    event RaceCancelled(uint256 indexed raceId);
 
     // ============ Modifiers (as internal functions) ============
     

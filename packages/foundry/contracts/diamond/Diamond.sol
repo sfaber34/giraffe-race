@@ -5,6 +5,7 @@ import { LibDiamond } from "./libraries/LibDiamond.sol";
 import { GiraffeRaceStorage, IGiraffeNFT, IWinProbTable6 } from "./libraries/GiraffeRaceStorage.sol";
 import { GiraffeRaceSimulator } from "../GiraffeRaceSimulator.sol";
 import { HouseTreasury } from "../HouseTreasury.sol";
+import "forge-std/console.sol";
 
 /**
  * @title GiraffeRaceDiamond
@@ -44,6 +45,8 @@ contract GiraffeRaceDiamond {
     }
 
     function _initializeGiraffeRaceStorage(DiamondArgs memory _args) internal {
+        console.log("Diamond init - treasuryOwner arg:", _args.treasuryOwner);
+        
         GiraffeRaceStorage.Layout storage s = GiraffeRaceStorage.layout();
         
         s.giraffeNft = IGiraffeNFT(_args.giraffeNft);
@@ -56,6 +59,8 @@ contract GiraffeRaceDiamond {
         // Set defaults
         s.houseEdgeBps = 500; // 5%
         s.maxBetAmount = 5_000_000; // 5 USDC (6 decimals)
+
+        console.log("Diamond init - treasuryOwner stored:", s.treasuryOwner);
 
         // Validate house giraffe token IDs
         for (uint256 i = 0; i < GiraffeRaceStorage.LANE_COUNT; i++) {

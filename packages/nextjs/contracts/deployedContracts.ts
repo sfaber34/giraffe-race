@@ -1705,7 +1705,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 4,
+      deployedOnBlock: 6,
     },
     GiraffeRaceSimulator: {
       address: "0x8ce361602b935680e8dec218b820ff5056beb7af",
@@ -1823,7 +1823,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 4,
+      deployedOnBlock: 6,
     },
     HouseTreasury: {
       address: "0xe1aa25618fa0c7a1cfdab5d6b456af611873b629",
@@ -2228,7 +2228,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 4,
+      deployedOnBlock: 6,
     },
     WinProbTableShard0: {
       address: "0xe1da8919f262ee86f9be05059c9280142cf23f48",
@@ -2272,7 +2272,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 4,
+      deployedOnBlock: 6,
     },
     WinProbTableShard1: {
       address: "0x0c8e79f3534b00d9a3d4a856b665bf4ebc22f2ba",
@@ -2316,7 +2316,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 4,
+      deployedOnBlock: 6,
     },
     WinProbTableShard2: {
       address: "0xed1db453c3156ff3155a97ad217b3087d5dc5f6e",
@@ -2360,7 +2360,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 4,
+      deployedOnBlock: 6,
     },
     WinProbTableShard3: {
       address: "0xf7cd8fa9b94db2aa972023b379c7f72c65e4de9d",
@@ -2404,7 +2404,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 3,
+      deployedOnBlock: 6,
     },
     WinProbTableShard4: {
       address: "0x12975173b87f7595ee45dffb2ab812ece596bf84",
@@ -2448,7 +2448,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 4,
+      deployedOnBlock: 6,
     },
     WinProbTableShard5: {
       address: "0x82dc47734901ee7d4f4232f398752cb9dd5daccc",
@@ -2492,7 +2492,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 4,
+      deployedOnBlock: 6,
     },
     WinProbTable6: {
       address: "0x196dbcbb54b8ec4958c959d8949ebfe87ac2aaaf",
@@ -2676,7 +2676,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 3,
+      deployedOnBlock: 5,
     },
     DiamondCutFacet: {
       address: "0x6379ebd504941f50d5bfde9348b37593bd29c835",
@@ -2867,11 +2867,47 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 4,
+      deployedOnBlock: 5,
     },
     AdminFacet: {
       address: "0x33b1b5aa9aa4da83a332f0bc5cac6a903fde5d92",
       abi: [
+        {
+          type: "function",
+          name: "adminCancelRace",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "debugStorage",
+          inputs: [],
+          outputs: [
+            {
+              name: "storageSlot",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+            {
+              name: "storedTreasuryOwner",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "storedGiraffeNft",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          stateMutability: "view",
+        },
         {
           type: "function",
           name: "houseEdgeBps",
@@ -2932,24 +2968,6 @@ const deployedContracts = {
               name: "newMaxBet",
               type: "uint256",
               internalType: "uint256",
-            },
-          ],
-          outputs: [],
-          stateMutability: "nonpayable",
-        },
-        {
-          type: "function",
-          name: "setRaceOdds",
-          inputs: [
-            {
-              name: "raceId",
-              type: "uint256",
-              internalType: "uint256",
-            },
-            {
-              name: "decimalOddsBps",
-              type: "uint32[6]",
-              internalType: "uint32[6]",
             },
           ],
           outputs: [],
@@ -3021,19 +3039,13 @@ const deployedContracts = {
         },
         {
           type: "event",
-          name: "RaceOddsSet",
+          name: "RaceCancelled",
           inputs: [
             {
               name: "raceId",
               type: "uint256",
               indexed: true,
               internalType: "uint256",
-            },
-            {
-              name: "decimalOddsBps",
-              type: "uint32[6]",
-              indexed: false,
-              internalType: "uint32[6]",
             },
           ],
           anonymous: false,
@@ -3053,27 +3065,17 @@ const deployedContracts = {
         },
         {
           type: "error",
+          name: "AlreadyCancelled",
+          inputs: [],
+        },
+        {
+          type: "error",
           name: "AlreadySettled",
           inputs: [],
         },
         {
           type: "error",
-          name: "BettingClosed",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "BettingNotOpen",
-          inputs: [],
-        },
-        {
-          type: "error",
           name: "HouseEdgeTooHigh",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "InvalidOdds",
           inputs: [],
         },
         {
@@ -3086,19 +3088,9 @@ const deployedContracts = {
           name: "NotTreasuryOwner",
           inputs: [],
         },
-        {
-          type: "error",
-          name: "OddsAlreadySet",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "RaceNotReady",
-          inputs: [],
-        },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 4,
+      deployedOnBlock: 3,
     },
     RaceLifecycleFacet: {
       address: "0x19a1c09fe3399c4daaa2c98b936a8e460fc5eaa4",
@@ -3413,7 +3405,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 4,
+      deployedOnBlock: 5,
     },
     BettingFacet: {
       address: "0x49b8e3b089d4ebf9f37b1da9b839ec013c2cd8c9",
@@ -4045,7 +4037,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 4,
+      deployedOnBlock: 5,
     },
     RaceViewsFacet: {
       address: "0x45009dd3abbe29db54fc5d893ceaa98a624882df",
@@ -4200,6 +4192,11 @@ const deployedContracts = {
             },
             {
               name: "oddsSet",
+              type: "bool",
+              internalType: "bool",
+            },
+            {
+              name: "cancelled",
               type: "bool",
               internalType: "bool",
             },
@@ -4466,11 +4463,24 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 4,
+      deployedOnBlock: 5,
     },
     GiraffeRace: {
       address: "0xf56aa3aceddf88ab12e494d0b96da3c09a5d264e",
       abi: [
+        {
+          type: "function",
+          name: "adminCancelRace",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
         {
           type: "function",
           name: "claim",
@@ -5003,6 +5013,11 @@ const deployedContracts = {
               type: "bool",
               internalType: "bool",
             },
+            {
+              name: "cancelled",
+              type: "bool",
+              internalType: "bool",
+            },
           ],
           stateMutability: "view",
         },
@@ -5304,24 +5319,6 @@ const deployedContracts = {
               name: "newMaxBet",
               type: "uint256",
               internalType: "uint256",
-            },
-          ],
-          outputs: [],
-          stateMutability: "nonpayable",
-        },
-        {
-          type: "function",
-          name: "setRaceOdds",
-          inputs: [
-            {
-              name: "raceId",
-              type: "uint256",
-              internalType: "uint256",
-            },
-            {
-              name: "decimalOddsBps",
-              type: "uint32[6]",
-              internalType: "uint32[6]",
             },
           ],
           outputs: [],
@@ -5738,6 +5735,19 @@ const deployedContracts = {
         },
         {
           type: "event",
+          name: "RaceCancelled",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
           name: "RaceCreated",
           inputs: [
             {
@@ -5845,7 +5855,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 4,
+      deployedOnBlock: 5,
     },
   },
 } as const;
