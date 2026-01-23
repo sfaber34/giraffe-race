@@ -11,6 +11,40 @@ import { GiraffeRaceStorage } from "./diamond/libraries/GiraffeRaceStorage.sol";
  *      All functions are marked external and have empty bodies to generate the ABI.
  */
 interface IGiraffeRace {
+    // ============ Errors ============
+    error InvalidRace();
+    error BetTooLarge();
+    error HouseEdgeTooHigh();
+    error NoClaimableBets();
+    error BettingClosed();
+    error BettingNotOpen();
+    error SubmissionsClosed();
+    error AlreadyBet();
+    error InvalidLane();
+    error ZeroBet();
+    error AlreadySettled();
+    error NotSettled();
+    error BlockhashUnavailable();
+    error RaceNotReady();
+    error NotWinner();
+    error AlreadyClaimed();
+    error AlreadySubmitted();
+    error InvalidHouseGiraffe();
+    error GiraffeNotAssigned();
+    error NotTokenOwner();
+    error TokenAlreadyEntered();
+    error EntryPoolFull();
+    error GiraffesAlreadyFinalized();
+    error PreviousRaceNotSettled();
+    error CooldownNotElapsed();
+    error NotTreasuryOwner();
+    error OddsNotSet();
+    error OddsAlreadySet();
+    error InvalidOdds();
+    error InsufficientBankroll();
+    error RaceNotCancellable();
+    error AlreadyCancelled();
+
     // ============ Events ============
     event RaceCreated(uint256 indexed raceId, uint64 submissionCloseBlock);
     event BettingWindowOpened(uint256 indexed raceId, uint64 bettingCloseBlock);

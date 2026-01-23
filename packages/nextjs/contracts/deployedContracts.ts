@@ -2492,7 +2492,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 6,
+      deployedOnBlock: 2,
     },
     WinProbTable6: {
       address: "0x196dbcbb54b8ec4958c959d8949ebfe87ac2aaaf",
@@ -2676,7 +2676,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 5,
+      deployedOnBlock: 6,
     },
     DiamondCutFacet: {
       address: "0x6379ebd504941f50d5bfde9348b37593bd29c835",
@@ -2765,7 +2765,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 3,
+      deployedOnBlock: 6,
     },
     DiamondLoupeFacet: {
       address: "0x5b3120d0da5fdcba7aef87a9c3c64829c1c0d76b",
@@ -2867,7 +2867,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 5,
+      deployedOnBlock: 6,
     },
     AdminFacet: {
       address: "0x33b1b5aa9aa4da83a332f0bc5cac6a903fde5d92",
@@ -3850,7 +3850,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 3,
+      deployedOnBlock: 6,
     },
     GiraffeSubmissionFacet: {
       address: "0x067c804bb006836469379d4a2a69a81803bd1f45",
@@ -4037,7 +4037,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 5,
+      deployedOnBlock: 6,
     },
     RaceViewsFacet: {
       address: "0x45009dd3abbe29db54fc5d893ceaa98a624882df",
@@ -4463,7 +4463,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 5,
+      deployedOnBlock: 6,
     },
     GiraffeRace: {
       address: "0xf56aa3aceddf88ab12e494d0b96da3c09a5d264e",
@@ -5852,6 +5852,166 @@ const deployedContracts = {
             },
           ],
           anonymous: false,
+        },
+        {
+          type: "error",
+          name: "AlreadyBet",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "AlreadyCancelled",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "AlreadyClaimed",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "AlreadySettled",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "AlreadySubmitted",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "BetTooLarge",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "BettingClosed",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "BettingNotOpen",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "BlockhashUnavailable",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "CooldownNotElapsed",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "EntryPoolFull",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "GiraffeNotAssigned",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "GiraffesAlreadyFinalized",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "HouseEdgeTooHigh",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "InsufficientBankroll",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "InvalidHouseGiraffe",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "InvalidLane",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "InvalidOdds",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "InvalidRace",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "NoClaimableBets",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "NotSettled",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "NotTokenOwner",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "NotTreasuryOwner",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "NotWinner",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "OddsAlreadySet",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "OddsNotSet",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "PreviousRaceNotSettled",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "RaceNotCancellable",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "RaceNotReady",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "SubmissionsClosed",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "TokenAlreadyEntered",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "ZeroBet",
+          inputs: [],
         },
       ],
       inheritedFunctions: {},

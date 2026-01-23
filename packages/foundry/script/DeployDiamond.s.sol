@@ -290,7 +290,7 @@ contract DeployDiamond is ScaffoldETHDeploy {
 
     function _getRaceViewsSelectors() internal pure returns (bytes4[] memory) {
         // NOTE: Removed getRace(), getRaceGiraffes(), getRaceScore() - use ById versions instead
-        bytes4[] memory selectors = new bytes4[](16);
+        bytes4[] memory selectors = new bytes4[](18);
         selectors[0] = RaceViewsFacet.laneCount.selector;
         selectors[1] = RaceViewsFacet.tickCount.selector;
         selectors[2] = RaceViewsFacet.speedRange.selector;
@@ -307,7 +307,8 @@ contract DeployDiamond is ScaffoldETHDeploy {
         selectors[13] = RaceViewsFacet.simulateWithScore.selector;
         selectors[14] = RaceViewsFacet.giraffeNft.selector;
         selectors[15] = RaceViewsFacet.simulator.selector;
-        // Note: treasury() and winProbTable() have selector conflicts, handled separately
+        selectors[16] = RaceViewsFacet.treasury.selector;
+        selectors[17] = RaceViewsFacet.winProbTable.selector;
         return selectors;
     }
 }
