@@ -27,11 +27,11 @@ export const GIRAFFE_SIZE_PX = 100;
 // Track height - fixed to fill parent container
 export const TRACK_HEIGHT_PX = 328;
 
-// Side-view specific: giraffes span nearly full track height
-// Lane 0 = furthest from camera (top, scaled to 85%), Lane 5 = closest (bottom, scaled to 100%)
-// Asymmetric positioning accounts for scale difference to achieve ~15px visual padding on both edges
-export const TRACK_BASE_Y_PX = 160; // Shifted up slightly to account for top giraffe's smaller scale
-export const TRACK_VERTICAL_SPREAD_PX = 206; // Spread between lane 0 and lane 5 centers
+// Side-view specific: giraffes span nearly full track height with ~15px padding
+// Lane 0 = furthest from camera (top), Lane 5 = closest to camera (bottom)
+// All giraffes same size for cartoon style
+export const TRACK_BASE_Y_PX = 164; // Center of track
+export const TRACK_VERTICAL_SPREAD_PX = 198; // Spread between lane 0 and lane 5 centers
 
 // Legacy export for compatibility (now unused in rendering)
 export const LANE_HEIGHT_PX = 86;

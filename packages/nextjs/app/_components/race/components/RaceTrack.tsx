@@ -59,14 +59,10 @@ const getLaneZIndex = (laneIndex: number): number => {
 };
 
 /**
- * Get scale factor for depth effect. Closer lanes (higher index) appear slightly larger.
+ * Get scale factor for giraffes. All same size for cartoon style.
  */
-const getLaneScale = (laneIndex: number): number => {
-  const minScale = 0.85;
-  const maxScale = 1.0;
-  const t = laneIndex / (LANE_COUNT - 1);
-  return minScale + t * (maxScale - minScale);
-};
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const getLaneScale = (_laneIndex: number): number => 1.0;
 
 export const RaceTrack = ({
   cameraScrollRefCb,
