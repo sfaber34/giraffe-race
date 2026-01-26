@@ -2720,7 +2720,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 12,
+      deployedOnBlock: 5,
     },
     GiraffeNFT: {
       address: "0xb19b36b1456e65e3a6d514d3f715f204bd59f431",
@@ -4070,7 +4070,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 14,
+      deployedOnBlock: 7,
     },
     GiraffeRaceSimulator: {
       address: "0x8ce361602b935680e8dec218b820ff5056beb7af",
@@ -4230,7 +4230,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 15,
+      deployedOnBlock: 8,
     },
     HouseTreasury: {
       address: "0xe1aa25618fa0c7a1cfdab5d6b456af611873b629",
@@ -4635,7 +4635,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 16,
+      deployedOnBlock: 9,
     },
     WinProbTableShard0: {
       address: "0xe1da8919f262ee86f9be05059c9280142cf23f48",
@@ -4679,7 +4679,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 17,
+      deployedOnBlock: 10,
     },
     WinProbTableShard1: {
       address: "0x0c8e79f3534b00d9a3d4a856b665bf4ebc22f2ba",
@@ -4723,7 +4723,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 18,
+      deployedOnBlock: 11,
     },
     WinProbTableShard2: {
       address: "0xed1db453c3156ff3155a97ad217b3087d5dc5f6e",
@@ -4767,7 +4767,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 19,
+      deployedOnBlock: 12,
     },
     WinProbTableShard3: {
       address: "0xf7cd8fa9b94db2aa972023b379c7f72c65e4de9d",
@@ -4811,7 +4811,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 20,
+      deployedOnBlock: 13,
     },
     WinProbTableShard4: {
       address: "0x12975173b87f7595ee45dffb2ab812ece596bf84",
@@ -4855,7 +4855,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 21,
+      deployedOnBlock: 14,
     },
     WinProbTableShard5: {
       address: "0x82dc47734901ee7d4f4232f398752cb9dd5daccc",
@@ -4899,7 +4899,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 22,
+      deployedOnBlock: 15,
     },
     WinProbTable6: {
       address: "0x196dbcbb54b8ec4958c959d8949ebfe87ac2aaaf",
@@ -5083,7 +5083,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 23,
+      deployedOnBlock: 16,
     },
     GiraffeRace: {
       address: "0x6379ebd504941f50d5bfde9348b37593bd29c835",
@@ -6776,7 +6776,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 30,
+      deployedOnBlock: 23,
     },
   },
 } as const;
