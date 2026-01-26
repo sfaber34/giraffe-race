@@ -42,13 +42,13 @@ export const useRaceData = () => {
   const { data: usdcContract, contractName: usdcContractName } = useUsdcContract();
   const { data: treasuryContract } = useDeployedContractInfo({ contractName: "HouseTreasury" as any });
 
-  // Owned tokens - doesn't change during race replay
+  // Owned tokens - watch to detect new NFTs (mints, transfers)
   const { data: ownedTokenIdsData, isLoading: isOwnedTokensLoading } = useScaffoldReadContract({
     contractName: "GiraffeNFT",
     functionName: "tokensOfOwner",
     args: [connectedAddress],
     query: { enabled: !!connectedAddress },
-    watch: false,
+    // Watch by default to detect new NFTs
   });
 
   const ownedTokenIds = useMemo(() => {
@@ -112,23 +112,23 @@ export const useRaceData = () => {
     void run();
   }, [publicClient, giraffeNftContract?.address, giraffeNftContract?.abi, ownedTokenIds]);
 
-  // Race IDs - watch to detect new races, but not during animation (handled by hasAnyRace check)
+  // Race IDs - watch to detect new races being created
   const { data: nextRaceIdData } = useScaffoldReadContract({
     contractName: "GiraffeRace",
     functionName: "nextRaceId",
     query: { enabled: !!giraffeRaceContract },
-    watch: false, // Don't poll every block, races aren't created that frequently
+    // Watch by default to detect new race creation
   });
   const nextRaceId = (nextRaceIdData as bigint | undefined) ?? 0n;
   const hasAnyRace = !!giraffeRaceContract && nextRaceId > 0n;
   const latestRaceId = hasAnyRace ? nextRaceId - 1n : null;
 
-  // Cooldown status - doesn't need block-by-block updates
+  // Cooldown status - watch to detect when cooldown ends
   const { data: cooldownData } = useScaffoldReadContract({
     contractName: "GiraffeRace",
     functionName: "getCreateRaceCooldown" as any,
     query: { enabled: !!giraffeRaceContract },
-    watch: false,
+    // Watch by default for cooldown status updates
   } as any);
 
   const cooldownStatus = useMemo<CooldownStatus | null>(() => {
@@ -171,13 +171,13 @@ export const useRaceData = () => {
     }
   }, [maxBetAmountData]);
 
-  // USDC balances - doesn't need block-by-block updates
+  // USDC balances - watch to reflect transactions
   const { data: userUsdcBalance } = useScaffoldReadContract({
     contractName: usdcContractName as any,
     functionName: "balanceOf" as any,
     args: [connectedAddress],
     query: { enabled: !!usdcContract && !!usdcContractName && !!connectedAddress },
-    watch: false,
+    // Watch by default to reflect balance changes
   } as any);
 
   const { data: userUsdcAllowance } = useScaffoldReadContract({
@@ -185,7 +185,7 @@ export const useRaceData = () => {
     functionName: "allowance" as any,
     args: [connectedAddress, treasuryContract?.address],
     query: { enabled: !!usdcContract && !!usdcContractName && !!treasuryContract && !!connectedAddress },
-    watch: false,
+    // Watch by default to reflect allowance changes
   } as any);
 
   const { data: treasuryBalance } = useScaffoldReadContract({
@@ -322,7 +322,7 @@ export const useRaceDetails = (
     functionName: "getRaceScheduleById" as any,
     args: [viewingRaceId ?? 0n],
     query: { enabled: hasAnyRace && viewingRaceId !== null },
-    watch: false,
+    watch: !hasSeenSettled, // Watch until settled for schedule updates
   } as any);
 
   const { data: raceGiraffesData } = useScaffoldReadContract({
@@ -330,7 +330,7 @@ export const useRaceDetails = (
     functionName: "getRaceGiraffesById",
     args: [viewingRaceId ?? 0n],
     query: { enabled: hasAnyRace && viewingRaceId !== null },
-    watch: false,
+    watch: !hasSeenSettled, // Watch until settled to detect lineup finalization
   });
 
   const { data: raceScoreData } = useScaffoldReadContract({
@@ -338,7 +338,7 @@ export const useRaceDetails = (
     functionName: "getRaceScoreById" as any,
     args: [viewingRaceId ?? 0n],
     query: { enabled: hasAnyRace && viewingRaceId !== null },
-    watch: false,
+    watch: !hasSeenSettled, // Watch until settled for score updates
   } as any);
 
   const { data: raceOddsData } = useScaffoldReadContract({
@@ -346,7 +346,7 @@ export const useRaceDetails = (
     functionName: "getRaceOddsById" as any,
     args: [viewingRaceId ?? 0n],
     query: { enabled: hasAnyRace && viewingRaceId !== null },
-    watch: false,
+    watch: !hasSeenSettled, // Watch until settled to detect odds being set (finalization)
   } as any);
 
   // Entry pool events
@@ -598,7 +598,7 @@ export const useMyBet = (
     functionName: "getBetById",
     args: [viewingRaceId ?? 0n, connectedAddress],
     query: { enabled: !!giraffeRaceContract && !!connectedAddress && hasAnyRace && viewingRaceId !== null },
-    watch: false, // Bet data is static once placed
+    // Watch to detect bet confirmation
   });
 
   return useMemo<MyBet | null>(() => {
@@ -620,7 +620,7 @@ export const useWinningClaims = (connectedAddress: `0x${string}` | undefined, gi
     functionName: "getNextWinningClaim",
     args: [connectedAddress],
     query: { enabled: !!giraffeRaceContract && !!connectedAddress },
-    watch: false, // Only changes after claiming
+    // Watch to detect new claimable winnings after settlement
   });
 
   const { data: winningClaimRemainingData } = useScaffoldReadContract({
@@ -628,7 +628,7 @@ export const useWinningClaims = (connectedAddress: `0x${string}` | undefined, gi
     functionName: "getWinningClaimRemaining",
     args: [connectedAddress],
     query: { enabled: !!giraffeRaceContract && !!connectedAddress },
-    watch: false, // Only changes after claiming
+    // Watch to detect claim updates
   });
 
   const winningClaimRemaining = useMemo(() => {
