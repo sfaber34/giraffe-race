@@ -19,7 +19,7 @@ export const BASE_REPLAY_SPEED_MULTIPLIER = 1.5;
 
 // Track geometry - Side-view camera perspective
 // All animals run side-by-side on one track with slight vertical stagger for depth
-export const WORLD_PADDING_LEFT_PX = 80;
+export const WORLD_PADDING_LEFT_PX = 100;
 export const WORLD_PADDING_RIGHT_PX = 140;
 export const PX_PER_UNIT = 3;
 export const GIRAFFE_SIZE_PX = 100;
