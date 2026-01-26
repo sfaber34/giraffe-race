@@ -22,12 +22,16 @@ export const BASE_REPLAY_SPEED_MULTIPLIER = 1.5;
 export const WORLD_PADDING_LEFT_PX = 80;
 export const WORLD_PADDING_RIGHT_PX = 140;
 export const PX_PER_UNIT = 3;
-export const GIRAFFE_SIZE_PX = 78;
+export const GIRAFFE_SIZE_PX = 100;
 
-// Side-view specific: vertical spread creates depth illusion
+// Track height - fixed to fill parent container
+export const TRACK_HEIGHT_PX = 328;
+
+// Side-view specific: giraffes span nearly full track height with ~15px padding
 // Lane 0 = furthest from camera (top), Lane 5 = closest to camera (bottom)
-export const TRACK_VERTICAL_SPREAD_PX = 70; // Total vertical spread for depth
-export const TRACK_BASE_Y_PX = 180; // Base Y position for the track center
+const VERTICAL_PADDING = 15; // Padding from top/bottom edges
+export const TRACK_BASE_Y_PX = TRACK_HEIGHT_PX / 2; // Center of track = 164px
+export const TRACK_VERTICAL_SPREAD_PX = TRACK_HEIGHT_PX - GIRAFFE_SIZE_PX - VERTICAL_PADDING * 2; // 198px spread
 
 // Legacy export for compatibility (now unused in rendering)
 export const LANE_HEIGHT_PX = 86;
@@ -37,4 +41,3 @@ export const LANE_GAP_PX = 10;
 export const TRACK_LENGTH_PX = TRACK_LENGTH * PX_PER_UNIT;
 export const FINISH_LINE_X = WORLD_PADDING_LEFT_PX + TRACK_LENGTH_PX;
 export const WORLD_WIDTH_PX = WORLD_PADDING_LEFT_PX + TRACK_LENGTH_PX + WORLD_PADDING_RIGHT_PX;
-export const TRACK_HEIGHT_PX = TRACK_BASE_Y_PX + TRACK_VERTICAL_SPREAD_PX + GIRAFFE_SIZE_PX;

@@ -116,10 +116,8 @@ export const RaceTrack = ({
             <div className="absolute inset-0">
               {/* Ground/track surface with perspective gradient */}
               <div
-                className="absolute left-0 right-0"
+                className="absolute inset-0"
                 style={{
-                  top: `${TRACK_BASE_Y_PX - TRACK_VERTICAL_SPREAD_PX - 20}px`,
-                  height: `${TRACK_VERTICAL_SPREAD_PX + GIRAFFE_SIZE_PX + 40}px`,
                   background: `
                     linear-gradient(180deg, 
                       rgba(139, 90, 43, 0.15) 0%,
@@ -134,9 +132,9 @@ export const RaceTrack = ({
               />
 
               {/* Track surface texture lines for depth */}
-              {Array.from({ length: 12 }).map((_, i) => {
-                const y = TRACK_BASE_Y_PX - TRACK_VERTICAL_SPREAD_PX / 2 + (i / 11) * (TRACK_VERTICAL_SPREAD_PX + 30);
-                const opacity = 0.08 + (i / 11) * 0.12;
+              {Array.from({ length: 14 }).map((_, i) => {
+                const y = (i / 13) * TRACK_HEIGHT_PX;
+                const opacity = 0.08 + (i / 13) * 0.12;
                 return (
                   <div
                     key={`line-${i}`}
@@ -155,9 +153,9 @@ export const RaceTrack = ({
                 className="absolute bg-white/40"
                 style={{
                   left: `${WORLD_PADDING_LEFT_PX}px`,
-                  top: `${TRACK_BASE_Y_PX - TRACK_VERTICAL_SPREAD_PX - 15}px`,
+                  top: 0,
                   width: "4px",
-                  height: `${TRACK_VERTICAL_SPREAD_PX + GIRAFFE_SIZE_PX + 30}px`,
+                  height: `${TRACK_HEIGHT_PX}px`,
                   transform: "skewY(-3deg)",
                 }}
               />
@@ -167,9 +165,9 @@ export const RaceTrack = ({
                 className="absolute"
                 style={{
                   left: `${WORLD_PADDING_LEFT_PX + TRACK_LENGTH_PX}px`,
-                  top: `${TRACK_BASE_Y_PX - TRACK_VERTICAL_SPREAD_PX - 15}px`,
+                  top: 0,
                   width: "6px",
-                  height: `${TRACK_VERTICAL_SPREAD_PX + GIRAFFE_SIZE_PX + 30}px`,
+                  height: `${TRACK_HEIGHT_PX}px`,
                   transform: "skewY(-3deg)",
                   background: "repeating-linear-gradient(180deg, #fff 0px, #fff 6px, #222 6px, #222 12px)",
                 }}
@@ -185,9 +183,9 @@ export const RaceTrack = ({
                     className="absolute opacity-20 pointer-events-none"
                     style={{
                       left: `${x}px`,
-                      top: `${TRACK_BASE_Y_PX - TRACK_VERTICAL_SPREAD_PX - 10}px`,
+                      top: 0,
                       width: "2px",
-                      height: `${TRACK_VERTICAL_SPREAD_PX + GIRAFFE_SIZE_PX + 20}px`,
+                      height: `${TRACK_HEIGHT_PX}px`,
                       background: "rgba(255,255,255,0.5)",
                       transform: "skewY(-3deg)",
                     }}
