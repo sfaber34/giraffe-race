@@ -14,6 +14,7 @@ export const LaneName = ({ tokenId, fallback }: LaneNameProps) => {
     functionName: "nameOf",
     args: [enabled ? tokenId : undefined],
     query: { enabled },
+    watch: false, // Names don't change, no need to watch
   });
 
   const name = (nameData as string | undefined) ?? "";

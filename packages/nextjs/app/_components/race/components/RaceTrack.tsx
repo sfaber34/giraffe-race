@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import {
   BASE_REPLAY_SPEED_MULTIPLIER,
   GIRAFFE_SIZE_PX,
@@ -64,7 +65,7 @@ const getLaneZIndex = (laneIndex: number): number => {
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const getLaneScale = (_laneIndex: number): number => 1.0;
 
-export const RaceTrack = ({
+export const RaceTrack = memo(function RaceTrack({
   cameraScrollRefCb,
   simulation,
   lineupFinalized,
@@ -79,7 +80,7 @@ export const RaceTrack = ({
   svgResetNonce,
   revealedWinner,
   myBet,
-}: RaceTrackProps) => {
+}: RaceTrackProps) {
   return (
     <>
       {/* Fixed lane labels - repositioned for side view */}
@@ -266,4 +267,4 @@ export const RaceTrack = ({
       </div>
     </>
   );
-};
+});

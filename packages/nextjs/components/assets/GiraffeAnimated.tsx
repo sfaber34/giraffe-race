@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import type { Hex } from "viem";
 import { isHex } from "viem";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
@@ -152,7 +152,7 @@ svg.giraffe-svg * {
   return classed.slice(0, insertPoint + 1) + overrideStyle + classed.slice(insertPoint + 1);
 }
 
-export function GiraffeAnimated({
+export const GiraffeAnimated = memo(function GiraffeAnimated({
   idPrefix,
   tokenId,
   seed,
@@ -177,6 +177,7 @@ export function GiraffeAnimated({
     functionName: "seedOf",
     args: [needsSeedFromContract ? tokenId : undefined],
     query: { enabled: needsSeedFromContract },
+    watch: false, // Seeds never change, no need to refetch on new blocks
   });
 
   const resolvedSeed = useMemo(() => {
@@ -445,4 +446,4 @@ export function GiraffeAnimated({
   }
 
   return <div className={className} style={wrapperStyle} ref={hostRef} aria-hidden="true" />;
-}
+});

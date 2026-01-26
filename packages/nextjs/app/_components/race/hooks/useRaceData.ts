@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { LANE_COUNT, SUBMISSION_WINDOW_BLOCKS } from "../constants";
 import {
   CooldownStatus,
@@ -28,7 +28,8 @@ export const useRaceData = () => {
   const { targetNetwork } = useTargetNetwork();
   const publicClient = usePublicClient({ chainId: targetNetwork.id });
   const { address: connectedAddress } = useAccount();
-  const { data: blockNumber } = useBlockNumber({ watch: true });
+  // Block number is fetched once here; live watching is done conditionally in RaceDashboard
+  const { data: blockNumber } = useBlockNumber({ watch: false });
 
   const [ownedTokenNameById, setOwnedTokenNameById] = useState<Record<string, string>>({});
   const [isLoadingOwnedTokenNames, setIsLoadingOwnedTokenNames] = useState(false);
@@ -41,12 +42,13 @@ export const useRaceData = () => {
   const { data: usdcContract, contractName: usdcContractName } = useUsdcContract();
   const { data: treasuryContract } = useDeployedContractInfo({ contractName: "HouseTreasury" as any });
 
-  // Owned tokens
+  // Owned tokens - doesn't change during race replay
   const { data: ownedTokenIdsData, isLoading: isOwnedTokensLoading } = useScaffoldReadContract({
     contractName: "GiraffeNFT",
     functionName: "tokensOfOwner",
     args: [connectedAddress],
     query: { enabled: !!connectedAddress },
+    watch: false,
   });
 
   const ownedTokenIds = useMemo(() => {
@@ -110,21 +112,23 @@ export const useRaceData = () => {
     void run();
   }, [publicClient, giraffeNftContract?.address, giraffeNftContract?.abi, ownedTokenIds]);
 
-  // Race IDs
+  // Race IDs - watch to detect new races, but not during animation (handled by hasAnyRace check)
   const { data: nextRaceIdData } = useScaffoldReadContract({
     contractName: "GiraffeRace",
     functionName: "nextRaceId",
     query: { enabled: !!giraffeRaceContract },
+    watch: false, // Don't poll every block, races aren't created that frequently
   });
   const nextRaceId = (nextRaceIdData as bigint | undefined) ?? 0n;
   const hasAnyRace = !!giraffeRaceContract && nextRaceId > 0n;
   const latestRaceId = hasAnyRace ? nextRaceId - 1n : null;
 
-  // Cooldown status
+  // Cooldown status - doesn't need block-by-block updates
   const { data: cooldownData } = useScaffoldReadContract({
     contractName: "GiraffeRace",
     functionName: "getCreateRaceCooldown" as any,
     query: { enabled: !!giraffeRaceContract },
+    watch: false,
   } as any);
 
   const cooldownStatus = useMemo<CooldownStatus | null>(() => {
@@ -133,11 +137,12 @@ export const useRaceData = () => {
     return { canCreate, blocksRemaining, cooldownEndsAtBlock };
   }, [cooldownData]);
 
-  // Settled liability
+  // Settled liability - doesn't need block-by-block updates
   const { data: settledLiabilityData } = useScaffoldReadContract({
     contractName: "GiraffeRace",
     functionName: "settledLiability",
     query: { enabled: !!giraffeRaceContract },
+    watch: false,
   });
 
   const settledLiability = useMemo(() => {
@@ -150,11 +155,12 @@ export const useRaceData = () => {
     }
   }, [settledLiabilityData]);
 
-  // Max bet amount
+  // Max bet amount - config value, never changes
   const { data: maxBetAmountData } = useScaffoldReadContract({
     contractName: "GiraffeRace",
     functionName: "maxBetAmount" as any,
     query: { enabled: !!giraffeRaceContract },
+    watch: false,
   } as any);
 
   const maxBetAmount = useMemo(() => {
@@ -165,12 +171,13 @@ export const useRaceData = () => {
     }
   }, [maxBetAmountData]);
 
-  // USDC balances - use the dynamic contract name (USDC for Base, MockUSDC for local)
+  // USDC balances - doesn't need block-by-block updates
   const { data: userUsdcBalance } = useScaffoldReadContract({
     contractName: usdcContractName as any,
     functionName: "balanceOf" as any,
     args: [connectedAddress],
     query: { enabled: !!usdcContract && !!usdcContractName && !!connectedAddress },
+    watch: false,
   } as any);
 
   const { data: userUsdcAllowance } = useScaffoldReadContract({
@@ -178,12 +185,14 @@ export const useRaceData = () => {
     functionName: "allowance" as any,
     args: [connectedAddress, treasuryContract?.address],
     query: { enabled: !!usdcContract && !!usdcContractName && !!treasuryContract && !!connectedAddress },
+    watch: false,
   } as any);
 
   const { data: treasuryBalance } = useScaffoldReadContract({
     contractName: "HouseTreasury" as any,
     functionName: "balance" as any,
     query: { enabled: !!treasuryContract },
+    watch: false,
   } as any);
 
   return {
@@ -287,12 +296,25 @@ export const useRaceDetails = (
   giraffeRaceContract: any,
   giraffeNftContract: any,
 ) => {
-  // Race data
+  // Track if we've seen this race as settled (to stop watching once settled)
+  const [hasSeenSettled, setHasSeenSettled] = useState(false);
+  const prevRaceIdRef = useRef<bigint | null>(null);
+
+  // Reset when race changes
+  useEffect(() => {
+    if (viewingRaceId !== prevRaceIdRef.current) {
+      setHasSeenSettled(false);
+      prevRaceIdRef.current = viewingRaceId;
+    }
+  }, [viewingRaceId]);
+
+  // Race data - watch until settled to detect settlement, then stop watching
   const { data: raceData } = useScaffoldReadContract({
     contractName: "GiraffeRace",
     functionName: "getRaceById",
     args: [viewingRaceId ?? 0n],
     query: { enabled: hasAnyRace && viewingRaceId !== null },
+    watch: !hasSeenSettled, // Stop watching once settled for smooth animation
   });
 
   const { data: raceScheduleData } = useScaffoldReadContract({
@@ -300,6 +322,7 @@ export const useRaceDetails = (
     functionName: "getRaceScheduleById" as any,
     args: [viewingRaceId ?? 0n],
     query: { enabled: hasAnyRace && viewingRaceId !== null },
+    watch: false,
   } as any);
 
   const { data: raceGiraffesData } = useScaffoldReadContract({
@@ -307,6 +330,7 @@ export const useRaceDetails = (
     functionName: "getRaceGiraffesById",
     args: [viewingRaceId ?? 0n],
     query: { enabled: hasAnyRace && viewingRaceId !== null },
+    watch: false,
   });
 
   const { data: raceScoreData } = useScaffoldReadContract({
@@ -314,6 +338,7 @@ export const useRaceDetails = (
     functionName: "getRaceScoreById" as any,
     args: [viewingRaceId ?? 0n],
     query: { enabled: hasAnyRace && viewingRaceId !== null },
+    watch: false,
   } as any);
 
   const { data: raceOddsData } = useScaffoldReadContract({
@@ -321,6 +346,7 @@ export const useRaceDetails = (
     functionName: "getRaceOddsById" as any,
     args: [viewingRaceId ?? 0n],
     query: { enabled: hasAnyRace && viewingRaceId !== null },
+    watch: false,
   } as any);
 
   // Entry pool events
@@ -345,6 +371,13 @@ export const useRaceDetails = (
       totalOnLane: (totalOnLane as readonly bigint[]).map(x => BigInt(x)),
     };
   }, [raceData]);
+
+  // Once we see the race is settled, stop watching (for smooth animation)
+  useEffect(() => {
+    if (parsed?.settled && !hasSeenSettled) {
+      setHasSeenSettled(true);
+    }
+  }, [parsed?.settled, hasSeenSettled]);
 
   const parsedSchedule = useMemo<ParsedSchedule | null>(() => {
     if (!raceScheduleData) return null;
@@ -441,42 +474,48 @@ export const useRaceDetails = (
     return submissionCloseBlock - SUBMISSION_WINDOW_BLOCKS;
   }, [submissionCloseBlock]);
 
-  // Lane stats (individual reads)
+  // Lane stats (individual reads) - static, no need to watch
   const { data: lane0StatsData } = useScaffoldReadContract({
     contractName: "GiraffeNFT",
     functionName: "statsOf" as any,
     args: [laneTokenIds[0]],
     query: { enabled: !!giraffeNftContract && laneTokenIds[0] !== 0n },
+    watch: false,
   } as any);
   const { data: lane1StatsData } = useScaffoldReadContract({
     contractName: "GiraffeNFT",
     functionName: "statsOf" as any,
     args: [laneTokenIds[1]],
     query: { enabled: !!giraffeNftContract && laneTokenIds[1] !== 0n },
+    watch: false,
   } as any);
   const { data: lane2StatsData } = useScaffoldReadContract({
     contractName: "GiraffeNFT",
     functionName: "statsOf" as any,
     args: [laneTokenIds[2]],
     query: { enabled: !!giraffeNftContract && laneTokenIds[2] !== 0n },
+    watch: false,
   } as any);
   const { data: lane3StatsData } = useScaffoldReadContract({
     contractName: "GiraffeNFT",
     functionName: "statsOf" as any,
     args: [laneTokenIds[3]],
     query: { enabled: !!giraffeNftContract && laneTokenIds[3] !== 0n },
+    watch: false,
   } as any);
   const { data: lane4StatsData } = useScaffoldReadContract({
     contractName: "GiraffeNFT",
     functionName: "statsOf" as any,
     args: [laneTokenIds[4] ?? 0n],
     query: { enabled: !!giraffeNftContract && (laneTokenIds[4] ?? 0n) !== 0n },
+    watch: false,
   } as any);
   const { data: lane5StatsData } = useScaffoldReadContract({
     contractName: "GiraffeNFT",
     functionName: "statsOf" as any,
     args: [laneTokenIds[5] ?? 0n],
     query: { enabled: !!giraffeNftContract && (laneTokenIds[5] ?? 0n) !== 0n },
+    watch: false,
   } as any);
 
   const laneStats = useMemo<LaneStats[]>(() => {
@@ -559,6 +598,7 @@ export const useMyBet = (
     functionName: "getBetById",
     args: [viewingRaceId ?? 0n, connectedAddress],
     query: { enabled: !!giraffeRaceContract && !!connectedAddress && hasAnyRace && viewingRaceId !== null },
+    watch: false, // Bet data is static once placed
   });
 
   return useMemo<MyBet | null>(() => {
@@ -580,6 +620,7 @@ export const useWinningClaims = (connectedAddress: `0x${string}` | undefined, gi
     functionName: "getNextWinningClaim",
     args: [connectedAddress],
     query: { enabled: !!giraffeRaceContract && !!connectedAddress },
+    watch: false, // Only changes after claiming
   });
 
   const { data: winningClaimRemainingData } = useScaffoldReadContract({
@@ -587,6 +628,7 @@ export const useWinningClaims = (connectedAddress: `0x${string}` | undefined, gi
     functionName: "getWinningClaimRemaining",
     args: [connectedAddress],
     query: { enabled: !!giraffeRaceContract && !!connectedAddress },
+    watch: false, // Only changes after claiming
   });
 
   const winningClaimRemaining = useMemo(() => {

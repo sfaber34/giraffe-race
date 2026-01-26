@@ -15,6 +15,7 @@ import {
 } from "./race/hooks";
 import { ClaimSnapshot, PlaybackSpeed } from "./race/types";
 import { parseUnits, toHex } from "viem";
+import { useBlockNumber } from "wagmi";
 import { useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 
 export const RaceDashboard = () => {
@@ -66,17 +67,6 @@ export const RaceDashboard = () => {
     entryPoolRaceId,
   } = raceDetails;
 
-  // Race status
-  const status = useRaceStatus(
-    giraffeRaceContract,
-    hasAnyRace,
-    parsed,
-    cooldownStatus,
-    blockNumber,
-    submissionCloseBlock,
-    bettingCloseBlock,
-  );
-
   // My bet
   const myBet = useMyBet(viewingRaceId, connectedAddress, giraffeRaceContract, hasAnyRace);
 
@@ -89,6 +79,25 @@ export const RaceDashboard = () => {
     settled: parsed?.settled ?? false,
     laneScore,
   });
+
+  // Conditional block watching: pause ONLY during active race playback (not when finished)
+  const isRaceAnimating = replay.isPlaying && replay.raceStarted && !!replay.simulation && !replay.raceIsOver;
+  const { data: liveBlockNumber } = useBlockNumber({
+    watch: !isRaceAnimating, // Watch when race is NOT animating (including when finished)
+  });
+  // Use live block number when available, fall back to initial from useRaceData
+  const activeBlockNumber = liveBlockNumber ?? blockNumber;
+
+  // Race status (uses activeBlockNumber for accurate status during race)
+  const status = useRaceStatus(
+    giraffeRaceContract,
+    hasAnyRace,
+    parsed,
+    cooldownStatus,
+    activeBlockNumber,
+    submissionCloseBlock,
+    bettingCloseBlock,
+  );
 
   // Camera hook
   const camera = useRaceCamera({
@@ -204,8 +213,8 @@ export const RaceDashboard = () => {
     !!parsed &&
     !parsed.settled &&
     bettingCloseBlock !== null &&
-    blockNumber !== undefined &&
-    blockNumber > bettingCloseBlock;
+    activeBlockNumber !== undefined &&
+    activeBlockNumber > bettingCloseBlock;
   const canSubmit = status === "submissions_open" || status === "no_race" || status === "settled";
   const isBetLocked = !!myBet?.hasBet;
   const selectedBetLane = isBetLocked ? myBet?.lane : betLane;
@@ -529,7 +538,7 @@ export const RaceDashboard = () => {
                     laneTokenIds={laneTokenIds}
                     myBet={myBet}
                     estimatedPayoutWei={estimatedPayoutWei}
-                    blockNumber={blockNumber}
+                    blockNumber={activeBlockNumber}
                     submissionCloseBlock={submissionCloseBlock}
                     bettingCloseBlock={bettingCloseBlock}
                     startBlock={startBlock}
@@ -582,7 +591,7 @@ export const RaceDashboard = () => {
             parsed={parsed}
             parsedSchedule={parsedSchedule}
             lineupFinalized={lineupFinalized}
-            blockNumber={blockNumber}
+            blockNumber={activeBlockNumber}
             submissionCloseBlock={submissionCloseBlock}
             bettingCloseBlock={bettingCloseBlock}
             startBlock={startBlock}
