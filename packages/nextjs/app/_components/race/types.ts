@@ -72,3 +72,17 @@ export interface QueueEntry {
   owner: `0x${string}`;
   isValid: boolean;
 }
+
+// Position info for finish order (1st, 2nd, or 3rd place)
+export interface PositionInfo {
+  lanes: number[]; // Lane indices in this position
+  count: number; // Number of lanes (1 = normal, 2+ = dead heat)
+}
+
+// Complete finish order from contract (for Win/Place/Show betting)
+export interface ParsedFinishOrder {
+  first: PositionInfo;
+  second: PositionInfo;
+  third: PositionInfo;
+  finalDistances: number[];
+}

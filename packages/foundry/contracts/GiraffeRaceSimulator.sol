@@ -17,6 +17,23 @@ contract GiraffeRaceSimulator {
     uint16 internal constant MAX_TICKS = 500;
     uint8 internal constant SPEED_RANGE = 10;
     uint16 internal constant BPS_DENOM = 10000;
+    uint16 internal constant FINISH_OVERSHOOT = 10; // Run until last place is 10 units past finish
+    
+    /// @notice Finish position info for a single position (1st, 2nd, or 3rd)
+    /// @dev lanes array holds the lane indices that finished in this position
+    /// @dev count indicates how many lanes tied for this position (dead heat)
+    struct PositionInfo {
+        uint8[6] lanes;  // Lane indices in this position (only first `count` are valid)
+        uint8 count;     // Number of lanes in this position (1 = normal, 2+ = dead heat)
+    }
+    
+    /// @notice Complete finish order for a race
+    struct FinishOrder {
+        PositionInfo first;
+        PositionInfo second;
+        PositionInfo third;
+        uint16[6] distances;  // Final distances for all lanes
+    }
 
     constructor() {
         // Verify constants match the central source at deployment time
@@ -58,6 +75,19 @@ contract GiraffeRaceSimulator {
         returns (uint8[LANE_COUNT] memory winners, uint8 winnerCount, uint16[LANE_COUNT] memory distances)
     {
         return _simulateOptimizedProfiled(seed, scores);
+    }
+    
+    /// @notice Simulate a race and return complete finish order (1st, 2nd, 3rd with dead heat support)
+    /// @dev Runs until all racers are 10 units past the finish line
+    /// @param seed The deterministic seed for the race
+    /// @param scores Lane scores (1-10)
+    /// @return finishOrder Complete finish order with dead heat info
+    function simulateFullRace(bytes32 seed, uint8[LANE_COUNT] memory scores)
+        external
+        pure
+        returns (FinishOrder memory finishOrder)
+    {
+        return _simulateFullRace(seed, scores);
     }
 
     function simulate(bytes32 seed) external pure returns (uint8 winner, uint16[LANE_COUNT] memory distances) {
@@ -261,6 +291,151 @@ contract GiraffeRaceSimulator {
             } else if (d == best) {
                 winners[winnerCount] = i;
                 winnerCount++;
+            }
+        }
+    }
+    
+    /// @notice Simulate a full race until all racers are 10 units past the finish line
+    /// @dev Returns complete finish order with dead heat support for 1st, 2nd, 3rd
+    function _simulateFullRace(bytes32 seed, uint8[LANE_COUNT] memory scores)
+        internal
+        pure
+        returns (FinishOrder memory finishOrder)
+    {
+        // Pre-calculate BPS multipliers
+        uint16[LANE_COUNT] memory bps;
+        for (uint8 a = 0; a < LANE_COUNT; a++) {
+            bps[a] = _scoreBps(scores[a]);
+        }
+
+        uint16[LANE_COUNT] memory distances;
+        uint16 finishTarget = TRACK_LENGTH + FINISH_OVERSHOOT;
+        bool allFinished = false;
+
+        for (uint256 t = 0; t < MAX_TICKS; t++) {
+            // One hash per tick - all entropy we need
+            bytes32 tickEntropy = keccak256(abi.encodePacked(seed, t));
+
+            for (uint256 a = 0; a < LANE_COUNT; a++) {
+                // Speed roll: 1 byte, % 10, gives 0-9, then +1 for 1-10
+                uint256 baseSpeed = (uint8(tickEntropy[a]) % SPEED_RANGE) + 1;
+                
+                // Apply handicap
+                uint256 raw = baseSpeed * uint256(bps[a]);
+                uint256 q = raw / uint256(BPS_DENOM);
+                uint256 rem = raw % uint256(BPS_DENOM);
+                
+                // Probabilistic rounding using 2 bytes for rounding decision
+                if (rem > 0) {
+                    // Extract 2 bytes for this lane's rounding roll (bytes 6-17)
+                    uint256 roundingRoll = (uint256(uint8(tickEntropy[6 + a * 2])) << 8) 
+                                         | uint256(uint8(tickEntropy[7 + a * 2]));
+                    // % BPS_DENOM gives 0-9999
+                    if ((roundingRoll % BPS_DENOM) < rem) {
+                        q += 1;
+                    }
+                }
+                
+                if (q == 0) q = 1;
+                distances[a] += uint16(q);
+            }
+
+            // Check if ALL lanes have passed the finish target (finish line + 10)
+            allFinished = true;
+            for (uint8 i = 0; i < LANE_COUNT; i++) {
+                if (distances[i] < finishTarget) {
+                    allFinished = false;
+                    break;
+                }
+            }
+            if (allFinished) break;
+        }
+
+        require(allFinished, "GiraffeRace: race did not finish");
+        
+        finishOrder.distances = distances;
+        
+        // Determine finish order (1st, 2nd, 3rd with dead heat support)
+        _calculateFinishOrder(distances, finishOrder);
+    }
+    
+    /// @notice Calculate finish positions from final distances
+    /// @dev Handles dead heats - multiple lanes can tie for any position
+    function _calculateFinishOrder(uint16[LANE_COUNT] memory distances, FinishOrder memory finishOrder) internal pure {
+        // Sort lanes by distance (descending) while tracking original indices
+        // We need to identify distinct distance values and group lanes by them
+        
+        // Find unique distances in descending order
+        uint16[LANE_COUNT] memory sortedDistances;
+        uint8[LANE_COUNT] memory sortedLanes;
+        
+        // Copy and sort using simple bubble sort (small fixed size)
+        for (uint8 i = 0; i < LANE_COUNT; i++) {
+            sortedDistances[i] = distances[i];
+            sortedLanes[i] = i;
+        }
+        
+        // Bubble sort descending by distance
+        for (uint8 i = 0; i < LANE_COUNT; i++) {
+            for (uint8 j = i + 1; j < LANE_COUNT; j++) {
+                if (sortedDistances[j] > sortedDistances[i]) {
+                    // Swap distances
+                    uint16 tmpDist = sortedDistances[i];
+                    sortedDistances[i] = sortedDistances[j];
+                    sortedDistances[j] = tmpDist;
+                    // Swap lane indices
+                    uint8 tmpLane = sortedLanes[i];
+                    sortedLanes[i] = sortedLanes[j];
+                    sortedLanes[j] = tmpLane;
+                }
+            }
+        }
+        
+        // Now extract 1st, 2nd, 3rd positions accounting for dead heats
+        uint8 positionIdx = 0; // 0 = filling 1st, 1 = filling 2nd, 2 = filling 3rd
+        uint8 sortIdx = 0;
+        
+        while (sortIdx < LANE_COUNT && positionIdx < 3) {
+            uint16 currentDist = sortedDistances[sortIdx];
+            
+            // Count how many lanes have this same distance (dead heat)
+            uint8 tieCount = 0;
+            uint8 tieStartIdx = sortIdx;
+            while (sortIdx < LANE_COUNT && sortedDistances[sortIdx] == currentDist) {
+                tieCount++;
+                sortIdx++;
+            }
+            
+            // Assign to the current position
+            if (positionIdx == 0) {
+                finishOrder.first.count = tieCount;
+                for (uint8 k = 0; k < tieCount; k++) {
+                    finishOrder.first.lanes[k] = sortedLanes[tieStartIdx + k];
+                }
+                positionIdx++;
+                // If there was a dead heat for 1st, we skip to 3rd (no 2nd place)
+                if (tieCount >= 2) {
+                    positionIdx++; // Skip 2nd position
+                }
+                if (tieCount >= 3) {
+                    positionIdx++; // Skip 3rd position too
+                }
+            } else if (positionIdx == 1) {
+                finishOrder.second.count = tieCount;
+                for (uint8 k = 0; k < tieCount; k++) {
+                    finishOrder.second.lanes[k] = sortedLanes[tieStartIdx + k];
+                }
+                positionIdx++;
+                // If there was a dead heat for 2nd, we skip 3rd
+                if (tieCount >= 2) {
+                    positionIdx++; // Skip 3rd position
+                }
+            } else if (positionIdx == 2) {
+                finishOrder.third.count = tieCount;
+                for (uint8 k = 0; k < tieCount; k++) {
+                    finishOrder.third.lanes[k] = sortedLanes[tieStartIdx + k];
+                }
+                positionIdx++;
             }
         }
     }

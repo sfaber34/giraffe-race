@@ -46,17 +46,33 @@ library SettlementLib {
         bytes32 baseSeed = keccak256(abi.encodePacked(bh, raceId, address(this)));
         bytes32 simSeed = keccak256(abi.encodePacked(baseSeed, "RACE_SIM"));
         
-        // Get ALL winners (supports dead heat)
-        (uint8[6] memory winners, uint8 winnerCount,) = 
-            simulator.winnersWithScore(simSeed, raceScore);
+        // Run full race simulation (until all racers finish)
+        GiraffeRaceSimulator.FinishOrder memory finishOrder = 
+            simulator.simulateFullRace(simSeed, raceScore);
 
-        // Update race state
+        // Update race state - legacy fields for backwards compatibility
         race.settled = true;
         race.settledAtBlock = uint64(block.number);
-        race.winner = winners[0];
-        race.deadHeatCount = winnerCount;
-        race.winners = winners;
+        race.winner = finishOrder.first.lanes[0];
+        race.deadHeatCount = finishOrder.first.count;
         race.seed = simSeed;
+        
+        // Copy first place winners to legacy winners array
+        for (uint8 i = 0; i < finishOrder.first.count; i++) {
+            race.winners[i] = finishOrder.first.lanes[i];
+        }
+        
+        // Store complete finish order for Win/Place/Show
+        race.firstPlace.count = finishOrder.first.count;
+        race.secondPlace.count = finishOrder.second.count;
+        race.thirdPlace.count = finishOrder.third.count;
+        
+        for (uint8 i = 0; i < 6; i++) {
+            race.firstPlace.lanes[i] = finishOrder.first.lanes[i];
+            race.secondPlace.lanes[i] = finishOrder.second.lanes[i];
+            race.thirdPlace.lanes[i] = finishOrder.third.lanes[i];
+            race.finalDistances[i] = finishOrder.distances[i];
+        }
 
         // Record liability for payouts
         newSettledLiability = settledLiability;
@@ -65,8 +81,8 @@ library SettlementLib {
         }
 
         // Emit appropriate event
-        if (winnerCount > 1) {
-            emit GiraffeRaceBase.RaceSettledDeadHeat(raceId, simSeed, winnerCount, winners);
+        if (finishOrder.first.count > 1) {
+            emit GiraffeRaceBase.RaceSettledDeadHeat(raceId, simSeed, finishOrder.first.count, race.winners);
         } else {
             emit GiraffeRaceBase.RaceSettled(raceId, simSeed, race.winner);
         }

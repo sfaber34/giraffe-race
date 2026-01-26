@@ -1,5 +1,17 @@
 import { Hex, encodePacked, keccak256 } from "viem";
 
+/// Position info for finish order (1st, 2nd, or 3rd place)
+export type PositionInfo = {
+  lanes: number[]; // Lane indices in this position
+  count: number; // Number of lanes (1 = normal, 2+ = dead heat)
+};
+
+export type FinishOrder = {
+  first: PositionInfo;
+  second: PositionInfo;
+  third: PositionInfo;
+};
+
 export type RaceSimulation = {
   winner: number; // Primary winner (first in tie order, for backwards compatibility)
   winners: number[]; // All winners (length 1 = normal, length 2+ = dead heat)
@@ -7,7 +19,11 @@ export type RaceSimulation = {
   distances: number[];
   frames: number[][];
   ticks: number;
+  // New: complete finish order for Win/Place/Show
+  finishOrder: FinishOrder;
 };
+
+const FINISH_OVERSHOOT = 10; // Match Solidity: run until last place is 10 units past finish
 
 const clampScore = (r: number) => {
   // Clamp to [1, 10]
@@ -35,6 +51,8 @@ const scoreBps = (score: number) => {
  * Entropy layout per tick (32 bytes):
  *   Bytes 0-5:   Speed rolls for lanes 0-5 (1 byte each, % 10)
  *   Bytes 6-17:  Rounding rolls for lanes 0-5 (2 bytes each, % 10000)
+ *
+ * Updated to run until ALL racers are 10 units past the finish line (for Win/Place/Show).
  */
 export function simulateRaceFromSeed({
   seed,
@@ -55,7 +73,8 @@ export function simulateRaceFromSeed({
   const frames: number[][] = [distances.slice()];
   const bps = Array.from({ length: laneCount }, (_, i) => scoreBps(score?.[i] ?? 10));
 
-  let finished = false;
+  const finishTarget = trackLength + FINISH_OVERSHOOT;
+  let allFinished = false;
   let ticks = 0;
 
   for (let t = 0; t < maxTicks; t++) {
@@ -87,27 +106,84 @@ export function simulateRaceFromSeed({
     frames.push(distances.slice());
     ticks = t + 1;
 
-    if (distances.some(d => d >= trackLength)) {
-      finished = true;
-      break;
-    }
+    // Check if ALL lanes have passed the finish target (finish line + 10)
+    allFinished = distances.every(d => d >= finishTarget);
+    if (allFinished) break;
   }
 
-  if (!finished) {
+  if (!allFinished) {
     throw new Error("Race did not finish (increase maxTicks?)");
   }
 
+  // Calculate finish order (1st, 2nd, 3rd with dead heat support)
+  const finishOrder = calculateFinishOrder(distances);
+
+  // Legacy fields for backwards compatibility
   const best = Math.max(...distances);
   const winners = distances
     .map((d, i) => ({ d, i }))
     .filter(x => x.d === best)
     .map(x => x.i);
 
-  // Dead heat: return ALL winners, no random selection (matches Solidity)
-  const winner = winners[0]!; // Primary winner for backwards compatibility
+  const winner = winners[0]!;
   const deadHeatCount = winners.length;
 
-  return { winner, winners, deadHeatCount, distances, frames, ticks };
+  return { winner, winners, deadHeatCount, distances, frames, ticks, finishOrder };
+}
+
+/**
+ * Calculate finish positions from final distances.
+ * Handles dead heats - multiple lanes can tie for any position.
+ */
+function calculateFinishOrder(distances: number[]): FinishOrder {
+  // Create array of {distance, laneIndex} and sort descending by distance
+  const sorted = distances.map((d, i) => ({ d, i })).sort((a, b) => b.d - a.d);
+
+  const finishOrder: FinishOrder = {
+    first: { lanes: [], count: 0 },
+    second: { lanes: [], count: 0 },
+    third: { lanes: [], count: 0 },
+  };
+
+  let positionIdx = 0; // 0 = filling 1st, 1 = filling 2nd, 2 = filling 3rd
+  let sortIdx = 0;
+
+  while (sortIdx < sorted.length && positionIdx < 3) {
+    const currentDist = sorted[sortIdx]!.d;
+
+    // Count how many lanes have this same distance (dead heat)
+    const tieStartIdx = sortIdx;
+    let tieCount = 0;
+    while (sortIdx < sorted.length && sorted[sortIdx]!.d === currentDist) {
+      tieCount++;
+      sortIdx++;
+    }
+
+    // Get the lane indices for this tie group
+    const tieLanes = sorted.slice(tieStartIdx, tieStartIdx + tieCount).map(x => x.i);
+
+    // Assign to the current position
+    if (positionIdx === 0) {
+      finishOrder.first.lanes = tieLanes;
+      finishOrder.first.count = tieCount;
+      positionIdx++;
+      // If there was a dead heat for 1st, we skip to 3rd (no 2nd place)
+      if (tieCount >= 2) positionIdx++; // Skip 2nd position
+      if (tieCount >= 3) positionIdx++; // Skip 3rd position too
+    } else if (positionIdx === 1) {
+      finishOrder.second.lanes = tieLanes;
+      finishOrder.second.count = tieCount;
+      positionIdx++;
+      // If there was a dead heat for 2nd, we skip 3rd
+      if (tieCount >= 2) positionIdx++; // Skip 3rd position
+    } else if (positionIdx === 2) {
+      finishOrder.third.lanes = tieLanes;
+      finishOrder.third.count = tieCount;
+      positionIdx++;
+    }
+  }
+
+  return finishOrder;
 }
 
 // Helper to convert hex string to byte array

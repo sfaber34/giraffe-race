@@ -69,6 +69,12 @@ abstract contract GiraffeRaceBase {
 
     // ============ Structs ============
     
+    /// @notice Position info for finish order (1st, 2nd, or 3rd place)
+    struct PositionInfo {
+        uint8[6] lanes;  // Lane indices in this position (only first `count` are valid)
+        uint8 count;     // Number of lanes in this position (1 = normal, 2+ = dead heat)
+    }
+    
     struct Race {
         uint64 bettingCloseBlock;
         uint64 settledAtBlock;
@@ -82,6 +88,11 @@ abstract contract GiraffeRaceBase {
         uint256[6] totalOnLane;
         uint32[6] decimalOddsBps;
         uint8[6] winners;
+        // Finish order for Win/Place/Show betting
+        PositionInfo firstPlace;
+        PositionInfo secondPlace;
+        PositionInfo thirdPlace;
+        uint16[6] finalDistances;
     }
 
     struct RaceGiraffes {

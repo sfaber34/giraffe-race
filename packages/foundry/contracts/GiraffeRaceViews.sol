@@ -66,6 +66,40 @@ abstract contract GiraffeRaceViews is GiraffeRaceBase {
         Race storage r = _races[raceId];
         return (r.deadHeatCount, r.winners);
     }
+    
+    /// @notice Get complete finish order for a race (for Win/Place/Show)
+    /// @param raceId The race ID
+    /// @return firstLanes Lane indices that finished 1st (first `firstCount` are valid)
+    /// @return firstCount Number of lanes in 1st place (1 = normal, 2+ = dead heat)
+    /// @return secondLanes Lane indices that finished 2nd
+    /// @return secondCount Number of lanes in 2nd place
+    /// @return thirdLanes Lane indices that finished 3rd  
+    /// @return thirdCount Number of lanes in 3rd place
+    /// @return finalDistances Final distance for each lane
+    function getRaceFinishOrderById(uint256 raceId)
+        external
+        view
+        returns (
+            uint8[6] memory firstLanes,
+            uint8 firstCount,
+            uint8[6] memory secondLanes,
+            uint8 secondCount,
+            uint8[6] memory thirdLanes,
+            uint8 thirdCount,
+            uint16[6] memory finalDistances
+        )
+    {
+        Race storage r = _races[raceId];
+        return (
+            r.firstPlace.lanes,
+            r.firstPlace.count,
+            r.secondPlace.lanes,
+            r.secondPlace.count,
+            r.thirdPlace.lanes,
+            r.thirdPlace.count,
+            r.finalDistances
+        );
+    }
 
     // ============ Race Actionability (for bots) ============
 

@@ -56,6 +56,7 @@ export const RaceDashboard = () => {
     parsedSchedule,
     parsedGiraffes,
     parsedOdds,
+    parsedFinishOrder,
     laneScore,
     laneTokenIds,
     laneStats,
@@ -512,6 +513,100 @@ export const RaceDashboard = () => {
                   <summary className="collapse-title text-sm font-medium">Seed (bytes32)</summary>
                   <div className="collapse-content">
                     <code className="text-xs break-all">{parsed.seed}</code>
+                  </div>
+                </details>
+              ) : null}
+
+              {/* Finish Order Comparison (Solidity vs Frontend) */}
+              {parsed?.settled && replay.simulation?.finishOrder && parsedFinishOrder ? (
+                <details className="collapse collapse-arrow bg-base-100 mt-2">
+                  <summary className="collapse-title text-sm font-medium">Finish Order Comparison (Debug)</summary>
+                  <div className="collapse-content">
+                    <div className="grid grid-cols-2 gap-4 text-xs">
+                      {/* Frontend Results */}
+                      <div>
+                        <div className="font-semibold mb-2">Frontend Simulation:</div>
+                        <div className="space-y-1">
+                          <div>
+                            <span className="text-warning">1st:</span>{" "}
+                            {replay.simulation.finishOrder.first.lanes.length > 0
+                              ? replay.simulation.finishOrder.first.lanes.map(l => `Lane ${l}`).join(", ")
+                              : "N/A"}
+                            {replay.simulation.finishOrder.first.count > 1 && (
+                              <span className="text-error ml-1">(Dead Heat!)</span>
+                            )}
+                          </div>
+                          <div>
+                            <span className="text-info">2nd:</span>{" "}
+                            {replay.simulation.finishOrder.second.lanes.length > 0
+                              ? replay.simulation.finishOrder.second.lanes.map(l => `Lane ${l}`).join(", ")
+                              : "N/A"}
+                            {replay.simulation.finishOrder.second.count > 1 && (
+                              <span className="text-error ml-1">(Dead Heat!)</span>
+                            )}
+                          </div>
+                          <div>
+                            <span className="text-success">3rd:</span>{" "}
+                            {replay.simulation.finishOrder.third.lanes.length > 0
+                              ? replay.simulation.finishOrder.third.lanes.map(l => `Lane ${l}`).join(", ")
+                              : "N/A"}
+                            {replay.simulation.finishOrder.third.count > 1 && (
+                              <span className="text-error ml-1">(Dead Heat!)</span>
+                            )}
+                          </div>
+                          <div className="mt-2 text-xs opacity-70">
+                            Distances: [{replay.simulation.distances.join(", ")}]
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Solidity Results */}
+                      <div>
+                        <div className="font-semibold mb-2">Solidity Contract:</div>
+                        <div className="space-y-1">
+                          <div>
+                            <span className="text-warning">1st:</span>{" "}
+                            {parsedFinishOrder.first.lanes.length > 0
+                              ? parsedFinishOrder.first.lanes.map(l => `Lane ${l}`).join(", ")
+                              : "N/A"}
+                            {parsedFinishOrder.first.count > 1 && <span className="text-error ml-1">(Dead Heat!)</span>}
+                          </div>
+                          <div>
+                            <span className="text-info">2nd:</span>{" "}
+                            {parsedFinishOrder.second.lanes.length > 0
+                              ? parsedFinishOrder.second.lanes.map(l => `Lane ${l}`).join(", ")
+                              : "N/A"}
+                            {parsedFinishOrder.second.count > 1 && (
+                              <span className="text-error ml-1">(Dead Heat!)</span>
+                            )}
+                          </div>
+                          <div>
+                            <span className="text-success">3rd:</span>{" "}
+                            {parsedFinishOrder.third.lanes.length > 0
+                              ? parsedFinishOrder.third.lanes.map(l => `Lane ${l}`).join(", ")
+                              : "N/A"}
+                            {parsedFinishOrder.third.count > 1 && <span className="text-error ml-1">(Dead Heat!)</span>}
+                          </div>
+                          <div className="mt-2 text-xs opacity-70">
+                            Distances: [{parsedFinishOrder.finalDistances.join(", ")}]
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Match indicator */}
+                    <div className="mt-3 pt-2 border-t border-base-300">
+                      {JSON.stringify(replay.simulation.finishOrder.first.lanes.sort()) ===
+                        JSON.stringify(parsedFinishOrder.first.lanes.sort()) &&
+                      JSON.stringify(replay.simulation.finishOrder.second.lanes.sort()) ===
+                        JSON.stringify(parsedFinishOrder.second.lanes.sort()) &&
+                      JSON.stringify(replay.simulation.finishOrder.third.lanes.sort()) ===
+                        JSON.stringify(parsedFinishOrder.third.lanes.sort()) ? (
+                        <span className="text-success font-semibold">✅ Results match!</span>
+                      ) : (
+                        <span className="text-error font-semibold">❌ Results MISMATCH!</span>
+                      )}
+                    </div>
                   </div>
                 </details>
               ) : null}

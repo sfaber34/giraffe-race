@@ -7,6 +7,7 @@ import {
   LaneStats,
   MyBet,
   NextWinningClaim,
+  ParsedFinishOrder,
   ParsedGiraffes,
   ParsedOdds,
   ParsedRace,
@@ -349,6 +350,15 @@ export const useRaceDetails = (
     watch: !hasSeenSettled, // Watch until settled to detect odds being set
   } as any);
 
+  // Fetch finish order (only after settlement)
+  const { data: finishOrderData } = useScaffoldReadContract({
+    contractName: "GiraffeRace",
+    functionName: "getRaceFinishOrderById" as any,
+    args: [viewingRaceId ?? 0n],
+    query: { enabled: hasAnyRace && viewingRaceId !== null && hasSeenSettled },
+    watch: false, // Only needed after settlement
+  } as any);
+
   // Parse race data
   const parsed = useMemo<ParsedRace | null>(() => {
     if (!raceData) return null;
@@ -475,11 +485,46 @@ export const useRaceDetails = (
   // Lineup is always finalized immediately when race is created (no separate step)
   const lineupFinalized = (parsedGiraffes?.assignedCount ?? 0) === Number(LANE_COUNT);
 
+  // Parse finish order data (for Win/Place/Show)
+  const parsedFinishOrder = useMemo<ParsedFinishOrder | null>(() => {
+    if (!finishOrderData) return null;
+    const [firstLanes, firstCount, secondLanes, secondCount, thirdLanes, thirdCount, finalDistances] =
+      finishOrderData as any;
+
+    const parsePositionLanes = (lanes: any, count: number): number[] => {
+      const arr = Array.isArray(lanes) ? lanes : [];
+      return arr.slice(0, count).map((x: any) => Number(x));
+    };
+
+    const fc = Number(firstCount ?? 0);
+    const sc = Number(secondCount ?? 0);
+    const tc = Number(thirdCount ?? 0);
+
+    return {
+      first: {
+        lanes: parsePositionLanes(firstLanes, fc),
+        count: fc,
+      },
+      second: {
+        lanes: parsePositionLanes(secondLanes, sc),
+        count: sc,
+      },
+      third: {
+        lanes: parsePositionLanes(thirdLanes, tc),
+        count: tc,
+      },
+      finalDistances: Array.isArray(finalDistances)
+        ? finalDistances.map((x: any) => Number(x))
+        : Array.from({ length: LANE_COUNT }, () => 0),
+    };
+  }, [finishOrderData]);
+
   return {
     parsed,
     parsedSchedule,
     parsedGiraffes,
     parsedOdds,
+    parsedFinishOrder,
     laneScore,
     laneTokenIds,
     laneStats,

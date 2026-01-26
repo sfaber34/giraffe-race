@@ -27,6 +27,9 @@ library GiraffeRaceConstants {
     
     /// @notice Speed range per tick (1 to SPEED_RANGE)
     uint8 internal constant SPEED_RANGE = 10;
+    
+    /// @notice Distance past finish line to run (ensures all racers visually cross)
+    uint16 internal constant FINISH_OVERSHOOT = 10;
 
     // ============ Odds Configuration ============
     
