@@ -170,12 +170,13 @@ export function GiraffeAnimated({
   const rateRafRef = useRef<number | null>(null);
   const rateLastTsRef = useRef<number | null>(null);
 
-  const seedEnabled = tokenId !== undefined && tokenId !== 0n && seed === undefined;
+  // Determine if we need to fetch the seed from the contract
+  const needsSeedFromContract = tokenId !== undefined && tokenId !== 0n && seed === undefined;
   const { data: seedData } = useScaffoldReadContract({
     contractName: "GiraffeNFT",
     functionName: "seedOf",
-    args: [seedEnabled ? tokenId : undefined],
-    query: { enabled: seedEnabled },
+    args: [needsSeedFromContract ? tokenId : undefined],
+    query: { enabled: needsSeedFromContract },
   });
 
   const resolvedSeed = useMemo(() => {
@@ -184,7 +185,17 @@ export function GiraffeAnimated({
     return undefined;
   }, [seed, seedData]);
 
+  // Don't render SVG until we have the seed (when tokenId is provided)
+  // This prevents the flash of default colors before the correct palette is applied
+  const isWaitingForSeed = needsSeedFromContract && !resolvedSeed;
+
   useEffect(() => {
+    // Don't generate SVG while waiting for seed - prevents FOUC
+    if (isWaitingForSeed) {
+      setSvgMarkup(null);
+      return;
+    }
+
     let cancelled = false;
     (async () => {
       const raw = await fetchGiraffeSvgText();
@@ -216,7 +227,7 @@ export function GiraffeAnimated({
     return () => {
       cancelled = true;
     };
-  }, [idPrefix, resolvedSeed]);
+  }, [idPrefix, resolvedSeed, isWaitingForSeed]);
 
   // IMPORTANT: Don't use dangerouslySetInnerHTML in render, because React may re-apply it on every parent re-render,
   // which recreates the SVG subtree and restarts CSS animations. Instead, imperatively set innerHTML only when the
