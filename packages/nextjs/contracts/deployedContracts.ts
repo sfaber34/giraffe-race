@@ -1481,13 +1481,7 @@ const deployedContracts = {
               internalType: "uint256",
             },
             {
-              name: "diceCreateGas",
-              type: "uint256",
-              indexed: false,
-              internalType: "uint256",
-            },
-            {
-              name: "bpsCalcGas",
+              name: "setupGas",
               type: "uint256",
               indexed: false,
               internalType: "uint256",
@@ -1505,13 +1499,7 @@ const deployedContracts = {
               internalType: "uint256",
             },
             {
-              name: "speedRollCount",
-              type: "uint256",
-              indexed: false,
-              internalType: "uint256",
-            },
-            {
-              name: "roundingRollCount",
+              name: "hashCount",
               type: "uint256",
               indexed: false,
               internalType: "uint256",
@@ -5756,7 +5744,7 @@ const deployedContracts = {
   },
   31337: {
     MockUSDC: {
-      address: "0x700b6a60ce7eaaea56f065753d8dcb9653dbad35",
+      address: "0x2c4b93b614ddbfaf0807e8f4ca982e9f9c2e2aa4",
       abi: [
         {
           type: "constructor",
@@ -6104,10 +6092,10 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 6,
+      deployedOnBlock: 1050,
     },
     GiraffeNFT: {
-      address: "0xb19b36b1456e65e3a6d514d3f715f204bd59f431",
+      address: "0xf1078fd568ad76e49e6f88d1ff485402a086976b",
       abi: [
         {
           type: "constructor",
@@ -7454,10 +7442,10 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 8,
+      deployedOnBlock: 1052,
     },
     GiraffeRaceSimulator: {
-      address: "0x8ce361602b935680e8dec218b820ff5056beb7af",
+      address: "0xe8f76a822b57b973c7a89006092364fff8f69040",
       abi: [
         {
           type: "function",
@@ -7581,13 +7569,7 @@ const deployedContracts = {
               internalType: "uint256",
             },
             {
-              name: "diceCreateGas",
-              type: "uint256",
-              indexed: false,
-              internalType: "uint256",
-            },
-            {
-              name: "bpsCalcGas",
+              name: "setupGas",
               type: "uint256",
               indexed: false,
               internalType: "uint256",
@@ -7605,13 +7587,7 @@ const deployedContracts = {
               internalType: "uint256",
             },
             {
-              name: "speedRollCount",
-              type: "uint256",
-              indexed: false,
-              internalType: "uint256",
-            },
-            {
-              name: "roundingRollCount",
+              name: "hashCount",
               type: "uint256",
               indexed: false,
               internalType: "uint256",
@@ -7621,10 +7597,10 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 9,
+      deployedOnBlock: 1053,
     },
     HouseTreasury: {
-      address: "0xe1aa25618fa0c7a1cfdab5d6b456af611873b629",
+      address: "0x4e85dc48a70da1298489d5b6fc2492767d98f384",
       abi: [
         {
           type: "constructor",
@@ -8026,10 +8002,10 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 10,
+      deployedOnBlock: 1054,
     },
     WinProbTableShard0: {
-      address: "0xe1da8919f262ee86f9be05059c9280142cf23f48",
+      address: "0x4d8e02bbfcf205828a8352af4376b165e123d7b0",
       abi: [
         {
           type: "function",
@@ -8070,10 +8046,10 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 11,
+      deployedOnBlock: 1055,
     },
     WinProbTableShard1: {
-      address: "0x0c8e79f3534b00d9a3d4a856b665bf4ebc22f2ba",
+      address: "0xeab25969e5285df34a3b245324d0b2b91e31cad4",
       abi: [
         {
           type: "function",
@@ -8114,10 +8090,10 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 12,
+      deployedOnBlock: 1056,
     },
     WinProbTableShard2: {
-      address: "0xed1db453c3156ff3155a97ad217b3087d5dc5f6e",
+      address: "0x150890d6984e98f408162ee65684779804bff858",
       abi: [
         {
           type: "function",
@@ -8158,10 +8134,10 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 13,
+      deployedOnBlock: 1057,
     },
     WinProbTableShard3: {
-      address: "0xf7cd8fa9b94db2aa972023b379c7f72c65e4de9d",
+      address: "0xc525e1bed21174d5615252a16ee2b283b894a318",
       abi: [
         {
           type: "function",
@@ -8202,10 +8178,10 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 14,
+      deployedOnBlock: 1058,
     },
     WinProbTableShard4: {
-      address: "0x12975173b87f7595ee45dffb2ab812ece596bf84",
+      address: "0xe8ecf644d9a3432dab3a0725308f265990eedca9",
       abi: [
         {
           type: "function",
@@ -8246,10 +8222,10 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 15,
+      deployedOnBlock: 1059,
     },
     WinProbTableShard5: {
-      address: "0x82dc47734901ee7d4f4232f398752cb9dd5daccc",
+      address: "0x3a1d75769758705cab1385377d4d88b8193a5f37",
       abi: [
         {
           type: "function",
@@ -8290,10 +8266,10 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 16,
+      deployedOnBlock: 1060,
     },
     WinProbTable6: {
-      address: "0x196dbcbb54b8ec4958c959d8949ebfe87ac2aaaf",
+      address: "0xb1527802e7800034d6887b0a99a5ad2683184b95",
       abi: [
         {
           type: "constructor",
@@ -8474,10 +8450,10 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 17,
+      deployedOnBlock: 1061,
     },
     DiamondCutFacet: {
-      address: "0x6379ebd504941f50d5bfde9348b37593bd29c835",
+      address: "0x67f65b834aaac92c15c2eba9ff7e81f2d33a1cfd",
       abi: [
         {
           type: "function",
@@ -8563,10 +8539,10 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 24,
+      deployedOnBlock: 1068,
     },
     DiamondLoupeFacet: {
-      address: "0x5b3120d0da5fdcba7aef87a9c3c64829c1c0d76b",
+      address: "0xa7b987f505366630109de019862c183e690a040b",
       abi: [
         {
           type: "function",
@@ -8665,10 +8641,10 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 25,
+      deployedOnBlock: 1069,
     },
     AdminFacet: {
-      address: "0x33b1b5aa9aa4da83a332f0bc5cac6a903fde5d92",
+      address: "0x3ebd66861c1d8f298c20ed56506b063206103227",
       abi: [
         {
           type: "function",
@@ -8888,10 +8864,10 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 26,
+      deployedOnBlock: 1070,
     },
     RaceLifecycleFacet: {
-      address: "0x19a1c09fe3399c4daaa2c98b936a8e460fc5eaa4",
+      address: "0xbf3cd410aa5a3e9da22fd9109add5d3655fcb1c5",
       abi: [
         {
           type: "function",
@@ -9222,10 +9198,10 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 27,
+      deployedOnBlock: 1071,
     },
     BettingFacet: {
-      address: "0x49b8e3b089d4ebf9f37b1da9b839ec013c2cd8c9",
+      address: "0xc8c25aab3eea991e083d2d0240ee4d693c59bdac",
       abi: [
         {
           type: "function",
@@ -9686,10 +9662,10 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 28,
+      deployedOnBlock: 1072,
     },
     GiraffeSubmissionFacet: {
-      address: "0x067c804bb006836469379d4a2a69a81803bd1f45",
+      address: "0x7c10a8944baa22a41a51b82dc419e866a04e55db",
       abi: [
         {
           type: "function",
@@ -9873,10 +9849,10 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 29,
+      deployedOnBlock: 1073,
     },
     RaceViewsFacet: {
-      address: "0x45009dd3abbe29db54fc5d893ceaa98a624882df",
+      address: "0xdc88b5feffd566bfa016b6b9268ea29929e7adf1",
       abi: [
         {
           type: "function",
@@ -10299,10 +10275,10 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 30,
+      deployedOnBlock: 1074,
     },
     GiraffeRace: {
-      address: "0xf56aa3aceddf88ab12e494d0b96da3c09a5d264e",
+      address: "0x25c74b7124bae93364213a6124a5e45bb0e98889",
       abi: [
         {
           type: "function",
@@ -11851,7 +11827,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 31,
+      deployedOnBlock: 1075,
     },
   },
 } as const;

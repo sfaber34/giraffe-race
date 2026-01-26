@@ -340,34 +340,29 @@ export const RaceDashboard = () => {
         }
       });
 
-      // Find SimulationGasProfile from simulator address
-      const simulatorLog = receipt.logs.find(
-        log => log.address.toLowerCase() === "0x8ce361602b935680e8dec218b820ff5056beb7af",
-      );
+      // Find SimulationGasProfile from simulator (any address that's NOT the diamond)
+      const diamondAddress = giraffeRaceContract?.address?.toLowerCase();
+      const simulatorLog = receipt.logs.find(log => log.address.toLowerCase() !== diamondAddress);
 
       if (simulatorLog) {
         const data = simulatorLog.data.slice(2);
         const totalTicks = BigInt("0x" + data.slice(0, 64));
-        const diceCreateGas = BigInt("0x" + data.slice(64, 128));
-        const bpsCalcGas = BigInt("0x" + data.slice(128, 192));
-        const mainLoopGas = BigInt("0x" + data.slice(192, 256));
-        const winnerCalcGas = BigInt("0x" + data.slice(256, 320));
-        const speedRollCount = BigInt("0x" + data.slice(320, 384));
-        const roundingRollCount = BigInt("0x" + data.slice(384, 448));
+        const setupGas = BigInt("0x" + data.slice(64, 128));
+        const mainLoopGas = BigInt("0x" + data.slice(128, 192));
+        const winnerCalcGas = BigInt("0x" + data.slice(192, 256));
+        const hashCount = BigInt("0x" + data.slice(256, 320));
 
         console.log("\n========== SIMULATION DETAILS ==========");
         console.log(`🎲 Total Ticks:        ${totalTicks}`);
-        console.log(`🎲 Speed Rolls:        ${speedRollCount}`);
-        console.log(`🎲 Rounding Rolls:     ${roundingRollCount}`);
-        console.log(`⛽ Dice Create:        ${diceCreateGas.toLocaleString()} gas`);
-        console.log(`⛽ BPS Calc:           ${bpsCalcGas.toLocaleString()} gas`);
+        console.log(`🔑 Hashes (1/tick):    ${hashCount}`);
+        console.log(`⛽ Setup:              ${setupGas.toLocaleString()} gas`);
         console.log(`⛽ Main Loop:          ${mainLoopGas.toLocaleString()} gas`);
         console.log(`⛽ Winner Calc:        ${winnerCalcGas.toLocaleString()} gas`);
       }
 
       console.log("=====================================\n");
     }
-  }, [writeGiraffeRaceAsync, publicClient]);
+  }, [writeGiraffeRaceAsync, publicClient, giraffeRaceContract?.address]);
 
   const handleSubmitNft = useCallback(async () => {
     if (selectedTokenId === null) return;
