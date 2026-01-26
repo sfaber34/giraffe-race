@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { LANE_COUNT, SUBMISSION_WINDOW_BLOCKS } from "../constants";
+import { LANE_COUNT } from "../constants";
 import {
   CooldownStatus,
   LaneStats,
@@ -11,6 +11,7 @@ import {
   ParsedOdds,
   ParsedRace,
   ParsedSchedule,
+  QueueEntry,
   RaceStatus,
 } from "../types";
 import { clampStat, parseStats } from "../utils";
@@ -18,7 +19,6 @@ import { Hex } from "viem";
 import { useAccount, useBlockNumber, usePublicClient } from "wagmi";
 import {
   useDeployedContractInfo,
-  useScaffoldEventHistory,
   useScaffoldReadContract,
   useTargetNetwork,
   useUsdcContract,
@@ -346,17 +346,8 @@ export const useRaceDetails = (
     functionName: "getRaceOddsById" as any,
     args: [viewingRaceId ?? 0n],
     query: { enabled: hasAnyRace && viewingRaceId !== null },
-    watch: !hasSeenSettled, // Watch until settled to detect odds being set (finalization)
+    watch: !hasSeenSettled, // Watch until settled to detect odds being set
   } as any);
-
-  // Entry pool events
-  const { data: submittedEvents } = useScaffoldEventHistory({
-    contractName: "GiraffeRace",
-    eventName: "GiraffeSubmitted",
-    filters: viewingRaceId !== null ? ({ raceId: viewingRaceId } as any) : undefined,
-    watch: true,
-    enabled: hasAnyRace && viewingRaceId !== null,
-  });
 
   // Parse race data
   const parsed = useMemo<ParsedRace | null>(() => {
@@ -381,12 +372,9 @@ export const useRaceDetails = (
 
   const parsedSchedule = useMemo<ParsedSchedule | null>(() => {
     if (!raceScheduleData) return null;
-    const [bettingCloseBlock, submissionCloseBlock, settledAtBlock] = raceScheduleData as unknown as [
-      bigint,
-      bigint,
-      bigint,
-    ];
-    return { bettingCloseBlock, submissionCloseBlock, settledAtBlock };
+    // New contract returns only [bettingCloseBlock, settledAtBlock]
+    const [bettingCloseBlock, settledAtBlock] = raceScheduleData as unknown as [bigint, bigint];
+    return { bettingCloseBlock, settledAtBlock };
   }, [raceScheduleData]);
 
   const parsedGiraffes = useMemo<ParsedGiraffes | null>(() => {
@@ -422,57 +410,12 @@ export const useRaceDetails = (
     return Array.from({ length: LANE_COUNT }, (_, i) => BigInt(arr[i] ?? 0n));
   }, [parsedGiraffes?.tokenIds]);
 
-  // Entry pool
-  const [entryPoolRaceId, setEntryPoolRaceId] = useState<bigint | null>(null);
-
-  useEffect(() => {
-    setEntryPoolRaceId(viewingRaceId);
-  }, [viewingRaceId]);
-
-  const entryPoolTokenIds = useMemo(() => {
-    if (entryPoolRaceId !== viewingRaceId) return [];
-    const evs = (submittedEvents as any[] | undefined) ?? [];
-    const out: bigint[] = [];
-    const seen = new Set<string>();
-    for (const e of evs) {
-      const eventRaceId = BigInt((e as any)?.args?.raceId ?? 0);
-      if (viewingRaceId !== null && eventRaceId !== viewingRaceId) continue;
-      const tokenId = BigInt((e as any)?.args?.tokenId ?? 0);
-      if (tokenId === 0n) continue;
-      const k = tokenId.toString();
-      if (seen.has(k)) continue;
-      seen.add(k);
-      out.push(tokenId);
-    }
-    return out;
-  }, [submittedEvents, viewingRaceId, entryPoolRaceId]);
-
-  const selectedLineupTokenIdSet = useMemo(() => {
-    const set = new Set<string>();
-    const ids = parsedGiraffes?.tokenIds ?? [];
-    for (const id of ids) {
-      const tokenId = BigInt(id ?? 0);
-      if (tokenId === 0n) continue;
-      set.add(tokenId.toString());
-    }
-    return set;
-  }, [parsedGiraffes?.tokenIds]);
-
-  // Submission/betting blocks
-  const submissionCloseBlock = parsedSchedule?.submissionCloseBlock ?? null;
-
   const bettingCloseBlock = useMemo(() => {
     const fromSchedule = parsedSchedule?.bettingCloseBlock;
     const fromRace = parsed?.bettingCloseBlock;
     const value = fromSchedule ?? fromRace ?? null;
     return value && value > 0n ? value : null;
   }, [parsedSchedule, parsed]);
-
-  const startBlock = useMemo(() => {
-    if (!submissionCloseBlock) return null;
-    if (submissionCloseBlock < SUBMISSION_WINDOW_BLOCKS) return null;
-    return submissionCloseBlock - SUBMISSION_WINDOW_BLOCKS;
-  }, [submissionCloseBlock]);
 
   // Lane stats (individual reads) - static, no need to watch
   const { data: lane0StatsData } = useScaffoldReadContract({
@@ -529,6 +472,7 @@ export const useRaceDetails = (
     ];
   }, [lane0StatsData, lane1StatsData, lane2StatsData, lane3StatsData, lane4StatsData, lane5StatsData]);
 
+  // Lineup is always finalized immediately when race is created (no separate step)
   const lineupFinalized = (parsedGiraffes?.assignedCount ?? 0) === Number(LANE_COUNT);
 
   return {
@@ -539,13 +483,8 @@ export const useRaceDetails = (
     laneScore,
     laneTokenIds,
     laneStats,
-    entryPoolTokenIds,
-    selectedLineupTokenIdSet,
-    submissionCloseBlock,
     bettingCloseBlock,
-    startBlock,
     lineupFinalized,
-    entryPoolRaceId,
   };
 };
 
@@ -555,7 +494,6 @@ export const useRaceStatus = (
   parsed: ParsedRace | null,
   cooldownStatus: CooldownStatus | null,
   blockNumber: bigint | undefined,
-  submissionCloseBlock: bigint | null,
   bettingCloseBlock: bigint | null,
 ): RaceStatus => {
   return useMemo(() => {
@@ -571,12 +509,10 @@ export const useRaceStatus = (
 
     if (blockNumber === undefined) return "betting_closed";
 
-    if (submissionCloseBlock !== null && blockNumber < submissionCloseBlock) {
-      return "submissions_open";
-    }
-
+    // With the new queue system, races go directly to betting_open when created
     if (!bettingCloseBlock) {
-      return "awaiting_finalization";
+      // Race exists but no betting close block yet - shouldn't happen with new system
+      return "betting_closed";
     }
 
     if (blockNumber < bettingCloseBlock) {
@@ -584,7 +520,7 @@ export const useRaceStatus = (
     }
 
     return "betting_closed";
-  }, [giraffeRaceContract, hasAnyRace, parsed, blockNumber, submissionCloseBlock, bettingCloseBlock, cooldownStatus]);
+  }, [giraffeRaceContract, hasAnyRace, parsed, blockNumber, bettingCloseBlock, cooldownStatus]);
 };
 
 export const useMyBet = (
@@ -657,4 +593,101 @@ export const useWinningClaims = (connectedAddress: `0x${string}` | undefined, gi
   }, [nextWinningClaimData]);
 
   return { nextWinningClaim, winningClaimRemaining };
+};
+
+// Hook for the persistent race queue
+export const useRaceQueue = (giraffeRaceContract: any, connectedAddress: `0x${string}` | undefined) => {
+  // Active queue length
+  const { data: activeQueueLengthData } = useScaffoldReadContract({
+    contractName: "GiraffeRace",
+    functionName: "getActiveQueueLength" as any,
+    query: { enabled: !!giraffeRaceContract },
+  } as any);
+
+  // User's queue status
+  const { data: userInQueueData } = useScaffoldReadContract({
+    contractName: "GiraffeRace",
+    functionName: "isUserInQueue" as any,
+    args: [connectedAddress],
+    query: { enabled: !!giraffeRaceContract && !!connectedAddress },
+  } as any);
+
+  // User's queued token
+  const { data: userQueuedTokenData } = useScaffoldReadContract({
+    contractName: "GiraffeRace",
+    functionName: "getUserQueuedToken" as any,
+    args: [connectedAddress],
+    query: { enabled: !!giraffeRaceContract && !!connectedAddress },
+  } as any);
+
+  // User's queue position
+  const { data: userQueuePositionData } = useScaffoldReadContract({
+    contractName: "GiraffeRace",
+    functionName: "getUserQueuePosition" as any,
+    args: [connectedAddress],
+    query: { enabled: !!giraffeRaceContract && !!connectedAddress },
+  } as any);
+
+  // Queue entries (first 20)
+  const { data: queueEntriesData } = useScaffoldReadContract({
+    contractName: "GiraffeRace",
+    functionName: "getQueueEntries" as any,
+    args: [0n, 20n],
+    query: { enabled: !!giraffeRaceContract },
+  } as any);
+
+  const activeQueueLength = useMemo(() => {
+    if (activeQueueLengthData === undefined) return 0;
+    try {
+      return Number(BigInt(activeQueueLengthData as any));
+    } catch {
+      return 0;
+    }
+  }, [activeQueueLengthData]);
+
+  const userInQueue = useMemo(() => {
+    return Boolean(userInQueueData);
+  }, [userInQueueData]);
+
+  const userQueuedToken = useMemo(() => {
+    if (!userQueuedTokenData) return null;
+    try {
+      const val = BigInt(userQueuedTokenData as any);
+      return val === 0n ? null : val;
+    } catch {
+      return null;
+    }
+  }, [userQueuedTokenData]);
+
+  const userQueuePosition = useMemo(() => {
+    if (!userQueuePositionData) return null;
+    try {
+      const val = Number(BigInt(userQueuePositionData as any));
+      return val === 0 ? null : val;
+    } catch {
+      return null;
+    }
+  }, [userQueuePositionData]);
+
+  const queueEntries = useMemo<QueueEntry[]>(() => {
+    if (!queueEntriesData) return [];
+    const entries = queueEntriesData as unknown as any[];
+    if (!Array.isArray(entries)) return [];
+    return entries
+      .map((e: any) => ({
+        index: BigInt(e?.index ?? 0),
+        tokenId: BigInt(e?.tokenId ?? 0),
+        owner: (e?.owner ?? "0x0") as `0x${string}`,
+        isValid: Boolean(e?.isValid),
+      }))
+      .filter(e => e.isValid);
+  }, [queueEntriesData]);
+
+  return {
+    activeQueueLength,
+    userInQueue,
+    userQueuedToken,
+    userQueuePosition,
+    queueEntries,
+  };
 };

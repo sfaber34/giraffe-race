@@ -35,10 +35,9 @@ abstract contract GiraffeRaceBase {
     uint16 public constant MAX_HOUSE_EDGE_BPS = 3000;
     uint32 public constant MIN_DECIMAL_ODDS_BPS = 10100;
     uint32 public constant TEMP_FIXED_DECIMAL_ODDS_BPS = 57000;
-    uint64 public constant SUBMISSION_WINDOW_BLOCKS = 30;
     uint64 public constant BETTING_WINDOW_BLOCKS = 30;
     uint64 public constant POST_RACE_COOLDOWN_BLOCKS = 30;
-    uint16 public constant MAX_ENTRIES_PER_RACE = 128;
+    uint16 public constant MAX_QUEUE_SIZE = 128;
 
     // ============ Claim Status Constants ============
     
@@ -58,10 +57,9 @@ abstract contract GiraffeRaceBase {
         assert(MAX_HOUSE_EDGE_BPS == C.MAX_HOUSE_EDGE_BPS);
         assert(MIN_DECIMAL_ODDS_BPS == C.MIN_DECIMAL_ODDS_BPS);
         assert(TEMP_FIXED_DECIMAL_ODDS_BPS == C.TEMP_FIXED_DECIMAL_ODDS_BPS);
-        assert(SUBMISSION_WINDOW_BLOCKS == C.SUBMISSION_WINDOW_BLOCKS);
         assert(BETTING_WINDOW_BLOCKS == C.BETTING_WINDOW_BLOCKS);
         assert(POST_RACE_COOLDOWN_BLOCKS == C.POST_RACE_COOLDOWN_BLOCKS);
-        assert(MAX_ENTRIES_PER_RACE == C.MAX_ENTRIES_PER_RACE);
+        assert(MAX_QUEUE_SIZE == C.MAX_QUEUE_SIZE);
         assert(CLAIM_STATUS_BLOCKHASH_UNAVAILABLE == C.CLAIM_STATUS_BLOCKHASH_UNAVAILABLE);
         assert(CLAIM_STATUS_READY_TO_SETTLE == C.CLAIM_STATUS_READY_TO_SETTLE);
         assert(CLAIM_STATUS_LOSS == C.CLAIM_STATUS_LOSS);
@@ -72,10 +70,8 @@ abstract contract GiraffeRaceBase {
     // ============ Structs ============
     
     struct Race {
-        uint64 submissionCloseBlock;
         uint64 bettingCloseBlock;
         uint64 settledAtBlock;
-        bool giraffesFinalized;
         bool oddsSet;
         bool settled;
         bool cancelled;
@@ -94,9 +90,11 @@ abstract contract GiraffeRaceBase {
         address[6] originalOwners;
     }
 
-    struct RaceEntry {
+    /// @notice Entry in the persistent race queue
+    struct QueueEntry {
         uint256 tokenId;
-        address submitter;
+        address owner;
+        bool removed;  // soft delete flag
     }
 
     struct Bet {
@@ -115,6 +113,14 @@ abstract contract GiraffeRaceBase {
         uint8 winner;
         uint256 payout;
         uint64 bettingCloseBlock;
+    }
+    
+    /// @notice View struct for queue entries
+    struct QueueEntryView {
+        uint256 index;
+        uint256 tokenId;
+        address owner;
+        bool isValid;  // true if owner still owns the token and entry not removed
     }
 
     // ============ State Variables ============
@@ -136,14 +142,17 @@ abstract contract GiraffeRaceBase {
     uint256 public nextRaceId;
     uint256 public settledLiability;
     
+    // Persistent race queue (FIFO)
+    QueueEntry[] internal _raceQueue;
+    uint256 public queueHead;  // index of first non-processed entry
+    mapping(uint256 => uint256) internal _tokenQueueIndex;  // tokenId => index+1 (0 means not in queue)
+    mapping(address => bool) public userInQueue;  // one entry per user
+    
     // Mappings
     mapping(uint256 => Race) internal _races;
     mapping(uint256 => mapping(address => Bet)) internal _bets;
     mapping(uint256 => RaceGiraffes) internal _raceGiraffes;
     mapping(uint256 => uint8[6]) internal _raceScore;
-    mapping(uint256 => mapping(address => bool)) internal _hasSubmittedGiraffe;
-    mapping(uint256 => RaceEntry[]) internal _raceEntries;
-    mapping(uint256 => mapping(uint256 => bool)) internal _tokenEntered;
     
     // User bet history
     mapping(address => uint256[]) internal _bettorRaceIds;
@@ -157,23 +166,17 @@ abstract contract GiraffeRaceBase {
     error NoClaimableBets();
     error BettingClosed();
     error BettingNotOpen();
-    error SubmissionsClosed();
     error AlreadyBet();
     error InvalidLane();
     error ZeroBet();
     error AlreadySettled();
     error NotSettled();
-    error BlockhashUnavailable();
     error RaceNotReady();
     error NotWinner();
     error AlreadyClaimed();
-    error AlreadySubmitted();
     error InvalidHouseGiraffe();
     error GiraffeNotAssigned();
     error NotTokenOwner();
-    error TokenAlreadyEntered();
-    error EntryPoolFull();
-    error GiraffesAlreadyFinalized();
     error PreviousRaceNotSettled();
     error CooldownNotElapsed();
     error NotTreasuryOwner();
@@ -183,22 +186,32 @@ abstract contract GiraffeRaceBase {
     error InsufficientBankroll();
     error RaceNotCancellable();
     error AlreadyCancelled();
+    
+    // Queue errors
+    error AlreadyInQueue();
+    error NotInQueue();
+    error QueueFull();
+    error TokenAlreadyQueued();
+    error CannotQueueHouseGiraffe();
 
     // ============ Events ============
     
-    event RaceCreated(uint256 indexed raceId, uint64 submissionCloseBlock);
-    event BettingWindowOpened(uint256 indexed raceId, uint64 bettingCloseBlock);
+    event RaceCreated(uint256 indexed raceId, uint64 bettingCloseBlock);
     event RaceOddsSet(uint256 indexed raceId, uint32[6] decimalOddsBps);
     event BetPlaced(uint256 indexed raceId, address indexed bettor, uint8 indexed lane, uint256 amount);
     event RaceSettled(uint256 indexed raceId, bytes32 seed, uint8 winner);
     event RaceSettledDeadHeat(uint256 indexed raceId, bytes32 seed, uint8 deadHeatCount, uint8[6] winners);
     event Claimed(uint256 indexed raceId, address indexed bettor, uint256 payout);
-    event GiraffeSubmitted(uint256 indexed raceId, address indexed owner, uint256 indexed tokenId, uint8 lane);
     event GiraffeAssigned(uint256 indexed raceId, uint256 indexed tokenId, address indexed originalOwner, uint8 lane);
     event HouseGiraffeAssigned(uint256 indexed raceId, uint256 indexed tokenId, uint8 lane);
     event HouseEdgeUpdated(uint16 oldEdgeBps, uint16 newEdgeBps);
     event MaxBetUpdated(uint256 oldMaxBet, uint256 newMaxBet);
     event RaceCancelled(uint256 indexed raceId);
+    
+    // Queue events
+    event QueueEntered(address indexed owner, uint256 indexed tokenId, uint256 queuePosition);
+    event QueueLeft(address indexed owner, uint256 indexed tokenId);
+    event QueueEntrySelected(uint256 indexed raceId, address indexed owner, uint256 indexed tokenId, uint8 lane);
 
     // ============ Modifiers ============
     

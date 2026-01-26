@@ -7,12 +7,11 @@ import { OddsLib } from "./libraries/OddsLib.sol"; // Used for calculateEffectiv
 
 /**
  * @title GiraffeRaceLifecycle
- * @notice Handles race creation, finalization, and settlement
- * @dev Core race lifecycle management
+ * @notice Handles race creation and settlement
+ * @dev Race creation now selects lineup from persistent queue (FIFO)
  */
 abstract contract GiraffeRaceLifecycle is GiraffeRaceBase {
-    // ============ Optimized Simple RNG (for small selections) ============
-    // Uses direct modulo - fine for selecting from small sets (max ~128 entries)
+    // ============ Optimized Simple RNG (for house giraffe selection) ============
     
     struct SimpleRng {
         bytes32 seed;
@@ -32,7 +31,8 @@ abstract contract GiraffeRaceLifecycle is GiraffeRaceBase {
 
     // ============ Race Creation ============
 
-    /// @notice Create a new race
+    /// @notice Create a new race - selects lineup from queue and opens betting immediately
+    /// @dev Lineup is selected FIFO from the persistent queue. Empty lanes filled with house giraffes.
     function createRace() external returns (uint256 raceId) {
         // Only allow one open race at a time
         if (nextRaceId > 0) {
@@ -45,32 +45,27 @@ abstract contract GiraffeRaceLifecycle is GiraffeRaceBase {
             }
         }
 
-        uint64 submissionCloseBlock = uint64(block.number + SUBMISSION_WINDOW_BLOCKS);
-
         raceId = nextRaceId++;
         Race storage r = _races[raceId];
-        r.submissionCloseBlock = submissionCloseBlock;
-
-        emit RaceCreated(raceId, submissionCloseBlock);
-    }
-
-    // ============ Race Finalization ============
-
-    /// @notice Finalize the race lineup after submissions close
-    /// @dev Sets the betting window and assigns giraffes to lanes
-    function finalizeRaceGiraffes() external {
-        uint256 raceId = _activeRaceId();
-        Race storage r = _races[raceId];
         
-        if (r.settled) revert AlreadySettled();
-        if (r.giraffesFinalized) revert GiraffesAlreadyFinalized();
-        if (block.number < r.submissionCloseBlock) revert BettingNotOpen();
-
-        _finalizeGiraffes(raceId);
+        // Select lineup from queue and fill with house giraffes
+        _selectLineupFromQueue(raceId);
         
-        // Set the betting close block NOW - this starts the betting window
+        // Snapshot effective score for each lane
+        RaceGiraffes storage ra = _raceGiraffes[raceId];
+        for (uint8 lane = 0; lane < LANE_COUNT; ) {
+            (uint8 zip, uint8 moxie, uint8 hustle) = giraffeNft.statsOf(ra.tokenIds[lane]);
+            _raceScore[raceId][lane] = OddsLib.calculateEffectiveScore(zip, moxie, hustle);
+            unchecked { ++lane; }
+        }
+        
+        // Set fixed odds
+        _autoSetOddsFromScore(raceId);
+        
+        // Open betting immediately
         r.bettingCloseBlock = uint64(block.number) + BETTING_WINDOW_BLOCKS;
-        emit BettingWindowOpened(raceId, r.bettingCloseBlock);
+        
+        emit RaceCreated(raceId, r.bettingCloseBlock);
     }
 
     // ============ Race Settlement ============
@@ -83,35 +78,99 @@ abstract contract GiraffeRaceLifecycle is GiraffeRaceBase {
 
     // ============ Internal Helpers ============
 
-    function _finalizeGiraffes(uint256 raceId) internal {
-        Race storage r = _races[raceId];
-
-        bytes32 bh = blockhash(uint256(r.submissionCloseBlock - 1));
-        if (bh == bytes32(0)) revert BlockhashUnavailable();
-
-        bytes32 baseSeed = keccak256(abi.encodePacked(bh, raceId, address(this)));
-        bytes32 fillSeed = keccak256(abi.encodePacked(baseSeed, "HOUSE_FILL"));
-
-        _finalizeGiraffesFromPool(raceId, fillSeed);
-
-        // Snapshot effective score for each lane
-        RaceGiraffes storage raSnapshot = _raceGiraffes[raceId];
-        for (uint8 lane = 0; lane < LANE_COUNT; ) {
-            (uint8 r0, uint8 c0, uint8 s0) = giraffeNft.statsOf(raSnapshot.tokenIds[lane]);
-            _raceScore[raceId][lane] = OddsLib.calculateEffectiveScore(r0, c0, s0);
-            unchecked { ++lane; }
-        }
-
-        // Auto-quote fixed odds
-        _autoSetOddsFromScore(raceId);
-        r.giraffesFinalized = true;
-
-        // Emit assignment events
+    /// @notice Select lineup from queue (FIFO) and fill remaining with house giraffes
+    function _selectLineupFromQueue(uint256 raceId) internal {
+        delete _raceGiraffes[raceId];
         RaceGiraffes storage ra = _raceGiraffes[raceId];
-        for (uint8 lane = 0; lane < LANE_COUNT; ) {
-            emit GiraffeAssigned(raceId, ra.tokenIds[lane], ra.originalOwners[lane], lane);
+        
+        uint8 assignedCount = 0;
+        
+        // Select from queue FIFO (first-come-first-served)
+        while (queueHead < _raceQueue.length && assignedCount < LANE_COUNT) {
+            QueueEntry storage entry = _raceQueue[queueHead];
+            
+            // Skip removed entries
+            if (entry.removed) {
+                queueHead++;
+                continue;
+            }
+            
+            // Validate ownership (user might have transferred NFT after queuing)
+            if (giraffeNft.ownerOf(entry.tokenId) != entry.owner) {
+                // Invalid entry - mark as removed and skip
+                entry.removed = true;
+                _tokenQueueIndex[entry.tokenId] = 0;
+                userInQueue[entry.owner] = false;
+                queueHead++;
+                continue;
+            }
+            
+            // Valid entry - assign to race
+            ra.tokenIds[assignedCount] = entry.tokenId;
+            ra.originalOwners[assignedCount] = entry.owner;
+            
+            emit QueueEntrySelected(raceId, entry.owner, entry.tokenId, assignedCount);
+            emit GiraffeAssigned(raceId, entry.tokenId, entry.owner, assignedCount);
+            
+            // Remove from queue (consumed)
+            entry.removed = true;
+            _tokenQueueIndex[entry.tokenId] = 0;
+            userInQueue[entry.owner] = false;
+            
+            queueHead++;
+            unchecked { ++assignedCount; }
+        }
+        
+        ra.assignedCount = assignedCount;
+        
+        // Fill remaining lanes with house giraffes (randomly selected)
+        if (assignedCount < LANE_COUNT) {
+            _fillWithHouseGiraffes(raceId, assignedCount);
+        }
+    }
+
+    /// @notice Fill remaining race lanes with randomly selected house giraffes
+    function _fillWithHouseGiraffes(uint256 raceId, uint8 startLane) internal {
+        RaceGiraffes storage ra = _raceGiraffes[raceId];
+        
+        // Create seed for random house giraffe selection
+        bytes32 seed = keccak256(abi.encodePacked(
+            block.prevrandao,
+            block.timestamp,
+            raceId,
+            address(this)
+        ));
+        SimpleRng memory rng = _createRng(seed);
+        
+        // Track which house giraffes are still available
+        uint8[6] memory availableIdx = [0, 1, 2, 3, 4, 5];
+        uint8 availableCount = LANE_COUNT;
+        
+        for (uint8 lane = startLane; lane < LANE_COUNT; ) {
+            if (availableCount == 0) revert InvalidHouseGiraffe();
+            
+            uint256 pick;
+            (pick, rng) = _roll(rng, availableCount);
+            
+            uint8 idx = availableIdx[uint8(pick)];
+            availableCount--;
+            availableIdx[uint8(pick)] = availableIdx[availableCount];
+            
+            uint256 houseTokenId = houseGiraffeTokenIds[idx];
+            if (giraffeNft.ownerOf(houseTokenId) != treasuryOwner) {
+                revert InvalidHouseGiraffe();
+            }
+            
+            ra.tokenIds[lane] = houseTokenId;
+            ra.originalOwners[lane] = treasuryOwner;
+            
+            emit HouseGiraffeAssigned(raceId, houseTokenId, lane);
+            emit GiraffeAssigned(raceId, houseTokenId, treasuryOwner, lane);
+            
             unchecked { ++lane; }
         }
+        
+        ra.assignedCount = LANE_COUNT;
     }
 
     function _autoSetOddsFromScore(uint256 raceId) internal {
@@ -125,88 +184,6 @@ abstract contract GiraffeRaceLifecycle is GiraffeRaceBase {
         }
         r.oddsSet = true;
         emit RaceOddsSet(raceId, r.decimalOddsBps);
-    }
-
-    function _finalizeGiraffesFromPool(
-        uint256 raceId, 
-        bytes32 fillSeed
-    ) internal {
-        delete _raceGiraffes[raceId];
-        RaceGiraffes storage ra = _raceGiraffes[raceId];
-
-        SimpleRng memory rng = _createRng(fillSeed);
-
-        uint8[6] memory availableIdx = [0, 1, 2, 3, 4, 5];
-        uint8 availableCount = LANE_COUNT;
-
-        RaceEntry[] storage entries = _raceEntries[raceId];
-        uint256 n = entries.length;
-
-        // Build valid entrants list
-        uint256[] memory validIdx = new uint256[](n);
-        uint256 validCount = 0;
-        for (uint256 i = 0; i < n; ) {
-            RaceEntry storage e = entries[i];
-            if (giraffeNft.ownerOf(e.tokenId) == e.submitter) {
-                validIdx[validCount++] = i;
-            }
-            unchecked { ++i; }
-        }
-
-        // Select racers
-        if (validCount <= LANE_COUNT) {
-            uint8 lane = 0;
-            for (uint256 i = 0; i < n && lane < LANE_COUNT; ) {
-                RaceEntry storage e = entries[i];
-                if (giraffeNft.ownerOf(e.tokenId) == e.submitter) {
-                    ra.tokenIds[lane] = e.tokenId;
-                    ra.originalOwners[lane] = e.submitter;
-                    unchecked { ++lane; }
-                }
-                unchecked { ++i; }
-            }
-            ra.assignedCount = lane;
-        } else {
-            for (uint8 lane = 0; lane < LANE_COUNT; ) {
-                uint256 remaining = validCount - uint256(lane);
-                uint256 pick;
-                (pick, rng) = _roll(rng, remaining);
-
-                uint256 chosenPos = uint256(lane) + pick;
-                uint256 entryIdx = validIdx[chosenPos];
-                validIdx[chosenPos] = validIdx[uint256(lane)];
-                validIdx[uint256(lane)] = entryIdx;
-
-                RaceEntry storage e = entries[entryIdx];
-                ra.tokenIds[lane] = e.tokenId;
-                ra.originalOwners[lane] = e.submitter;
-                unchecked { ++lane; }
-            }
-            ra.assignedCount = LANE_COUNT;
-        }
-
-        // Fill remaining lanes with house giraffes
-        for (uint8 lane = ra.assignedCount; lane < LANE_COUNT; ) {
-            if (availableCount == 0) revert InvalidHouseGiraffe();
-            uint256 pick;
-            (pick, rng) = _roll(rng, availableCount);
-
-            uint8 idx = availableIdx[uint8(pick)];
-            availableCount--;
-            availableIdx[uint8(pick)] = availableIdx[availableCount];
-
-            uint256 houseTokenId = houseGiraffeTokenIds[idx];
-            if (giraffeNft.ownerOf(houseTokenId) != treasuryOwner) {
-                revert InvalidHouseGiraffe();
-            }
-
-            ra.tokenIds[lane] = houseTokenId;
-            ra.originalOwners[lane] = treasuryOwner;
-            emit HouseGiraffeAssigned(raceId, houseTokenId, lane);
-            unchecked { ++lane; }
-        }
-
-        ra.assignedCount = LANE_COUNT;
     }
 
     // ============ View Functions ============

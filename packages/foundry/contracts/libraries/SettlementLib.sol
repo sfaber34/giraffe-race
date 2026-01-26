@@ -27,10 +27,8 @@ library SettlementLib {
         uint256 settledLiability
     ) internal returns (uint256 newSettledLiability) {
         // Validation
-        if (race.submissionCloseBlock == 0) revert GiraffeRaceBase.InvalidRace();
+        if (race.bettingCloseBlock == 0) revert GiraffeRaceBase.InvalidRace();
         if (race.settled) revert GiraffeRaceBase.AlreadySettled();
-        if (!race.giraffesFinalized) revert GiraffeRaceBase.RaceNotReady();
-        if (race.bettingCloseBlock == 0) revert GiraffeRaceBase.RaceNotReady();
         if (block.number <= race.bettingCloseBlock) revert GiraffeRaceBase.RaceNotReady();
         
         // Fixed odds required only if there were bets
@@ -38,7 +36,11 @@ library SettlementLib {
 
         // Get blockhash for randomness
         bytes32 bh = blockhash(race.bettingCloseBlock);
-        if (bh == bytes32(0)) revert GiraffeRaceBase.BlockhashUnavailable();
+        if (bh == bytes32(0)) {
+            // Blockhash not available (>256 blocks ago) - race cannot be settled
+            // Admin should cancel this race for refunds
+            revert GiraffeRaceBase.RaceNotReady();
+        }
 
         // Generate deterministic seed
         bytes32 baseSeed = keccak256(abi.encodePacked(bh, raceId, address(this)));

@@ -21,13 +21,10 @@ interface RaceStatusCardProps {
   isViewingLatest: boolean;
   parsed: ParsedRace | null;
   parsedSchedule: ParsedSchedule | null;
-  lineupFinalized: boolean;
 
   // Block/timing
   blockNumber: bigint | undefined;
-  submissionCloseBlock: bigint | null;
   bettingCloseBlock: bigint | null;
-  startBlock: bigint | null;
   cooldownStatus: CooldownStatus | null;
 
   // Treasury
@@ -49,7 +46,6 @@ interface RaceStatusCardProps {
 
   // Actions
   onCreateRace: () => Promise<void>;
-  onFinalizeLineup: () => Promise<void>;
   onSettleRace: () => Promise<void>;
   onMineBlocks: (count: number) => Promise<void>;
   onFundTreasury: () => Promise<void>;
@@ -58,7 +54,6 @@ interface RaceStatusCardProps {
   // Flags
   activeRaceExists: boolean;
   isInCooldown: boolean;
-  canFinalize: boolean;
   canSettle: boolean;
   isMining: boolean;
 }
@@ -74,11 +69,8 @@ export const RaceStatusCard = ({
   isViewingLatest,
   parsed,
   parsedSchedule,
-  lineupFinalized,
   blockNumber,
-  submissionCloseBlock,
   bettingCloseBlock,
-  startBlock,
   cooldownStatus,
   treasuryBalance,
   settledLiability,
@@ -92,14 +84,12 @@ export const RaceStatusCard = ({
   setFundAmountUsdc,
   isFundingRace,
   onCreateRace,
-  onFinalizeLineup,
   onSettleRace,
   onMineBlocks,
   onFundTreasury,
   onClaimPayout,
   activeRaceExists,
   isInCooldown,
-  canFinalize,
   canSettle,
   isMining,
 }: RaceStatusCardProps) => {
@@ -123,7 +113,7 @@ export const RaceStatusCard = ({
           </div>
         ) : status === "no_race" ? (
           <div className="alert alert-info">
-            <span className="text-sm">No active race. Start one, or submit an NFT (which will auto-start).</span>
+            <span className="text-sm">No active race. Create one to start betting!</span>
           </div>
         ) : (
           <div className="text-sm">
@@ -138,13 +128,11 @@ export const RaceStatusCard = ({
             <div className="flex justify-between">
               <span className="opacity-70">Status</span>
               <span className="font-semibold">
-                {status === "submissions_open"
-                  ? "Submissions open"
-                  : status === "betting_open"
-                    ? "Betting open"
-                    : status === "betting_closed"
-                      ? "Betting closed"
-                      : "Settled"}
+                {status === "betting_open"
+                  ? "Betting open"
+                  : status === "betting_closed"
+                    ? "Betting closed"
+                    : "Settled"}
               </span>
             </div>
             <div className="flex justify-between">
@@ -152,16 +140,8 @@ export const RaceStatusCard = ({
               <span className="font-mono">{blockNumber !== undefined ? blockNumber.toString() : "-"}</span>
             </div>
             <div className="flex justify-between">
-              <span className="opacity-70">Submissions close</span>
-              <span className="font-mono">{submissionCloseBlock?.toString() ?? "-"}</span>
-            </div>
-            <div className="flex justify-between">
               <span className="opacity-70">Betting closes</span>
-              <span className="font-mono">{bettingCloseBlock?.toString() ?? "(awaiting finalization)"}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="opacity-70">Lineup</span>
-              <span className="font-semibold">{lineupFinalized ? "Finalized" : "Not finalized"}</span>
+              <span className="font-mono">{bettingCloseBlock?.toString() ?? "-"}</span>
             </div>
             <div className="flex justify-between">
               <span className="opacity-70">Pot</span>
@@ -174,15 +154,9 @@ export const RaceStatusCard = ({
 
         <div className="flex flex-col gap-3">
           <BlockCountdownBar
-            label="Until submissions close"
-            current={blockNumber}
-            start={startBlock ?? undefined}
-            end={submissionCloseBlock ?? undefined}
-          />
-          <BlockCountdownBar
             label="Until betting closes"
             current={blockNumber}
-            start={submissionCloseBlock ?? undefined}
+            start={bettingCloseBlock ? bettingCloseBlock - 30n : undefined}
             end={bettingCloseBlock ?? undefined}
           />
           <BlockCountdownBar
@@ -225,13 +199,6 @@ export const RaceStatusCard = ({
             </button>
             <button
               className="btn btn-sm btn-outline"
-              disabled={!giraffeRaceContract || !canFinalize || !isViewingLatest}
-              onClick={onFinalizeLineup}
-            >
-              Finalize lineup
-            </button>
-            <button
-              className="btn btn-sm btn-outline"
               disabled={!giraffeRaceContract || !canSettle || !isViewingLatest}
               onClick={onSettleRace}
             >
@@ -251,8 +218,7 @@ export const RaceStatusCard = ({
             </button>
           </div>
           <div className="text-xs opacity-70">
-            Anyone can create/finalize/settle. Odds are auto-quoted on-chain at lineup finalization based on the locked
-            effective score snapshot (avg of zip/moxie/hustle).
+            Lineup is selected from the queue when a race is created. Odds are fixed at creation time.
           </div>
         </div>
 

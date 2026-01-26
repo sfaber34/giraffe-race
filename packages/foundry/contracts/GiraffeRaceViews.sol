@@ -30,24 +30,23 @@ abstract contract GiraffeRaceViews is GiraffeRaceBase {
     function getRaceFlagsById(uint256 raceId)
         external
         view
-        returns (bool settled, bool giraffesFinalized, bool oddsSet, bool cancelled)
+        returns (bool settled, bool oddsSet, bool cancelled)
     {
         Race storage r = _races[raceId];
-        if (r.submissionCloseBlock == 0) return (false, false, false, false);
-        return (r.settled, r.giraffesFinalized, r.oddsSet, r.cancelled);
+        if (r.bettingCloseBlock == 0) return (false, false, false);
+        return (r.settled, r.oddsSet, r.cancelled);
     }
 
     function getRaceScheduleById(uint256 raceId)
         external
         view
-        returns (uint64 bettingCloseBlock, uint64 submissionCloseBlock, uint64 settledAtBlock)
+        returns (uint64 bettingCloseBlock, uint64 settledAtBlock)
     {
         Race storage r = _races[raceId];
-        submissionCloseBlock = r.submissionCloseBlock;
-        if (submissionCloseBlock == 0) return (0, 0, 0);
         bettingCloseBlock = r.bettingCloseBlock;
+        if (bettingCloseBlock == 0) return (0, 0);
         settledAtBlock = r.settledAtBlock;
-        return (bettingCloseBlock, submissionCloseBlock, settledAtBlock);
+        return (bettingCloseBlock, settledAtBlock);
     }
 
     function getRaceOddsById(uint256 raceId)
@@ -74,49 +73,31 @@ abstract contract GiraffeRaceViews is GiraffeRaceBase {
         external
         view
         returns (
-            bool canFinalizeNow,
             bool canSettleNow,
             uint64 bettingCloseBlock,
-            uint64 submissionCloseBlock,
-            uint64 finalizeEntropyBlock,
-            uint64 finalizeBlockhashExpiresAt,
             uint64 settleBlockhashExpiresAt,
-            uint64 blocksUntilFinalizeExpiry,
             uint64 blocksUntilSettleExpiry
         )
     {
         Race storage r = _races[raceId];
-        submissionCloseBlock = r.submissionCloseBlock;
-        if (submissionCloseBlock == 0) {
-            return (false, false, 0, 0, 0, 0, 0, 0, 0);
-        }
-
         bettingCloseBlock = r.bettingCloseBlock;
-        finalizeEntropyBlock = submissionCloseBlock > 0 ? (submissionCloseBlock - 1) : 0;
-
-        finalizeBlockhashExpiresAt = finalizeEntropyBlock == 0 ? 0 : uint64(uint256(finalizeEntropyBlock) + 256);
-        settleBlockhashExpiresAt = bettingCloseBlock == 0 ? 0 : uint64(uint256(bettingCloseBlock) + 256);
-
-        if (finalizeBlockhashExpiresAt != 0 && block.number < finalizeBlockhashExpiresAt) {
-            blocksUntilFinalizeExpiry = uint64(uint256(finalizeBlockhashExpiresAt) - block.number);
-        } else {
-            blocksUntilFinalizeExpiry = 0;
+        if (bettingCloseBlock == 0) {
+            return (false, 0, 0, 0);
         }
-        if (settleBlockhashExpiresAt != 0 && block.number < settleBlockhashExpiresAt) {
+
+        settleBlockhashExpiresAt = uint64(uint256(bettingCloseBlock) + 256);
+
+        if (block.number < settleBlockhashExpiresAt) {
             blocksUntilSettleExpiry = uint64(uint256(settleBlockhashExpiresAt) - block.number);
         } else {
             blocksUntilSettleExpiry = 0;
         }
 
-        bool finalizeBlockReached = block.number >= submissionCloseBlock;
-        bool finalizeBhAvailable = finalizeEntropyBlock != 0 && blockhash(uint256(finalizeEntropyBlock)) != bytes32(0);
-        canFinalizeNow = submissionCloseBlock != 0 && !r.settled && !r.giraffesFinalized && finalizeBlockReached && finalizeBhAvailable;
-
-        bool settleBhAvailable = bettingCloseBlock != 0 && blockhash(uint256(bettingCloseBlock)) != bytes32(0);
-        bool settleTimeReached = bettingCloseBlock != 0 && block.number > bettingCloseBlock;
+        bool settleBhAvailable = blockhash(uint256(bettingCloseBlock)) != bytes32(0);
+        bool settleTimeReached = block.number > bettingCloseBlock;
         bool oddsOk = r.totalPot == 0 || r.oddsSet;
 
-        canSettleNow = r.giraffesFinalized && !r.settled && settleTimeReached && settleBhAvailable && oddsOk;
+        canSettleNow = !r.settled && settleTimeReached && settleBhAvailable && oddsOk;
     }
 
     // ============ Giraffe Assignments ============

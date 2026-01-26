@@ -1,13 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { EnterNftCard, EntryPoolCard, PlaceBetCard, RaceOverlay, RaceStatusCard, RaceTrack } from "./race/components";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { EnterNftCard, PlaceBetCard, RaceOverlay, RaceQueueCard, RaceStatusCard, RaceTrack } from "./race/components";
 import { LANE_COUNT, TRACK_HEIGHT_PX, USDC_DECIMALS } from "./race/constants";
 import {
   useMyBet,
   useRaceCamera,
   useRaceData,
   useRaceDetails,
+  useRaceQueue,
   useRaceReplay,
   useRaceStatus,
   useViewingRace,
@@ -58,14 +59,13 @@ export const RaceDashboard = () => {
     laneScore,
     laneTokenIds,
     laneStats,
-    entryPoolTokenIds,
-    selectedLineupTokenIdSet,
-    submissionCloseBlock,
     bettingCloseBlock,
-    startBlock,
     lineupFinalized,
-    entryPoolRaceId,
   } = raceDetails;
+
+  // Race queue
+  const queue = useRaceQueue(giraffeRaceContract, connectedAddress);
+  const { activeQueueLength, userInQueue, userQueuedToken, userQueuePosition, queueEntries } = queue;
 
   // My bet
   const myBet = useMyBet(viewingRaceId, connectedAddress, giraffeRaceContract, hasAnyRace);
@@ -88,14 +88,13 @@ export const RaceDashboard = () => {
   // Use live block number when available, fall back to initial from useRaceData
   const activeBlockNumber = liveBlockNumber ?? blockNumber;
 
-  // Race status (uses activeBlockNumber for accurate status during race)
+  // Race status
   const status = useRaceStatus(
     giraffeRaceContract,
     hasAnyRace,
     parsed,
     cooldownStatus,
     activeBlockNumber,
-    submissionCloseBlock,
     bettingCloseBlock,
   );
 
@@ -109,17 +108,11 @@ export const RaceDashboard = () => {
   // Local UI state
   const [isMining, setIsMining] = useState(false);
   const [selectedTokenId, setSelectedTokenId] = useState<bigint | null>(null);
-  const [submittedTokenId, setSubmittedTokenId] = useState<bigint | null>(null);
   const [betLane, setBetLane] = useState<number | null>(null);
   const [betAmountUsdc, setBetAmountUsdc] = useState("");
   const [fundAmountUsdc, setFundAmountUsdc] = useState("");
   const [isFundingRace, setIsFundingRace] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
-
-  // Finalize reveal state
-  const [isFinalizeRevealActive, setIsFinalizeRevealActive] = useState(false);
-  const [canShowBetCard, setCanShowBetCard] = useState(false);
-  const finalizeRevealTimeoutRef = useRef<number | null>(null);
 
   // Claim snapshot state
   const [claimSnapshot, setClaimSnapshot] = useState<ClaimSnapshot | null>(null);
@@ -135,46 +128,8 @@ export const RaceDashboard = () => {
 
   // Reset state on race/wallet change
   useEffect(() => {
-    setSubmittedTokenId(null);
-  }, [connectedAddress, viewingRaceId]);
-
-  useEffect(() => {
     setBetLane(null);
   }, [connectedAddress, viewingRaceId]);
-
-  // Finalize reveal effect
-  useEffect(() => {
-    if (finalizeRevealTimeoutRef.current) window.clearTimeout(finalizeRevealTimeoutRef.current);
-    finalizeRevealTimeoutRef.current = null;
-    setIsFinalizeRevealActive(false);
-    setCanShowBetCard(false);
-  }, [viewingRaceId]);
-
-  useEffect(() => {
-    if (status === "settled" || status === "betting_closed") {
-      setIsFinalizeRevealActive(false);
-      setCanShowBetCard(true);
-      return;
-    }
-    if (!lineupFinalized && status === "submissions_open") {
-      setIsFinalizeRevealActive(false);
-      setCanShowBetCard(false);
-      return;
-    }
-    if (!lineupFinalized) return;
-
-    if (finalizeRevealTimeoutRef.current) window.clearTimeout(finalizeRevealTimeoutRef.current);
-    setIsFinalizeRevealActive(true);
-    setCanShowBetCard(false);
-    finalizeRevealTimeoutRef.current = window.setTimeout(() => {
-      setIsFinalizeRevealActive(false);
-      setCanShowBetCard(true);
-    }, 3000);
-    return () => {
-      if (finalizeRevealTimeoutRef.current) window.clearTimeout(finalizeRevealTimeoutRef.current);
-      finalizeRevealTimeoutRef.current = null;
-    };
-  }, [lineupFinalized, status]);
 
   // Lock bet lane to user's bet
   useEffect(() => {
@@ -207,7 +162,6 @@ export const RaceDashboard = () => {
   }, [connectedAddress, claimUiUnlocked, syncClaimSnapshotAfterUserAction, nextWinningClaim, winningClaimRemaining]);
 
   // Derived state
-  const canFinalize = (status === "awaiting_finalization" || status === "betting_open") && !lineupFinalized;
   const canBet = status === "betting_open" && lineupFinalized && parsedOdds?.oddsSet === true;
   const canSettle =
     !!parsed &&
@@ -215,26 +169,16 @@ export const RaceDashboard = () => {
     bettingCloseBlock !== null &&
     activeBlockNumber !== undefined &&
     activeBlockNumber > bettingCloseBlock;
-  const canSubmit = status === "submissions_open" || status === "no_race" || status === "settled";
   const isBetLocked = !!myBet?.hasBet;
   const selectedBetLane = isBetLocked ? myBet?.lane : betLane;
-  const isEnterLocked = submittedTokenId !== null && isViewingLatest;
   const activeRaceExists = status !== "no_race" && status !== "cooldown" && status !== "settled" && !parsed?.settled;
   const isInCooldown =
     status === "cooldown" || (cooldownStatus && !cooldownStatus.canCreate && cooldownStatus.blocksRemaining > 0n);
 
-  // Show/hide cards
-  const showEnterNftCard =
-    (!lineupFinalized || isFinalizeRevealActive) && status !== "betting_closed" && status !== "settled";
-  const isEntryPoolReady = entryPoolRaceId === viewingRaceId;
-  const showEntryPoolCard =
-    isEntryPoolReady &&
-    (status === "submissions_open" || (status === "betting_open" && !lineupFinalized) || isFinalizeRevealActive) &&
-    !canShowBetCard &&
-    status !== "betting_closed" &&
-    status !== "settled" &&
-    status !== "no_race";
-  const showPlaceBetCard = status === "settled" || status === "betting_closed" || (lineupFinalized && canShowBetCard);
+  // Show/hide cards - simplified for new queue system
+  // Always show bet card and queue cards - they are persistent across races
+  const showPlaceBetCard = true;
+  const showQueueSection = true;
 
   // Bet calculations
   const placeBetValue = useMemo(() => {
@@ -318,10 +262,6 @@ export const RaceDashboard = () => {
     await writeGiraffeRaceAsync({ functionName: "createRace" } as any);
   }, [writeGiraffeRaceAsync]);
 
-  const handleFinalizeLineup = useCallback(async () => {
-    await writeGiraffeRaceAsync({ functionName: "finalizeRaceGiraffes" } as any);
-  }, [writeGiraffeRaceAsync]);
-
   const handleSettleRace = useCallback(async () => {
     const txHash = await writeGiraffeRaceAsync({ functionName: "settleRace" } as any);
     console.log("🏁 settleRace TX Hash:", txHash);
@@ -373,14 +313,20 @@ export const RaceDashboard = () => {
     }
   }, [writeGiraffeRaceAsync, publicClient, giraffeRaceContract?.address]);
 
-  const handleSubmitNft = useCallback(async () => {
+  const handleEnterQueue = useCallback(async () => {
     if (selectedTokenId === null) return;
     await writeGiraffeRaceAsync({
-      functionName: "submitGiraffe",
+      functionName: "enterQueue" as any,
       args: [selectedTokenId],
     } as any);
-    setSubmittedTokenId(selectedTokenId);
+    setSelectedTokenId(null);
   }, [selectedTokenId, writeGiraffeRaceAsync]);
+
+  const handleLeaveQueue = useCallback(async () => {
+    await writeGiraffeRaceAsync({
+      functionName: "leaveQueue" as any,
+    } as any);
+  }, [writeGiraffeRaceAsync]);
 
   const handleFundTreasury = useCallback(async () => {
     if (!treasuryContract?.address) return;
@@ -440,8 +386,7 @@ export const RaceDashboard = () => {
         <div className="flex flex-col gap-2">
           <h1 className="text-4xl font-bold">Giraffe Race</h1>
           <p className="text-base-content/70">
-            Single on-demand flow: create race (or submit), wait for submissions to close, finalize lineup, bet, settle,
-            replay, claim.
+            Enter the queue, wait for a race, place your bets, and watch your giraffe compete!
           </p>
         </div>
 
@@ -539,11 +484,7 @@ export const RaceDashboard = () => {
                     myBet={myBet}
                     estimatedPayoutWei={estimatedPayoutWei}
                     blockNumber={activeBlockNumber}
-                    submissionCloseBlock={submissionCloseBlock}
                     bettingCloseBlock={bettingCloseBlock}
-                    startBlock={startBlock}
-                    submittedTokenId={submittedTokenId}
-                    ownedTokenNameById={ownedTokenNameById}
                     onCreateRace={handleCreateRace}
                   />
                 </div>
@@ -590,11 +531,8 @@ export const RaceDashboard = () => {
             isViewingLatest={isViewingLatest}
             parsed={parsed}
             parsedSchedule={parsedSchedule}
-            lineupFinalized={lineupFinalized}
             blockNumber={activeBlockNumber}
-            submissionCloseBlock={submissionCloseBlock}
             bettingCloseBlock={bettingCloseBlock}
-            startBlock={startBlock}
             cooldownStatus={cooldownStatus}
             treasuryBalance={treasuryBalance}
             settledLiability={settledLiability}
@@ -608,14 +546,12 @@ export const RaceDashboard = () => {
             setFundAmountUsdc={setFundAmountUsdc}
             isFundingRace={isFundingRace}
             onCreateRace={handleCreateRace}
-            onFinalizeLineup={handleFinalizeLineup}
             onSettleRace={handleSettleRace}
             onMineBlocks={mineBlocks}
             onFundTreasury={handleFundTreasury}
             onClaimPayout={handleClaimPayout}
             activeRaceExists={activeRaceExists}
             isInCooldown={!!isInCooldown}
-            canFinalize={canFinalize}
             canSettle={canSettle}
             isMining={isMining}
           />
@@ -634,34 +570,6 @@ export const RaceDashboard = () => {
               </div>
 
               <div className="grid grid-cols-1 gap-4">
-                {showEnterNftCard ? (
-                  <EnterNftCard
-                    connectedAddress={connectedAddress}
-                    ownedTokenIds={ownedTokenIds}
-                    ownedTokenNameById={ownedTokenNameById}
-                    isOwnedTokensLoading={isOwnedTokensLoading}
-                    isLoadingOwnedTokenNames={isLoadingOwnedTokenNames}
-                    selectedTokenId={selectedTokenId}
-                    setSelectedTokenId={setSelectedTokenId}
-                    submittedTokenId={submittedTokenId}
-                    viewingRaceId={viewingRaceId}
-                    isEnterLocked={isEnterLocked}
-                    canSubmit={canSubmit}
-                    isViewingLatest={isViewingLatest}
-                    giraffeRaceContract={giraffeRaceContract}
-                    onSubmitNft={handleSubmitNft}
-                  />
-                ) : null}
-
-                {showEntryPoolCard ? (
-                  <EntryPoolCard
-                    entryPoolTokenIds={entryPoolTokenIds}
-                    selectedLineupTokenIdSet={selectedLineupTokenIdSet}
-                    isFinalizeRevealActive={isFinalizeRevealActive}
-                    viewingRaceId={viewingRaceId}
-                  />
-                ) : null}
-
                 {showPlaceBetCard ? (
                   <PlaceBetCard
                     viewingRaceId={viewingRaceId}
@@ -692,6 +600,33 @@ export const RaceDashboard = () => {
                     onApprove={handleApprove}
                     onPlaceBet={handlePlaceBet}
                   />
+                ) : null}
+
+                {showQueueSection ? (
+                  <>
+                    <EnterNftCard
+                      connectedAddress={connectedAddress}
+                      ownedTokenIds={ownedTokenIds}
+                      ownedTokenNameById={ownedTokenNameById}
+                      isOwnedTokensLoading={isOwnedTokensLoading}
+                      isLoadingOwnedTokenNames={isLoadingOwnedTokenNames}
+                      selectedTokenId={selectedTokenId}
+                      setSelectedTokenId={setSelectedTokenId}
+                      userInQueue={userInQueue}
+                      userQueuedToken={userQueuedToken}
+                      userQueuePosition={userQueuePosition}
+                      giraffeRaceContract={giraffeRaceContract}
+                      onEnterQueue={handleEnterQueue}
+                      onLeaveQueue={handleLeaveQueue}
+                    />
+
+                    <RaceQueueCard
+                      queueEntries={queueEntries}
+                      activeQueueLength={activeQueueLength}
+                      userInQueue={userInQueue}
+                      userQueuedToken={userQueuedToken}
+                    />
+                  </>
                 ) : null}
               </div>
             </div>

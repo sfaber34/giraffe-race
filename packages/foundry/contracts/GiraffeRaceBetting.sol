@@ -22,8 +22,7 @@ abstract contract GiraffeRaceBetting is GiraffeRaceBase {
         uint256 raceId = _activeRaceId();
         Race storage r = _races[raceId];
         
-        // Betting requires finalization
-        if (!r.giraffesFinalized) revert BettingNotOpen();
+        // Betting window check
         if (r.bettingCloseBlock == 0) revert BettingNotOpen();
         if (block.number >= r.bettingCloseBlock) revert BettingClosed();
 

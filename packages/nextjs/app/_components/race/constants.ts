@@ -1,10 +1,9 @@
-// Race-related constants - keep in sync with GiraffeRaceStorage.sol (Diamond pattern)
+// Race-related constants - keep in sync with GiraffeRaceConstants.sol
 
 export const USDC_DECIMALS = 6;
 export const LANE_COUNT = 6 as const;
 
-// Window sizes (not offsets from race creation)
-export const SUBMISSION_WINDOW_BLOCKS = 30n;
+// Window sizes
 export const BETTING_WINDOW_BLOCKS = 30n;
 
 // Race simulation parameters

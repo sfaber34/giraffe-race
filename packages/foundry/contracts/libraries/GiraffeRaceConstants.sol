@@ -44,10 +44,7 @@ library GiraffeRaceConstants {
 
     // ============ Phase Schedule ============
     
-    /// @notice Blocks for submission window
-    uint64 internal constant SUBMISSION_WINDOW_BLOCKS = 30;
-    
-    /// @notice Blocks for betting window (after finalization)
+    /// @notice Blocks for betting window (after race creation)
     uint64 internal constant BETTING_WINDOW_BLOCKS = 30;
     
     /// @notice Cooldown blocks after settlement before new race
@@ -55,8 +52,8 @@ library GiraffeRaceConstants {
 
     // ============ Limits ============
     
-    /// @notice Maximum entries per race entrant pool
-    uint16 internal constant MAX_ENTRIES_PER_RACE = 128;
+    /// @notice Maximum entries in the persistent race queue
+    uint16 internal constant MAX_QUEUE_SIZE = 128;
 
     // ============ Claim Status ============
     

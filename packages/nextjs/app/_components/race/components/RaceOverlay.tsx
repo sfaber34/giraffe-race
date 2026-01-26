@@ -31,13 +31,7 @@ interface RaceOverlayProps {
 
   // Block data
   blockNumber: bigint | undefined;
-  submissionCloseBlock: bigint | null;
   bettingCloseBlock: bigint | null;
-  startBlock: bigint | null;
-
-  // UI state
-  submittedTokenId: bigint | null;
-  ownedTokenNameById: Record<string, string>;
 
   // Actions
   onCreateRace: () => Promise<void>;
@@ -60,11 +54,7 @@ export const RaceOverlay = ({
   myBet,
   estimatedPayoutWei,
   blockNumber,
-  submissionCloseBlock,
   bettingCloseBlock,
-  startBlock,
-  submittedTokenId,
-  ownedTokenNameById,
   onCreateRace,
 }: RaceOverlayProps) => {
   const revealedWinner = raceIsOver && parsed?.settled ? parsed.winner : null;
@@ -168,55 +158,10 @@ export const RaceOverlay = ({
     );
   }
 
-  // Pre-race overlay (submissions open, awaiting finalization, betting open, bet placed, settled, cooldown)
+  // Pre-race overlay (betting open, bet placed, settled, cooldown, no race)
   return (
     <>
-      {status === "submissions_open" || status === "awaiting_finalization" ? (
-        <div
-          className="flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-base-100/90 backdrop-blur-sm shadow-lg"
-          style={{ minWidth: 320 }}
-        >
-          <div className="text-3xl font-black text-primary drop-shadow">
-            {status === "submissions_open" ? "Submissions open" : "Awaiting lineup"}
-          </div>
-          {submittedTokenId ? (
-            <div className="text-xl font-semibold text-base-content/80 flex items-center gap-2">
-              <span>You entered</span>
-              <GiraffeAnimated
-                idPrefix={`overlay-submitted-${(viewingRaceId ?? 0n).toString()}-${submittedTokenId.toString()}`}
-                tokenId={submittedTokenId}
-                playbackRate={1}
-                playing={true}
-                sizePx={48}
-              />
-              <span>
-                {(ownedTokenNameById[submittedTokenId.toString()] || "").trim()
-                  ? ownedTokenNameById[submittedTokenId.toString()]
-                  : `#${submittedTokenId.toString()}`}
-              </span>
-            </div>
-          ) : (
-            <div className="text-lg font-semibold text-base-content/70">
-              {status === "submissions_open" ? "Enter a giraffe" : "Waiting for finalization..."}
-            </div>
-          )}
-          {status === "submissions_open" && (
-            <div className="w-full mt-2">
-              <BlockCountdownBar
-                label="Submissions close in"
-                current={blockNumber}
-                start={startBlock ?? undefined}
-                end={submissionCloseBlock ?? undefined}
-              />
-            </div>
-          )}
-          {status === "awaiting_finalization" && (
-            <div className="w-full mt-2 text-sm text-base-content/60 text-center">
-              Submissions closed. Waiting for lineup to be finalized.
-            </div>
-          )}
-        </div>
-      ) : status === "betting_open" ? (
+      {status === "betting_open" ? (
         <div
           className="flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-base-100/90 backdrop-blur-sm shadow-lg"
           style={{ minWidth: 320 }}

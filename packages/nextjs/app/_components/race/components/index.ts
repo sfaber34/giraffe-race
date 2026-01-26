@@ -4,5 +4,5 @@ export * from "./RaceOverlay";
 export * from "./RaceTrack";
 export * from "./RaceStatusCard";
 export * from "./EnterNftCard";
-export * from "./EntryPoolCard";
+export * from "./RaceQueueCard";
 export * from "./PlaceBetCard";

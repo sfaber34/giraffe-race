@@ -1,13 +1,6 @@
 import { Hex } from "viem";
 
-export type RaceStatus =
-  | "no_race"
-  | "cooldown"
-  | "submissions_open"
-  | "awaiting_finalization"
-  | "betting_open"
-  | "betting_closed"
-  | "settled";
+export type RaceStatus = "no_race" | "cooldown" | "betting_open" | "betting_closed" | "settled";
 
 export type PlaybackSpeed = 1 | 2 | 3;
 
@@ -22,7 +15,6 @@ export interface ParsedRace {
 
 export interface ParsedSchedule {
   bettingCloseBlock: bigint;
-  submissionCloseBlock: bigint;
   settledAtBlock: bigint;
 }
 
@@ -71,4 +63,12 @@ export interface NextWinningClaim {
 export interface ClaimSnapshot {
   nextWinningClaim: NextWinningClaim | null;
   winningClaimRemaining: bigint | null;
+}
+
+// Queue entry for the persistent race queue
+export interface QueueEntry {
+  index: bigint;
+  tokenId: bigint;
+  owner: `0x${string}`;
+  isValid: boolean;
 }

@@ -4316,7 +4316,7 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "MAX_ENTRIES_PER_RACE",
+          name: "MAX_HOUSE_EDGE_BPS",
           inputs: [],
           outputs: [
             {
@@ -4329,7 +4329,7 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "MAX_HOUSE_EDGE_BPS",
+          name: "MAX_QUEUE_SIZE",
           inputs: [],
           outputs: [
             {
@@ -4401,19 +4401,6 @@ const deployedContracts = {
               name: "",
               type: "uint8",
               internalType: "uint8",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "SUBMISSION_WINDOW_BLOCKS",
-          inputs: [],
-          outputs: [
-            {
-              name: "",
-              type: "uint64",
-              internalType: "uint64",
             },
           ],
           stateMutability: "view",
@@ -4498,10 +4485,29 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "finalizeRaceGiraffes",
-          inputs: [],
+          name: "enterQueue",
+          inputs: [
+            {
+              name: "tokenId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
           outputs: [],
           stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "getActiveQueueLength",
+          inputs: [],
+          outputs: [
+            {
+              name: "count",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
         },
         {
           type: "function",
@@ -4739,6 +4745,78 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "getQueueEntries",
+          inputs: [
+            {
+              name: "start",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "count",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "entries",
+              type: "tuple[]",
+              internalType: "struct GiraffeRaceBase.QueueEntryView[]",
+              components: [
+                {
+                  name: "index",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "tokenId",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "owner",
+                  type: "address",
+                  internalType: "address",
+                },
+                {
+                  name: "isValid",
+                  type: "bool",
+                  internalType: "bool",
+                },
+              ],
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getQueueHead",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getQueueLength",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "getRaceActionabilityById",
           inputs: [
             {
@@ -4748,11 +4826,6 @@ const deployedContracts = {
             },
           ],
           outputs: [
-            {
-              name: "canFinalizeNow",
-              type: "bool",
-              internalType: "bool",
-            },
             {
               name: "canSettleNow",
               type: "bool",
@@ -4764,27 +4837,7 @@ const deployedContracts = {
               internalType: "uint64",
             },
             {
-              name: "submissionCloseBlock",
-              type: "uint64",
-              internalType: "uint64",
-            },
-            {
-              name: "finalizeEntropyBlock",
-              type: "uint64",
-              internalType: "uint64",
-            },
-            {
-              name: "finalizeBlockhashExpiresAt",
-              type: "uint64",
-              internalType: "uint64",
-            },
-            {
               name: "settleBlockhashExpiresAt",
-              type: "uint64",
-              internalType: "uint64",
-            },
-            {
-              name: "blocksUntilFinalizeExpiry",
               type: "uint64",
               internalType: "uint64",
             },
@@ -4866,54 +4919,6 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "getRaceEntry",
-          inputs: [
-            {
-              name: "raceId",
-              type: "uint256",
-              internalType: "uint256",
-            },
-            {
-              name: "index",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          outputs: [
-            {
-              name: "tokenId",
-              type: "uint256",
-              internalType: "uint256",
-            },
-            {
-              name: "submitter",
-              type: "address",
-              internalType: "address",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "getRaceEntryCount",
-          inputs: [
-            {
-              name: "raceId",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          outputs: [
-            {
-              name: "",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
           name: "getRaceFlagsById",
           inputs: [
             {
@@ -4925,11 +4930,6 @@ const deployedContracts = {
           outputs: [
             {
               name: "settled",
-              type: "bool",
-              internalType: "bool",
-            },
-            {
-              name: "giraffesFinalized",
               type: "bool",
               internalType: "bool",
             },
@@ -5016,11 +5016,6 @@ const deployedContracts = {
               internalType: "uint64",
             },
             {
-              name: "submissionCloseBlock",
-              type: "uint64",
-              internalType: "uint64",
-            },
-            {
               name: "settledAtBlock",
               type: "uint64",
               internalType: "uint64",
@@ -5043,6 +5038,44 @@ const deployedContracts = {
               name: "score",
               type: "uint8[6]",
               internalType: "uint8[6]",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getUserQueuePosition",
+          inputs: [
+            {
+              name: "user",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "position",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getUserQueuedToken",
+          inputs: [
+            {
+              name: "user",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "tokenId",
+              type: "uint256",
+              internalType: "uint256",
             },
           ],
           stateMutability: "view",
@@ -5081,30 +5114,6 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "hasSubmitted",
-          inputs: [
-            {
-              name: "raceId",
-              type: "uint256",
-              internalType: "uint256",
-            },
-            {
-              name: "user",
-              type: "address",
-              internalType: "address",
-            },
-          ],
-          outputs: [
-            {
-              name: "",
-              type: "bool",
-              internalType: "bool",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
           name: "houseEdgeBps",
           inputs: [],
           outputs: [
@@ -5137,17 +5146,31 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "isTokenEntered",
+          name: "isTokenInQueue",
           inputs: [
-            {
-              name: "raceId",
-              type: "uint256",
-              internalType: "uint256",
-            },
             {
               name: "tokenId",
               type: "uint256",
               internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "bool",
+              internalType: "bool",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "isUserInQueue",
+          inputs: [
+            {
+              name: "user",
+              type: "address",
+              internalType: "address",
             },
           ],
           outputs: [
@@ -5171,6 +5194,13 @@ const deployedContracts = {
             },
           ],
           stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "leaveQueue",
+          inputs: [],
+          outputs: [],
+          stateMutability: "nonpayable",
         },
         {
           type: "function",
@@ -5215,6 +5245,19 @@ const deployedContracts = {
           ],
           outputs: [],
           stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "queueHead",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
         },
         {
           type: "function",
@@ -5330,19 +5373,6 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "submitGiraffe",
-          inputs: [
-            {
-              name: "tokenId",
-              type: "uint256",
-              internalType: "uint256",
-            },
-          ],
-          outputs: [],
-          stateMutability: "nonpayable",
-        },
-        {
-          type: "function",
           name: "treasury",
           inputs: [],
           outputs: [
@@ -5363,6 +5393,25 @@ const deployedContracts = {
               name: "",
               type: "address",
               internalType: "address",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "userInQueue",
+          inputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "bool",
+              internalType: "bool",
             },
           ],
           stateMutability: "view",
@@ -5394,25 +5443,6 @@ const deployedContracts = {
               type: "uint256",
               indexed: false,
               internalType: "uint256",
-            },
-          ],
-          anonymous: false,
-        },
-        {
-          type: "event",
-          name: "BettingWindowOpened",
-          inputs: [
-            {
-              name: "raceId",
-              type: "uint256",
-              indexed: true,
-              internalType: "uint256",
-            },
-            {
-              name: "bettingCloseBlock",
-              type: "uint64",
-              indexed: false,
-              internalType: "uint64",
             },
           ],
           anonymous: false,
@@ -5463,37 +5493,6 @@ const deployedContracts = {
               type: "address",
               indexed: true,
               internalType: "address",
-            },
-            {
-              name: "lane",
-              type: "uint8",
-              indexed: false,
-              internalType: "uint8",
-            },
-          ],
-          anonymous: false,
-        },
-        {
-          type: "event",
-          name: "GiraffeSubmitted",
-          inputs: [
-            {
-              name: "raceId",
-              type: "uint256",
-              indexed: true,
-              internalType: "uint256",
-            },
-            {
-              name: "owner",
-              type: "address",
-              indexed: true,
-              internalType: "address",
-            },
-            {
-              name: "tokenId",
-              type: "uint256",
-              indexed: true,
-              internalType: "uint256",
             },
             {
               name: "lane",
@@ -5569,6 +5568,81 @@ const deployedContracts = {
         },
         {
           type: "event",
+          name: "QueueEntered",
+          inputs: [
+            {
+              name: "owner",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "tokenId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "queuePosition",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "QueueEntrySelected",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "owner",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "tokenId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "lane",
+              type: "uint8",
+              indexed: false,
+              internalType: "uint8",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "QueueLeft",
+          inputs: [
+            {
+              name: "owner",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "tokenId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
           name: "RaceCancelled",
           inputs: [
             {
@@ -5591,7 +5665,7 @@ const deployedContracts = {
               internalType: "uint256",
             },
             {
-              name: "submissionCloseBlock",
+              name: "bettingCloseBlock",
               type: "uint64",
               indexed: false,
               internalType: "uint64",
@@ -5691,12 +5765,12 @@ const deployedContracts = {
         },
         {
           type: "error",
-          name: "AlreadySettled",
+          name: "AlreadyInQueue",
           inputs: [],
         },
         {
           type: "error",
-          name: "AlreadySubmitted",
+          name: "AlreadySettled",
           inputs: [],
         },
         {
@@ -5716,7 +5790,7 @@ const deployedContracts = {
         },
         {
           type: "error",
-          name: "BlockhashUnavailable",
+          name: "CannotQueueHouseGiraffe",
           inputs: [],
         },
         {
@@ -5726,17 +5800,7 @@ const deployedContracts = {
         },
         {
           type: "error",
-          name: "EntryPoolFull",
-          inputs: [],
-        },
-        {
-          type: "error",
           name: "GiraffeNotAssigned",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "GiraffesAlreadyFinalized",
           inputs: [],
         },
         {
@@ -5776,6 +5840,11 @@ const deployedContracts = {
         },
         {
           type: "error",
+          name: "NotInQueue",
+          inputs: [],
+        },
+        {
+          type: "error",
           name: "NotSettled",
           inputs: [],
         },
@@ -5811,6 +5880,11 @@ const deployedContracts = {
         },
         {
           type: "error",
+          name: "QueueFull",
+          inputs: [],
+        },
+        {
+          type: "error",
           name: "RaceNotCancellable",
           inputs: [],
         },
@@ -5821,12 +5895,7 @@ const deployedContracts = {
         },
         {
           type: "error",
-          name: "SubmissionsClosed",
-          inputs: [],
-        },
-        {
-          type: "error",
-          name: "TokenAlreadyEntered",
+          name: "TokenAlreadyQueued",
           inputs: [],
         },
         {
