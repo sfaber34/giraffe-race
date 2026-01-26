@@ -6,7 +6,7 @@ import { GiraffeRaceBetting } from "./GiraffeRaceBetting.sol";
 import { GiraffeRaceSubmissions } from "./GiraffeRaceSubmissions.sol";
 import { GiraffeRaceLifecycle } from "./GiraffeRaceLifecycle.sol";
 import { GiraffeRaceViews } from "./GiraffeRaceViews.sol";
-import { IGiraffeNFT, IWinProbTable6 } from "./GiraffeRaceBase.sol";
+import { IGiraffeNFT } from "./GiraffeRaceBase.sol";
 import { GiraffeRaceSimulator } from "./GiraffeRaceSimulator.sol";
 import { HouseTreasury } from "./HouseTreasury.sol";
 
@@ -36,14 +36,12 @@ contract GiraffeRace is
         address _treasuryOwner,
         uint256[6] memory _houseGiraffeTokenIds,
         address _simulator,
-        address _treasury,
-        address _winProbTable
+        address _treasury
     ) {
         giraffeNft = IGiraffeNFT(_giraffeNft);
         treasuryOwner = _treasuryOwner;
         simulator = GiraffeRaceSimulator(_simulator);
         treasury = HouseTreasury(_treasury);
-        winProbTable = IWinProbTable6(_winProbTable);
         houseGiraffeTokenIds = _houseGiraffeTokenIds;
         
         // Set defaults

@@ -14,12 +14,6 @@ interface IGiraffeNFT is IERC721 {
     function statsOf(uint256 tokenId) external view returns (uint8 zip, uint8 moxie, uint8 hustle);
 }
 
-/// @notice Interface for the win probability table
-interface IWinProbTable6 {
-    function get(uint8[6] memory scores) external view returns (uint16[6] memory probsBps);
-    function getSorted(uint8 a, uint8 b, uint8 c, uint8 d, uint8 e, uint8 f) external view returns (uint16[6] memory probsBps);
-}
-
 /**
  * @title GiraffeRaceBase
  * @notice Base contract with shared state, constants, events, errors, and modifiers
@@ -129,7 +123,6 @@ abstract contract GiraffeRaceBase {
     IGiraffeNFT public giraffeNft;
     GiraffeRaceSimulator public simulator;
     HouseTreasury public treasury;
-    IWinProbTable6 public winProbTable;
     
     // Admin
     address public treasuryOwner;
@@ -201,7 +194,6 @@ abstract contract GiraffeRaceBase {
     event RaceSettledDeadHeat(uint256 indexed raceId, bytes32 seed, uint8 deadHeatCount, uint8[6] winners);
     event Claimed(uint256 indexed raceId, address indexed bettor, uint256 payout);
     event GiraffeSubmitted(uint256 indexed raceId, address indexed owner, uint256 indexed tokenId, uint8 lane);
-    event WinProbTableUpdated(address indexed newTable);
     event GiraffeAssigned(uint256 indexed raceId, uint256 indexed tokenId, address indexed originalOwner, uint8 lane);
     event HouseGiraffeAssigned(uint256 indexed raceId, uint256 indexed tokenId, uint8 lane);
     event HouseEdgeUpdated(uint16 oldEdgeBps, uint16 newEdgeBps);

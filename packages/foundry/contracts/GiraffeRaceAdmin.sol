@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import { GiraffeRaceBase, IWinProbTable6 } from "./GiraffeRaceBase.sol";
+import { GiraffeRaceBase } from "./GiraffeRaceBase.sol";
 
 /**
  * @title GiraffeRaceAdmin
@@ -29,14 +29,6 @@ abstract contract GiraffeRaceAdmin is GiraffeRaceBase {
         maxBetAmount = newMaxBet;
         
         emit MaxBetUpdated(oldMaxBet, newMaxBet);
-    }
-
-    /// @notice Update the win probability table contract address.
-    /// @dev Set to address(0) to use fallback fixed odds.
-    function setWinProbTable(address _winProbTable) external onlyTreasuryOwner {
-        winProbTable = IWinProbTable6(_winProbTable);
-        
-        emit WinProbTableUpdated(_winProbTable);
     }
 
     /// @notice Cancel a stuck race and enable refunds for all bettors

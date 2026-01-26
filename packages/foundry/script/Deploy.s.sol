@@ -7,13 +7,6 @@ import { GiraffeNFT } from "../contracts/GiraffeNFT.sol";
 import { GiraffeRaceSimulator } from "../contracts/GiraffeRaceSimulator.sol";
 import { HouseTreasury } from "../contracts/HouseTreasury.sol";
 import { MockUSDC } from "../contracts/MockUSDC.sol";
-import { WinProbTable6 } from "../contracts/libraries/WinProbTable6.sol";
-import { WinProbTableShard0 } from "../contracts/libraries/WinProbTableShard0.sol";
-import { WinProbTableShard1 } from "../contracts/libraries/WinProbTableShard1.sol";
-import { WinProbTableShard2 } from "../contracts/libraries/WinProbTableShard2.sol";
-import { WinProbTableShard3 } from "../contracts/libraries/WinProbTableShard3.sol";
-import { WinProbTableShard4 } from "../contracts/libraries/WinProbTableShard4.sol";
-import { WinProbTableShard5 } from "../contracts/libraries/WinProbTableShard5.sol";
 
 /**
  * @title DeployScript
@@ -90,24 +83,6 @@ contract DeployScript is ScaffoldETHDeploy {
         console.log("HouseTreasury deployed at:", address(treasury));
         deployments.push(Deployment("HouseTreasury", address(treasury)));
 
-        // Deploy WinProbTable shards
-        WinProbTableShard0 shard0 = new WinProbTableShard0();
-        WinProbTableShard1 shard1 = new WinProbTableShard1();
-        WinProbTableShard2 shard2 = new WinProbTableShard2();
-        WinProbTableShard3 shard3 = new WinProbTableShard3();
-        WinProbTableShard4 shard4 = new WinProbTableShard4();
-        WinProbTableShard5 shard5 = new WinProbTableShard5();
-        WinProbTable6 winProbTable = new WinProbTable6(
-            address(shard0),
-            address(shard1),
-            address(shard2),
-            address(shard3),
-            address(shard4),
-            address(shard5)
-        );
-        console.log("WinProbTable6 deployed at:", address(winProbTable));
-        deployments.push(Deployment("WinProbTable6", address(winProbTable)));
-
         // 2. Mint house giraffes to treasuryOwner
         uint256[6] memory houseGiraffeTokenIds;
         houseGiraffeTokenIds[0] = giraffeNft.mintTo(treasuryOwner, "house-1");
@@ -124,8 +99,7 @@ contract DeployScript is ScaffoldETHDeploy {
             treasuryOwner,
             houseGiraffeTokenIds,
             address(simulator),
-            address(treasury),
-            address(winProbTable)
+            address(treasury)
         );
         console.log("GiraffeRace deployed at:", address(giraffeRace));
         deployments.push(Deployment("GiraffeRace", address(giraffeRace)));
@@ -151,7 +125,6 @@ contract DeployScript is ScaffoldETHDeploy {
         console.log("GiraffeNFT:           ", address(giraffeNft));
         console.log("Treasury:             ", address(treasury));
         console.log("Simulator:            ", address(simulator));
-        console.log("WinProbTable:         ", address(winProbTable));
         console.log("Treasury Owner:       ", treasuryOwner);
     }
 }

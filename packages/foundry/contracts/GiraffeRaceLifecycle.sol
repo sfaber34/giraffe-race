@@ -3,7 +3,7 @@ pragma solidity ^0.8.19;
 
 import { GiraffeRaceBase } from "./GiraffeRaceBase.sol";
 import { SettlementLib } from "./libraries/SettlementLib.sol";
-import { OddsLib } from "./libraries/OddsLib.sol";
+import { OddsLib } from "./libraries/OddsLib.sol"; // Used for calculateEffectiveScore
 
 /**
  * @title GiraffeRaceLifecycle
@@ -118,31 +118,11 @@ abstract contract GiraffeRaceLifecycle is GiraffeRaceBase {
         Race storage r = _races[raceId];
         if (r.oddsSet) return;
 
-        uint8[6] memory scores = _raceScore[raceId];
-
-        // Fallback if no probability table
-        if (address(winProbTable) == address(0)) {
-            for (uint8 lane = 0; lane < LANE_COUNT; ) {
-                r.decimalOddsBps[lane] = TEMP_FIXED_DECIMAL_ODDS_BPS;
-                unchecked { ++lane; }
-            }
-            r.oddsSet = true;
-            emit RaceOddsSet(raceId, r.decimalOddsBps);
-            return;
+        // Use fixed odds for all lanes
+        for (uint8 lane = 0; lane < LANE_COUNT; ) {
+            r.decimalOddsBps[lane] = TEMP_FIXED_DECIMAL_ODDS_BPS;
+            unchecked { ++lane; }
         }
-
-        // Get win probabilities from on-chain table
-        uint16[6] memory probsBps = winProbTable.get(scores);
-
-        // Apply symmetry fix
-        uint16[6] memory probsAdj = OddsLib.adjustProbabilitiesForSymmetry(probsBps, scores);
-
-        // Convert to odds
-        for (uint8 i = 0; i < LANE_COUNT; ) {
-            r.decimalOddsBps[i] = OddsLib.probabilityToOdds(probsAdj[i], houseEdgeBps);
-            unchecked { ++i; }
-        }
-
         r.oddsSet = true;
         emit RaceOddsSet(raceId, r.decimalOddsBps);
     }
