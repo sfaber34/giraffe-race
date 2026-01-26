@@ -1,19 +1,31 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import { GiraffeRaceConstants as C } from "./diamond/libraries/GiraffeRaceConstants.sol";
+import { GiraffeRaceConstants as C } from "./libraries/GiraffeRaceConstants.sol";
 
-/// @notice Stateless simulator contract to keep `GiraffeRace` deployed bytecode under the 24KB limit.
-/// @dev Must stay in sync with the on-chain race rules used by GiraffeRace.
-///      OPTIMIZED: Uses direct modulo instead of rejection sampling for ~97% gas savings.
+/// @notice Stateless simulator contract for GiraffeRace
+/// @dev OPTIMIZED: Uses direct modulo instead of rejection sampling for ~97% gas savings.
+///      
+///      NOTE: Solidity requires literal values for array sizes in function signatures.
+///      Constants here use literals that MUST match GiraffeRaceConstants. The constructor
+///      verifies this at deployment time.
 contract GiraffeRaceSimulator {
-    // NOTE: Solidity requires literal values for array sizes in function signatures.
-    // These MUST match GiraffeRaceConstants - verified by _checkConstants() below.
+    // Race constants - literals required for array sizes in function signatures
+    // These MUST match GiraffeRaceConstants (verified in constructor)
     uint8 internal constant LANE_COUNT = 6;
     uint16 internal constant TRACK_LENGTH = 1000;
     uint16 internal constant MAX_TICKS = 500;
     uint8 internal constant SPEED_RANGE = 10;
     uint16 internal constant BPS_DENOM = 10000;
+
+    constructor() {
+        // Verify constants match the central source at deployment time
+        assert(LANE_COUNT == C.LANE_COUNT);
+        assert(TRACK_LENGTH == C.TRACK_LENGTH);
+        assert(MAX_TICKS == C.MAX_TICKS);
+        assert(SPEED_RANGE == C.SPEED_RANGE);
+        assert(BPS_DENOM == C.ODDS_SCALE);
+    }
 
     // Gas profiling event
     event SimulationGasProfile(
@@ -23,16 +35,6 @@ contract GiraffeRaceSimulator {
         uint256 winnerCalcGas,
         uint256 hashCount
     );
-
-    /// @dev Compile-time check that local constants match GiraffeRaceConstants.
-    ///      This function is never called but ensures constants stay in sync.
-    function _checkConstants() internal pure {
-        assert(LANE_COUNT == C.LANE_COUNT);
-        assert(TRACK_LENGTH == C.TRACK_LENGTH);
-        assert(MAX_TICKS == C.MAX_TICKS);
-        assert(SPEED_RANGE == C.SPEED_RANGE);
-        assert(BPS_DENOM == C.ODDS_SCALE);
-    }
 
     /// @notice Deterministically choose a winner given a seed + lane effective score snapshot.
     /// @dev `scores` is a 1-10 value per lane (typically the rounded average of zip/moxie/hustle).

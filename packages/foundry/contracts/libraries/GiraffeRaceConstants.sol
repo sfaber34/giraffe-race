@@ -3,13 +3,20 @@ pragma solidity ^0.8.19;
 
 /**
  * @title GiraffeRaceConstants
- * @notice Shared constants for the GiraffeRace system
- * @dev Single source of truth for magic numbers and configuration values
+ * @notice Single source of truth for all GiraffeRace constants
+ * @dev Import this and use `C.CONSTANT_NAME` throughout the codebase.
+ *      
+ *      IMPORTANT: Solidity requires literal values for array sizes in function 
+ *      signatures. When you need `uint8[6]` in a function parameter/return type,
+ *      you must use the literal `6`. However, you should add an assertion to 
+ *      ensure it matches this file:
+ *      
+ *          assert(6 == GiraffeRaceConstants.LANE_COUNT);
  */
 library GiraffeRaceConstants {
     // ============ Race Configuration ============
     
-    /// @notice Number of lanes in each race
+    /// @notice Number of lanes in each race (also used for array sizes)
     uint8 internal constant LANE_COUNT = 6;
     
     /// @notice Track length in arbitrary distance units
@@ -50,4 +57,12 @@ library GiraffeRaceConstants {
     
     /// @notice Maximum entries per race entrant pool
     uint16 internal constant MAX_ENTRIES_PER_RACE = 128;
+
+    // ============ Claim Status ============
+    
+    uint8 internal constant CLAIM_STATUS_BLOCKHASH_UNAVAILABLE = 0;
+    uint8 internal constant CLAIM_STATUS_READY_TO_SETTLE = 1;
+    uint8 internal constant CLAIM_STATUS_LOSS = 2;
+    uint8 internal constant CLAIM_STATUS_WIN = 3;
+    uint8 internal constant CLAIM_STATUS_REFUND = 4;
 }

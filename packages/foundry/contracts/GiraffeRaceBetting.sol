@@ -1,40 +1,39 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import { GiraffeRaceStorage } from "../libraries/GiraffeRaceStorage.sol";
-import { ClaimLib } from "../libraries/ClaimLib.sol";
-import { SettlementLib } from "../libraries/SettlementLib.sol";
+import { GiraffeRaceBase } from "./GiraffeRaceBase.sol";
+import { ClaimLib } from "./libraries/ClaimLib.sol";
+import { SettlementLib } from "./libraries/SettlementLib.sol";
 
 /**
- * @title BettingFacet
+ * @title GiraffeRaceBetting
  * @notice Handles bet placement and claim processing
  * @dev Manages user bets and payouts
  */
-contract BettingFacet {
+abstract contract GiraffeRaceBetting is GiraffeRaceBase {
     // ============ Bet Placement ============
 
     /// @notice Place a bet on a lane for the current active race
     /// @param lane The lane to bet on (0-5)
     /// @param amount The bet amount in USDC (6 decimals)
     function placeBet(uint8 lane, uint256 amount) external {
-        if (lane >= GiraffeRaceStorage.LANE_COUNT) revert GiraffeRaceStorage.InvalidLane();
+        if (lane >= LANE_COUNT) revert InvalidLane();
 
-        GiraffeRaceStorage.Layout storage s = GiraffeRaceStorage.layout();
-        uint256 raceId = GiraffeRaceStorage.activeRaceId();
-        GiraffeRaceStorage.Race storage r = s.races[raceId];
+        uint256 raceId = _activeRaceId();
+        Race storage r = _races[raceId];
         
         // Betting requires finalization
-        if (!r.giraffesFinalized) revert GiraffeRaceStorage.BettingNotOpen();
-        if (r.bettingCloseBlock == 0) revert GiraffeRaceStorage.BettingNotOpen();
-        if (block.number >= r.bettingCloseBlock) revert GiraffeRaceStorage.BettingClosed();
+        if (!r.giraffesFinalized) revert BettingNotOpen();
+        if (r.bettingCloseBlock == 0) revert BettingNotOpen();
+        if (block.number >= r.bettingCloseBlock) revert BettingClosed();
 
-        if (amount == 0) revert GiraffeRaceStorage.ZeroBet();
-        if (amount > s.maxBetAmount) revert GiraffeRaceStorage.BetTooLarge();
+        if (amount == 0) revert ZeroBet();
+        if (amount > maxBetAmount) revert BetTooLarge();
 
-        if (!r.oddsSet) revert GiraffeRaceStorage.OddsNotSet();
+        if (!r.oddsSet) revert OddsNotSet();
 
-        GiraffeRaceStorage.Bet storage b = s.bets[raceId][msg.sender];
-        if (b.amount != 0) revert GiraffeRaceStorage.AlreadyBet();
+        Bet storage b = _bets[raceId][msg.sender];
+        if (b.amount != 0) revert AlreadyBet();
 
         // Risk control: ensure treasury can cover worst-case payout
         uint256 maxPayout = ClaimLib.calculateProjectedMaxPayout(
@@ -43,12 +42,12 @@ contract BettingFacet {
             lane,
             amount
         );
-        if (s.treasury.balance() < s.settledLiability + maxPayout) {
-            revert GiraffeRaceStorage.InsufficientBankroll();
+        if (treasury.balance() < settledLiability + maxPayout) {
+            revert InsufficientBankroll();
         }
 
         // Collect bet from user via treasury
-        s.treasury.collectBet(msg.sender, amount);
+        treasury.collectBet(msg.sender, amount);
 
         b.amount = uint128(amount);
         b.lane = lane;
@@ -56,8 +55,8 @@ contract BettingFacet {
         r.totalPot += amount;
         r.totalOnLane[lane] += amount;
 
-        s.bettorRaceIds[msg.sender].push(raceId);
-        emit GiraffeRaceStorage.BetPlaced(raceId, msg.sender, lane, amount);
+        _bettorRaceIds[msg.sender].push(raceId);
+        emit BetPlaced(raceId, msg.sender, lane, amount);
     }
 
     // ============ Claims ============
@@ -66,42 +65,38 @@ contract BettingFacet {
     /// @dev For dead heats, winners receive (betAmount * odds) / deadHeatCount
     /// @return payout The payout amount (0 for losses)
     function claim() external returns (uint256 payout) {
-        GiraffeRaceStorage.Layout storage s = GiraffeRaceStorage.layout();
-        return _processClaim(s, msg.sender, false);
+        return _processClaim(msg.sender, false);
     }
 
     /// @notice Claim the caller's next winning payout (skips losses)
     /// @dev Advances through losses silently to find the next win
     /// @return payout The winning payout amount
     function claimNextWinningPayout() external returns (uint256 payout) {
-        GiraffeRaceStorage.Layout storage s = GiraffeRaceStorage.layout();
-        return _processClaim(s, msg.sender, true);
+        return _processClaim(msg.sender, true);
     }
 
     /// @notice Internal claim processing - reduces code duplication
-    /// @param s Storage layout reference
     /// @param bettor The bettor address
     /// @param skipLosses If true, silently resolve losses and continue to next win
     /// @return payout The payout amount
     function _processClaim(
-        GiraffeRaceStorage.Layout storage s,
         address bettor,
         bool skipLosses
     ) internal returns (uint256 payout) {
-        uint256[] storage ids = s.bettorRaceIds[bettor];
-        uint256 idx = s.nextClaimIndex[bettor];
-        if (idx >= ids.length) revert GiraffeRaceStorage.NoClaimableBets();
+        uint256[] storage ids = _bettorRaceIds[bettor];
+        uint256 idx = _nextClaimIndex[bettor];
+        if (idx >= ids.length) revert NoClaimableBets();
 
         while (idx < ids.length) {
             uint256 raceId = ids[idx];
-            GiraffeRaceStorage.Race storage r = s.races[raceId];
+            Race storage r = _races[raceId];
 
             // On-demand settlement (skip if cancelled - no settlement needed)
             if (!r.settled && !r.cancelled) {
-                SettlementLib.settleRace(s, raceId);
+                settledLiability = SettlementLib.settleRace(r, raceId, _raceScore[raceId], simulator, settledLiability);
             }
 
-            GiraffeRaceStorage.Bet storage b = s.bets[raceId][bettor];
+            Bet storage b = _bets[raceId][bettor];
             
             // Skip already resolved
             if (b.amount == 0 || b.claimed) {
@@ -112,10 +107,10 @@ contract BettingFacet {
             // Handle cancelled races: refund original bet
             if (r.cancelled) {
                 b.claimed = true;
-                s.nextClaimIndex[bettor] = idx + 1;
+                _nextClaimIndex[bettor] = idx + 1;
                 payout = uint256(b.amount);
-                s.treasury.payWinner(bettor, payout);
-                emit GiraffeRaceStorage.Claimed(raceId, bettor, payout);
+                treasury.payWinner(bettor, payout);
+                emit Claimed(raceId, bettor, payout);
                 return payout;
             }
 
@@ -127,20 +122,20 @@ contract BettingFacet {
                     // Silently resolve loss and continue
                     b.claimed = true;
                     idx++;
-                    s.nextClaimIndex[bettor] = idx;
+                    _nextClaimIndex[bettor] = idx;
                     continue;
                 } else {
                     // Return loss resolution
                     b.claimed = true;
-                    s.nextClaimIndex[bettor] = idx + 1;
-                    emit GiraffeRaceStorage.Claimed(raceId, bettor, 0);
+                    _nextClaimIndex[bettor] = idx + 1;
+                    emit Claimed(raceId, bettor, 0);
                     return 0;
                 }
             }
 
             // Winner: calculate and pay out
             b.claimed = true;
-            s.nextClaimIndex[bettor] = idx + 1;
+            _nextClaimIndex[bettor] = idx + 1;
 
             payout = ClaimLib.calculatePayout(
                 uint256(b.amount),
@@ -149,50 +144,46 @@ contract BettingFacet {
             );
             
             if (payout != 0) {
-                s.settledLiability -= payout;
-                s.treasury.payWinner(bettor, payout);
+                settledLiability -= payout;
+                treasury.payWinner(bettor, payout);
             }
 
-            emit GiraffeRaceStorage.Claimed(raceId, bettor, payout);
+            emit Claimed(raceId, bettor, payout);
             return payout;
         }
 
-        s.nextClaimIndex[bettor] = ids.length;
-        revert GiraffeRaceStorage.NoClaimableBets();
+        _nextClaimIndex[bettor] = ids.length;
+        revert NoClaimableBets();
     }
 
     // ============ View Functions ============
-    // NOTE: getBet() removed. UI should call latestRaceId() then use getBetById().
 
     function getBetById(uint256 raceId, address bettor) external view returns (uint128 amount, uint8 lane, bool claimed) {
-        GiraffeRaceStorage.Layout storage s = GiraffeRaceStorage.layout();
-        GiraffeRaceStorage.Bet storage b = s.bets[raceId][bettor];
+        Bet storage b = _bets[raceId][bettor];
         return (b.amount, b.lane, b.claimed);
     }
 
     function getClaimRemaining(address bettor) external view returns (uint256 remaining) {
-        GiraffeRaceStorage.Layout storage s = GiraffeRaceStorage.layout();
-        uint256[] storage ids = s.bettorRaceIds[bettor];
-        uint256 idx = s.nextClaimIndex[bettor];
+        uint256[] storage ids = _bettorRaceIds[bettor];
+        uint256 idx = _nextClaimIndex[bettor];
         if (idx >= ids.length) return 0;
         return ids.length - idx;
     }
 
     function getWinningClaimRemaining(address bettor) external view returns (uint256 remaining) {
-        GiraffeRaceStorage.Layout storage s = GiraffeRaceStorage.layout();
-        uint256[] storage ids = s.bettorRaceIds[bettor];
-        uint256 idx = s.nextClaimIndex[bettor];
+        uint256[] storage ids = _bettorRaceIds[bettor];
+        uint256 idx = _nextClaimIndex[bettor];
         if (idx >= ids.length) return 0;
 
         for (uint256 i = idx; i < ids.length; ) {
             uint256 rid = ids[i];
-            GiraffeRaceStorage.Bet storage b = s.bets[rid][bettor];
+            Bet storage b = _bets[rid][bettor];
             if (b.amount == 0 || b.claimed) {
                 unchecked { ++i; }
                 continue;
             }
 
-            GiraffeRaceStorage.Race storage r = s.races[rid];
+            Race storage r = _races[rid];
             if (!r.settled) {
                 unchecked { ++i; }
                 continue;
@@ -207,21 +198,20 @@ contract BettingFacet {
         }
     }
 
-    function getNextWinningClaim(address bettor) external view returns (GiraffeRaceStorage.NextClaimView memory out) {
-        GiraffeRaceStorage.Layout storage s = GiraffeRaceStorage.layout();
-        uint256[] storage ids = s.bettorRaceIds[bettor];
-        uint256 idx = s.nextClaimIndex[bettor];
+    function getNextWinningClaim(address bettor) external view returns (NextClaimView memory out) {
+        uint256[] storage ids = _bettorRaceIds[bettor];
+        uint256 idx = _nextClaimIndex[bettor];
         if (idx >= ids.length) return out;
 
         for (uint256 i = idx; i < ids.length; ) {
             uint256 rid = ids[i];
-            GiraffeRaceStorage.Bet storage b = s.bets[rid][bettor];
+            Bet storage b = _bets[rid][bettor];
             if (b.amount == 0 || b.claimed) {
                 unchecked { ++i; }
                 continue;
             }
 
-            GiraffeRaceStorage.Race storage r = s.races[rid];
+            Race storage r = _races[rid];
             if (!r.settled) {
                 unchecked { ++i; }
                 continue;
@@ -239,9 +229,9 @@ contract BettingFacet {
 
             out.hasClaim = true;
             out.raceId = rid;
-            out.status = GiraffeRaceStorage.CLAIM_STATUS_WIN;
+            out.status = CLAIM_STATUS_WIN;
             out.betLane = b.lane;
-            out.betTokenId = s.raceGiraffes[rid].tokenIds[b.lane];
+            out.betTokenId = _raceGiraffes[rid].tokenIds[b.lane];
             out.betAmount = b.amount;
             out.winner = r.winner;
             out.payout = p;
@@ -250,30 +240,29 @@ contract BettingFacet {
         }
     }
 
-    function getNextClaim(address bettor) external view returns (GiraffeRaceStorage.NextClaimView memory out) {
-        GiraffeRaceStorage.Layout storage s = GiraffeRaceStorage.layout();
-        uint256[] storage ids = s.bettorRaceIds[bettor];
-        uint256 idx = s.nextClaimIndex[bettor];
+    function getNextClaim(address bettor) external view returns (NextClaimView memory out) {
+        uint256[] storage ids = _bettorRaceIds[bettor];
+        uint256 idx = _nextClaimIndex[bettor];
         if (idx >= ids.length) return out;
 
         while (idx < ids.length) {
             uint256 rid = ids[idx];
-            GiraffeRaceStorage.Bet storage b = s.bets[rid][bettor];
+            Bet storage b = _bets[rid][bettor];
             if (b.amount == 0 || b.claimed) {
                 idx++;
                 continue;
             }
 
-            GiraffeRaceStorage.Race storage r = s.races[rid];
+            Race storage r = _races[rid];
             uint64 cb = r.bettingCloseBlock;
 
             // Handle cancelled races: show refund status
             if (r.cancelled) {
                 out.hasClaim = true;
                 out.raceId = rid;
-                out.status = GiraffeRaceStorage.CLAIM_STATUS_REFUND;
+                out.status = CLAIM_STATUS_REFUND;
                 out.betLane = b.lane;
-                out.betTokenId = s.raceGiraffes[rid].tokenIds[b.lane];
+                out.betTokenId = _raceGiraffes[rid].tokenIds[b.lane];
                 out.betAmount = b.amount;
                 out.winner = 0;
                 out.payout = uint256(b.amount); // Refund = original bet
@@ -285,14 +274,14 @@ contract BettingFacet {
                 bool ready = cb != 0 && block.number > cb;
                 bool bhLikelyAvailable = ready && (block.number - cb) <= 256;
                 uint8 status = bhLikelyAvailable 
-                    ? GiraffeRaceStorage.CLAIM_STATUS_READY_TO_SETTLE 
-                    : GiraffeRaceStorage.CLAIM_STATUS_BLOCKHASH_UNAVAILABLE;
+                    ? CLAIM_STATUS_READY_TO_SETTLE 
+                    : CLAIM_STATUS_BLOCKHASH_UNAVAILABLE;
                 
                 out.hasClaim = true;
                 out.raceId = rid;
                 out.status = status;
                 out.betLane = b.lane;
-                out.betTokenId = s.raceGiraffes[rid].tokenIds[b.lane];
+                out.betTokenId = _raceGiraffes[rid].tokenIds[b.lane];
                 out.betAmount = b.amount;
                 out.winner = 0;
                 out.payout = 0;
@@ -304,9 +293,9 @@ contract BettingFacet {
             if (!ClaimLib.isWinnerFromRace(r, b.lane)) {
                 out.hasClaim = true;
                 out.raceId = rid;
-                out.status = GiraffeRaceStorage.CLAIM_STATUS_LOSS;
+                out.status = CLAIM_STATUS_LOSS;
                 out.betLane = b.lane;
-                out.betTokenId = s.raceGiraffes[rid].tokenIds[b.lane];
+                out.betTokenId = _raceGiraffes[rid].tokenIds[b.lane];
                 out.betAmount = b.amount;
                 out.winner = w;
                 out.payout = 0;
@@ -322,9 +311,9 @@ contract BettingFacet {
             
             out.hasClaim = true;
             out.raceId = rid;
-            out.status = GiraffeRaceStorage.CLAIM_STATUS_WIN;
+            out.status = CLAIM_STATUS_WIN;
             out.betLane = b.lane;
-            out.betTokenId = s.raceGiraffes[rid].tokenIds[b.lane];
+            out.betTokenId = _raceGiraffes[rid].tokenIds[b.lane];
             out.betAmount = b.amount;
             out.winner = w;
             out.payout = p;
@@ -333,9 +322,5 @@ contract BettingFacet {
         }
 
         return out;
-    }
-
-    function settledLiability() external view returns (uint256) {
-        return GiraffeRaceStorage.layout().settledLiability;
     }
 }

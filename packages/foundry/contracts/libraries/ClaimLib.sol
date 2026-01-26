@@ -1,15 +1,26 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import { GiraffeRaceStorage } from "./GiraffeRaceStorage.sol";
+import { GiraffeRaceBase } from "../GiraffeRaceBase.sol";
+import { GiraffeRaceConstants as C } from "./GiraffeRaceConstants.sol";
 
 /**
  * @title ClaimLib
  * @notice Library for claim-related calculations and winner detection
- * @dev Extracted from GiraffeRace to reduce contract size and improve reusability
- *      Uses constants from GiraffeRaceStorage (except for array sizes which require literals)
+ * @dev Extracted to reduce contract size and improve reusability.
+ *      Uses literals for array sizes (Solidity requirement) - verified via _checkConstants().
  */
 library ClaimLib {
+    // Literals required for array sizes in function signatures
+    uint8 internal constant LANE_COUNT = 6;
+    uint16 internal constant ODDS_SCALE = 10000;
+
+    /// @dev Verify constants match central source. Called in tests.
+    function _checkConstants() internal pure {
+        assert(LANE_COUNT == C.LANE_COUNT);
+        assert(ODDS_SCALE == C.ODDS_SCALE);
+    }
+
     /// @notice Calculate payout for a winning bet
     /// @param betAmount The amount bet
     /// @param decimalOddsBps The decimal odds in basis points
@@ -21,7 +32,7 @@ library ClaimLib {
         uint8 deadHeatCount
     ) internal pure returns (uint256 payout) {
         // Winner payout: (betAmount * odds) / ODDS_SCALE / deadHeatCount
-        payout = (betAmount * uint256(decimalOddsBps)) / GiraffeRaceStorage.ODDS_SCALE;
+        payout = (betAmount * uint256(decimalOddsBps)) / ODDS_SCALE;
         if (deadHeatCount > 1) {
             payout = payout / uint256(deadHeatCount);
         }
@@ -33,7 +44,7 @@ library ClaimLib {
     /// @param lane The lane to check
     /// @return True if the lane is a winner
     function isWinner(
-        uint8[6] memory winners, // Literal 6 required by Solidity for array size
+        uint8[6] memory winners,
         uint8 deadHeatCount,
         uint8 lane
     ) internal pure returns (bool) {
@@ -44,12 +55,12 @@ library ClaimLib {
         return false;
     }
 
-    /// @notice Check if a lane is a winner using storage reference
-    /// @param race The race storage reference
+    /// @notice Check if a lane is a winner using race struct
+    /// @param race The race struct
     /// @param lane The lane to check
     /// @return True if the lane is a winner
     function isWinnerFromRace(
-        GiraffeRaceStorage.Race storage race,
+        GiraffeRaceBase.Race storage race,
         uint8 lane
     ) internal view returns (bool) {
         for (uint8 i = 0; i < race.deadHeatCount; ) {
@@ -64,11 +75,11 @@ library ClaimLib {
     /// @param decimalOddsBps Array of decimal odds for each lane
     /// @return maxPayout The maximum potential payout
     function calculateMaxPayout(
-        uint256[6] memory totalOnLane, // Literal 6 required by Solidity for array size
+        uint256[6] memory totalOnLane,
         uint32[6] memory decimalOddsBps
     ) internal pure returns (uint256 maxPayout) {
-        for (uint8 i = 0; i < GiraffeRaceStorage.LANE_COUNT; ) {
-            uint256 payoutIfWin = (totalOnLane[i] * uint256(decimalOddsBps[i])) / GiraffeRaceStorage.ODDS_SCALE;
+        for (uint8 i = 0; i < LANE_COUNT; ) {
+            uint256 payoutIfWin = (totalOnLane[i] * uint256(decimalOddsBps[i])) / ODDS_SCALE;
             if (payoutIfWin > maxPayout) {
                 maxPayout = payoutIfWin;
             }
@@ -83,17 +94,17 @@ library ClaimLib {
     /// @param newBetAmount Amount of the new bet
     /// @return maxPayout The maximum potential payout including the new bet
     function calculateProjectedMaxPayout(
-        uint256[6] memory totalOnLane, // Literal 6 required by Solidity for array size
+        uint256[6] memory totalOnLane,
         uint32[6] memory decimalOddsBps,
         uint8 newBetLane,
         uint256 newBetAmount
     ) internal pure returns (uint256 maxPayout) {
-        for (uint8 i = 0; i < GiraffeRaceStorage.LANE_COUNT; ) {
+        for (uint8 i = 0; i < LANE_COUNT; ) {
             uint256 laneTotal = totalOnLane[i];
             if (i == newBetLane) {
                 laneTotal += newBetAmount;
             }
-            uint256 payoutIfWin = (laneTotal * uint256(decimalOddsBps[i])) / GiraffeRaceStorage.ODDS_SCALE;
+            uint256 payoutIfWin = (laneTotal * uint256(decimalOddsBps[i])) / ODDS_SCALE;
             if (payoutIfWin > maxPayout) {
                 maxPayout = payoutIfWin;
             }
@@ -102,15 +113,15 @@ library ClaimLib {
     }
 
     /// @notice Calculate total liability for a settled race (sum of winning lane payouts / deadHeatCount)
-    /// @param race The race storage reference
+    /// @param race The race struct
     /// @return liability Total liability for the race
     function calculateRaceLiability(
-        GiraffeRaceStorage.Race storage race
+        GiraffeRaceBase.Race storage race
     ) internal view returns (uint256 liability) {
         uint8 winnerCount = race.deadHeatCount;
         for (uint8 i = 0; i < winnerCount; ) {
             uint8 w = race.winners[i];
-            uint256 lanePayout = (race.totalOnLane[w] * uint256(race.decimalOddsBps[w])) / GiraffeRaceStorage.ODDS_SCALE;
+            uint256 lanePayout = (race.totalOnLane[w] * uint256(race.decimalOddsBps[w])) / ODDS_SCALE;
             liability += lanePayout / uint256(winnerCount);
             unchecked { ++i; }
         }

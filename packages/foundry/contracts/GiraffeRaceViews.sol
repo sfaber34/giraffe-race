@@ -1,38 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import { GiraffeRaceStorage } from "../libraries/GiraffeRaceStorage.sol";
+import { GiraffeRaceBase } from "./GiraffeRaceBase.sol";
 
 /**
- * @title RaceViewsFacet
+ * @title GiraffeRaceViews
  * @notice Read-only functions for race state, giraffe assignments, and simulation
  * @dev Consolidates all view functions for UI/bot consumption
- *      Note: Local LANE_COUNT constant required for array size in return types (Solidity limitation)
  */
-contract RaceViewsFacet {
-    // Local constant required for array sizes in function return types (Solidity limitation)
-    uint8 private constant LANE_COUNT = 6;
-
-    // ============ Constants ============
-
-    function laneCount() external pure returns (uint8) {
-        return GiraffeRaceStorage.LANE_COUNT;
-    }
-
-    function tickCount() external pure returns (uint16) {
-        return GiraffeRaceStorage.MAX_TICKS;
-    }
-
-    function speedRange() external pure returns (uint8) {
-        return GiraffeRaceStorage.SPEED_RANGE;
-    }
-
-    function trackLength() external pure returns (uint16) {
-        return GiraffeRaceStorage.TRACK_LENGTH;
-    }
-
+abstract contract GiraffeRaceViews is GiraffeRaceBase {
     // ============ Race State ============
-    // NOTE: Non-ById variants removed. UI should call latestRaceId() then use ById functions.
 
     function getRaceById(uint256 raceId)
         external
@@ -43,10 +20,10 @@ contract RaceViewsFacet {
             uint8 winner,
             bytes32 seed,
             uint256 totalPot,
-            uint256[LANE_COUNT] memory totalOnLane
+            uint256[6] memory totalOnLane
         )
     {
-        GiraffeRaceStorage.Race storage r = GiraffeRaceStorage.layout().races[raceId];
+        Race storage r = _races[raceId];
         return (r.bettingCloseBlock, r.settled, r.winner, r.seed, r.totalPot, r.totalOnLane);
     }
 
@@ -55,7 +32,7 @@ contract RaceViewsFacet {
         view
         returns (bool settled, bool giraffesFinalized, bool oddsSet, bool cancelled)
     {
-        GiraffeRaceStorage.Race storage r = GiraffeRaceStorage.layout().races[raceId];
+        Race storage r = _races[raceId];
         if (r.submissionCloseBlock == 0) return (false, false, false, false);
         return (r.settled, r.giraffesFinalized, r.oddsSet, r.cancelled);
     }
@@ -65,7 +42,7 @@ contract RaceViewsFacet {
         view
         returns (uint64 bettingCloseBlock, uint64 submissionCloseBlock, uint64 settledAtBlock)
     {
-        GiraffeRaceStorage.Race storage r = GiraffeRaceStorage.layout().races[raceId];
+        Race storage r = _races[raceId];
         submissionCloseBlock = r.submissionCloseBlock;
         if (submissionCloseBlock == 0) return (0, 0, 0);
         bettingCloseBlock = r.bettingCloseBlock;
@@ -76,18 +53,18 @@ contract RaceViewsFacet {
     function getRaceOddsById(uint256 raceId)
         external
         view
-        returns (bool oddsSet, uint32[LANE_COUNT] memory decimalOddsBps)
+        returns (bool oddsSet, uint32[6] memory decimalOddsBps)
     {
-        GiraffeRaceStorage.Race storage r = GiraffeRaceStorage.layout().races[raceId];
+        Race storage r = _races[raceId];
         return (r.oddsSet, r.decimalOddsBps);
     }
 
     function getRaceDeadHeatById(uint256 raceId)
         external
         view
-        returns (uint8 deadHeatCount, uint8[LANE_COUNT] memory winners)
+        returns (uint8 deadHeatCount, uint8[6] memory winners)
     {
-        GiraffeRaceStorage.Race storage r = GiraffeRaceStorage.layout().races[raceId];
+        Race storage r = _races[raceId];
         return (r.deadHeatCount, r.winners);
     }
 
@@ -108,7 +85,7 @@ contract RaceViewsFacet {
             uint64 blocksUntilSettleExpiry
         )
     {
-        GiraffeRaceStorage.Race storage r = GiraffeRaceStorage.layout().races[raceId];
+        Race storage r = _races[raceId];
         submissionCloseBlock = r.submissionCloseBlock;
         if (submissionCloseBlock == 0) {
             return (false, false, 0, 0, 0, 0, 0, 0, 0);
@@ -143,54 +120,35 @@ contract RaceViewsFacet {
     }
 
     // ============ Giraffe Assignments ============
-    // NOTE: Non-ById variants removed. UI should call latestRaceId() then use ById functions.
 
     function getRaceGiraffesById(uint256 raceId)
         external
         view
         returns (
             uint8 assignedCount,
-            uint256[LANE_COUNT] memory tokenIds,
-            address[LANE_COUNT] memory originalOwners
+            uint256[6] memory tokenIds,
+            address[6] memory originalOwners
         )
     {
-        GiraffeRaceStorage.RaceGiraffes storage ra = GiraffeRaceStorage.layout().raceGiraffes[raceId];
+        RaceGiraffes storage ra = _raceGiraffes[raceId];
         return (ra.assignedCount, ra.tokenIds, ra.originalOwners);
     }
 
-    function getRaceScoreById(uint256 raceId) external view returns (uint8[LANE_COUNT] memory score) {
-        return GiraffeRaceStorage.layout().raceScore[raceId];
+    function getRaceScoreById(uint256 raceId) external view returns (uint8[6] memory score) {
+        return _raceScore[raceId];
     }
 
     // ============ Simulation ============
 
-    function simulate(bytes32 seed) external view returns (uint8 winner, uint16[LANE_COUNT] memory distances) {
-        return GiraffeRaceStorage.layout().simulator.simulate(seed);
+    function simulate(bytes32 seed) external view returns (uint8 winner, uint16[6] memory distances) {
+        return simulator.simulate(seed);
     }
 
-    function simulateWithScore(bytes32 seed, uint8[LANE_COUNT] calldata score)
+    function simulateWithScore(bytes32 seed, uint8[6] calldata score)
         external
         view
-        returns (uint8 winner, uint16[LANE_COUNT] memory distances)
+        returns (uint8 winner, uint16[6] memory distances)
     {
-        return GiraffeRaceStorage.layout().simulator.simulateWithScore(seed, score);
-    }
-
-    // ============ Contract References ============
-
-    function giraffeNft() external view returns (address) {
-        return address(GiraffeRaceStorage.layout().giraffeNft);
-    }
-
-    function simulator() external view returns (address) {
-        return address(GiraffeRaceStorage.layout().simulator);
-    }
-
-    function treasury() external view returns (address) {
-        return address(GiraffeRaceStorage.layout().treasury);
-    }
-
-    function winProbTable() external view returns (address) {
-        return address(GiraffeRaceStorage.layout().winProbTable);
+        return simulator.simulateWithScore(seed, score);
     }
 }
