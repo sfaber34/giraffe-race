@@ -202,6 +202,9 @@ library GiraffeRaceStorage {
     event MaxBetUpdated(uint256 oldMaxBet, uint256 newMaxBet);
     event RaceCancelled(uint256 indexed raceId);
 
+    // ============ Gas Profiling Events ============
+    event GasCheckpoint(string label, uint256 gasUsed);
+
     // ============ Modifiers (as internal functions) ============
     
     function enforceIsTreasuryOwner() internal view {

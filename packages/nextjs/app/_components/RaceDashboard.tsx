@@ -314,8 +314,60 @@ export const RaceDashboard = () => {
   }, [writeGiraffeRaceAsync]);
 
   const handleSettleRace = useCallback(async () => {
-    await writeGiraffeRaceAsync({ functionName: "settleRace" } as any);
-  }, [writeGiraffeRaceAsync]);
+    const txHash = await writeGiraffeRaceAsync({ functionName: "settleRace" } as any);
+    console.log("🏁 settleRace TX Hash:", txHash);
+
+    if (publicClient && txHash) {
+      const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+      console.log("⛽ TOTAL Gas Used:", receipt.gasUsed.toString());
+
+      // GasCheckpoint event topic: keccak256("GasCheckpoint(string,uint256)")
+      const gasCheckpointTopic = "0x7fd61c220461f2c47e0b5052f6e584193320f4d0cd137c3e9602fe44e5e48e17";
+
+      console.log("\n========== GAS BREAKDOWN ==========");
+
+      receipt.logs.forEach(log => {
+        if (log.topics[0] === gasCheckpointTopic) {
+          // Decode GasCheckpoint(string label, uint256 gasUsed)
+          // Data layout: offset(32) + gasUsed(32) + stringLength(32) + stringData
+          const data = log.data.slice(2); // remove 0x
+          const gasUsed = BigInt("0x" + data.slice(64, 128));
+          const stringLength = parseInt(data.slice(128, 192), 16);
+          const labelHex = data.slice(192, 192 + stringLength * 2);
+          const label = Buffer.from(labelHex, "hex").toString("utf8");
+
+          console.log(`⛽ ${label.padEnd(20)}: ${gasUsed.toLocaleString()} gas`);
+        }
+      });
+
+      // Find SimulationGasProfile from simulator address
+      const simulatorLog = receipt.logs.find(
+        log => log.address.toLowerCase() === "0x8ce361602b935680e8dec218b820ff5056beb7af",
+      );
+
+      if (simulatorLog) {
+        const data = simulatorLog.data.slice(2);
+        const totalTicks = BigInt("0x" + data.slice(0, 64));
+        const diceCreateGas = BigInt("0x" + data.slice(64, 128));
+        const bpsCalcGas = BigInt("0x" + data.slice(128, 192));
+        const mainLoopGas = BigInt("0x" + data.slice(192, 256));
+        const winnerCalcGas = BigInt("0x" + data.slice(256, 320));
+        const speedRollCount = BigInt("0x" + data.slice(320, 384));
+        const roundingRollCount = BigInt("0x" + data.slice(384, 448));
+
+        console.log("\n========== SIMULATION DETAILS ==========");
+        console.log(`🎲 Total Ticks:        ${totalTicks}`);
+        console.log(`🎲 Speed Rolls:        ${speedRollCount}`);
+        console.log(`🎲 Rounding Rolls:     ${roundingRollCount}`);
+        console.log(`⛽ Dice Create:        ${diceCreateGas.toLocaleString()} gas`);
+        console.log(`⛽ BPS Calc:           ${bpsCalcGas.toLocaleString()} gas`);
+        console.log(`⛽ Main Loop:          ${mainLoopGas.toLocaleString()} gas`);
+        console.log(`⛽ Winner Calc:        ${winnerCalcGas.toLocaleString()} gas`);
+      }
+
+      console.log("=====================================\n");
+    }
+  }, [writeGiraffeRaceAsync, publicClient]);
 
   const handleSubmitNft = useCallback(async () => {
     if (selectedTokenId === null) return;

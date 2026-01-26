@@ -18,6 +18,9 @@ library SettlementLib {
         GiraffeRaceStorage.Layout storage s,
         uint256 raceId
     ) internal {
+        uint256 gasStart = gasleft();
+        uint256 gasCheckpoint;
+        
         GiraffeRaceStorage.Race storage r = s.races[raceId];
         
         // Validation
@@ -30,6 +33,9 @@ library SettlementLib {
         // Fixed odds required only if there were bets
         if (r.totalPot != 0 && !r.oddsSet) revert GiraffeRaceStorage.OddsNotSet();
 
+        gasCheckpoint = gasleft();
+        emit GiraffeRaceStorage.GasCheckpoint("validation", gasStart - gasCheckpoint);
+
         // Get blockhash for randomness
         bytes32 bh = blockhash(r.bettingCloseBlock);
         if (bh == bytes32(0)) revert GiraffeRaceStorage.BlockhashUnavailable();
@@ -38,22 +44,34 @@ library SettlementLib {
         bytes32 baseSeed = keccak256(abi.encodePacked(bh, raceId, address(this)));
         bytes32 simSeed = keccak256(abi.encodePacked(baseSeed, "RACE_SIM"));
         
+        gasStart = gasleft();
+        emit GiraffeRaceStorage.GasCheckpoint("seed_generation", gasCheckpoint - gasStart);
+        
         // Get ALL winners (supports dead heat)
+        gasCheckpoint = gasleft();
         (uint8[6] memory winners, uint8 winnerCount,) = 
             s.simulator.winnersWithScore(simSeed, s.raceScore[raceId]);
+        gasStart = gasleft();
+        emit GiraffeRaceStorage.GasCheckpoint("SIMULATION", gasCheckpoint - gasStart);
 
         // Update race state
+        gasCheckpoint = gasleft();
         r.settled = true;
         r.settledAtBlock = uint64(block.number);
         r.winner = winners[0];
         r.deadHeatCount = winnerCount;
         r.winners = winners;
         r.seed = simSeed;
+        gasStart = gasleft();
+        emit GiraffeRaceStorage.GasCheckpoint("storage_writes", gasCheckpoint - gasStart);
 
         // Record liability for payouts
+        gasCheckpoint = gasleft();
         if (r.totalPot != 0) {
             s.settledLiability += ClaimLib.calculateRaceLiability(r);
         }
+        gasStart = gasleft();
+        emit GiraffeRaceStorage.GasCheckpoint("liability_calc", gasCheckpoint - gasStart);
 
         // Emit appropriate event
         if (winnerCount > 1) {

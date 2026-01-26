@@ -17,6 +17,17 @@ contract GiraffeRaceSimulator {
     uint8 internal constant SPEED_RANGE = 10;
     uint16 internal constant BPS_DENOM = 10000;
 
+    // Gas profiling event
+    event SimulationGasProfile(
+        uint256 totalTicks,
+        uint256 diceCreateGas,
+        uint256 bpsCalcGas,
+        uint256 mainLoopGas,
+        uint256 winnerCalcGas,
+        uint256 speedRollCount,
+        uint256 roundingRollCount
+    );
+
     /// @dev Compile-time check that local constants match GiraffeRaceConstants.
     ///      This function is never called but ensures constants stay in sync.
     function _checkConstants() internal pure {
@@ -46,10 +57,103 @@ contract GiraffeRaceSimulator {
     /// @return distances Final distances after all ticks.
     function winnersWithScore(bytes32 seed, uint8[LANE_COUNT] memory scores)
         external
-        pure
         returns (uint8[LANE_COUNT] memory winners, uint8 winnerCount, uint16[LANE_COUNT] memory distances)
     {
-        return _simulateWithScore(seed, scores);
+        return _simulateWithScoreProfiled(seed, scores);
+    }
+    
+    /// @notice Profiled version of simulation that emits gas usage
+    function _simulateWithScoreProfiled(bytes32 seed, uint8[LANE_COUNT] memory scores)
+        internal
+        returns (uint8[LANE_COUNT] memory winners, uint8 winnerCount, uint16[LANE_COUNT] memory distances)
+    {
+        uint256 gasStart = gasleft();
+        uint256 gasCheckpoint;
+        
+        DeterministicDice.Dice memory dice = DeterministicDice.create(seed);
+        
+        gasCheckpoint = gasleft();
+        uint256 diceCreateGas = gasStart - gasCheckpoint;
+
+        bool finished = false;
+
+        uint16[LANE_COUNT] memory bps;
+        for (uint8 a = 0; a < LANE_COUNT; a++) {
+            bps[a] = _scoreBps(scores[a]);
+        }
+        
+        gasStart = gasleft();
+        uint256 bpsCalcGas = gasCheckpoint - gasStart;
+        gasCheckpoint = gasleft();
+        
+        uint256 speedRollCount = 0;
+        uint256 roundingRollCount = 0;
+        uint256 tickCount = 0;
+
+        for (uint256 t = 0; t < MAX_TICKS; t++) {
+            tickCount++;
+            for (uint256 a = 0; a < LANE_COUNT; a++) {
+                uint256 r;
+                (r, dice) = dice.roll(SPEED_RANGE);
+                speedRollCount++;
+                uint256 baseSpeed = r + 1;
+                // Probabilistic rounding (instead of floor) to avoid a chunky handicap.
+                uint256 raw = baseSpeed * uint256(bps[uint8(a)]);
+                uint256 q = raw / uint256(BPS_DENOM);
+                uint256 rem = raw % uint256(BPS_DENOM);
+                if (rem > 0) {
+                    uint256 pickBps;
+                    (pickBps, dice) = dice.roll(BPS_DENOM);
+                    roundingRollCount++;
+                    if (pickBps < rem) q += 1;
+                }
+                if (q == 0) q = 1;
+                distances[a] += uint16(q);
+            }
+
+            for (uint8 i = 0; i < LANE_COUNT; i++) {
+                if (distances[i] >= TRACK_LENGTH) {
+                    finished = true;
+                    break;
+                }
+            }
+            if (finished) break;
+        }
+
+        require(finished, "GiraffeRace: race did not finish");
+        
+        gasStart = gasleft();
+        uint256 mainLoopGas = gasCheckpoint - gasStart;
+        gasCheckpoint = gasleft();
+
+        uint16 best = distances[0];
+        winnerCount = 1;
+        winners[0] = 0;
+
+        for (uint8 i = 1; i < LANE_COUNT; i++) {
+            uint16 d = distances[i];
+            if (d > best) {
+                best = d;
+                winnerCount = 1;
+                winners[0] = i;
+            } else if (d == best) {
+                winners[winnerCount] = i;
+                winnerCount++;
+            }
+        }
+        
+        gasStart = gasleft();
+        uint256 winnerCalcGas = gasCheckpoint - gasStart;
+        
+        emit SimulationGasProfile(
+            tickCount,
+            diceCreateGas,
+            bpsCalcGas,
+            mainLoopGas,
+            winnerCalcGas,
+            speedRollCount,
+            roundingRollCount
+        );
     }
 
     function simulate(bytes32 seed) external pure returns (uint8 winner, uint16[LANE_COUNT] memory distances) {

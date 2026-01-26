@@ -16,7 +16,7 @@ export const DEFAULT_ALCHEMY_API_KEY = "cR4WnXePioePZ5fFrnSiR";
 const scaffoldConfig = {
   // The networks on which your DApp is live
   // Use chains.base for Base Mainnet, chains.foundry for local development
-  targetNetworks: [chains.base],
+  targetNetworks: [chains.foundry],
   // The interval at which your front-end polls the RPC servers for new data
   // Base has ~2 second block times, so 4 seconds keeps UI responsive
   pollingInterval: 4000,

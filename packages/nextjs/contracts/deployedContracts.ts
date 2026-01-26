@@ -1468,7 +1468,56 @@ const deployedContracts = {
               internalType: "uint16[6]",
             },
           ],
-          stateMutability: "pure",
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "event",
+          name: "SimulationGasProfile",
+          inputs: [
+            {
+              name: "totalTicks",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+            {
+              name: "diceCreateGas",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+            {
+              name: "bpsCalcGas",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+            {
+              name: "mainLoopGas",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+            {
+              name: "winnerCalcGas",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+            {
+              name: "speedRollCount",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+            {
+              name: "roundingRollCount",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
         },
       ],
       inheritedFunctions: {},
@@ -2854,6 +2903,25 @@ const deployedContracts = {
         },
         {
           type: "event",
+          name: "GasCheckpoint",
+          inputs: [
+            {
+              name: "label",
+              type: "string",
+              indexed: false,
+              internalType: "string",
+            },
+            {
+              name: "gasUsed",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
           name: "GiraffeAssigned",
           inputs: [
             {
@@ -3369,6 +3437,25 @@ const deployedContracts = {
             },
             {
               name: "payout",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "GasCheckpoint",
+          inputs: [
+            {
+              name: "label",
+              type: "string",
+              indexed: false,
+              internalType: "string",
+            },
+            {
+              name: "gasUsed",
               type: "uint256",
               indexed: false,
               internalType: "uint256",
@@ -6017,7 +6104,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 10,
+      deployedOnBlock: 6,
     },
     GiraffeNFT: {
       address: "0xb19b36b1456e65e3a6d514d3f715f204bd59f431",
@@ -7367,7 +7454,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 12,
+      deployedOnBlock: 8,
     },
     GiraffeRaceSimulator: {
       address: "0x8ce361602b935680e8dec218b820ff5056beb7af",
@@ -7481,11 +7568,60 @@ const deployedContracts = {
               internalType: "uint16[6]",
             },
           ],
-          stateMutability: "pure",
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "event",
+          name: "SimulationGasProfile",
+          inputs: [
+            {
+              name: "totalTicks",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+            {
+              name: "diceCreateGas",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+            {
+              name: "bpsCalcGas",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+            {
+              name: "mainLoopGas",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+            {
+              name: "winnerCalcGas",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+            {
+              name: "speedRollCount",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+            {
+              name: "roundingRollCount",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 13,
+      deployedOnBlock: 9,
     },
     HouseTreasury: {
       address: "0xe1aa25618fa0c7a1cfdab5d6b456af611873b629",
@@ -7890,7 +8026,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 14,
+      deployedOnBlock: 10,
     },
     WinProbTableShard0: {
       address: "0xe1da8919f262ee86f9be05059c9280142cf23f48",
@@ -7934,7 +8070,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 15,
+      deployedOnBlock: 11,
     },
     WinProbTableShard1: {
       address: "0x0c8e79f3534b00d9a3d4a856b665bf4ebc22f2ba",
@@ -7978,7 +8114,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 16,
+      deployedOnBlock: 12,
     },
     WinProbTableShard2: {
       address: "0xed1db453c3156ff3155a97ad217b3087d5dc5f6e",
@@ -8022,7 +8158,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 17,
+      deployedOnBlock: 13,
     },
     WinProbTableShard3: {
       address: "0xf7cd8fa9b94db2aa972023b379c7f72c65e4de9d",
@@ -8066,7 +8202,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 18,
+      deployedOnBlock: 14,
     },
     WinProbTableShard4: {
       address: "0x12975173b87f7595ee45dffb2ab812ece596bf84",
@@ -8110,7 +8246,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 19,
+      deployedOnBlock: 15,
     },
     WinProbTableShard5: {
       address: "0x82dc47734901ee7d4f4232f398752cb9dd5daccc",
@@ -8154,7 +8290,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 20,
+      deployedOnBlock: 16,
     },
     WinProbTable6: {
       address: "0x196dbcbb54b8ec4958c959d8949ebfe87ac2aaaf",
@@ -8338,7 +8474,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 21,
+      deployedOnBlock: 17,
     },
     DiamondCutFacet: {
       address: "0x6379ebd504941f50d5bfde9348b37593bd29c835",
@@ -8427,7 +8563,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 28,
+      deployedOnBlock: 24,
     },
     DiamondLoupeFacet: {
       address: "0x5b3120d0da5fdcba7aef87a9c3c64829c1c0d76b",
@@ -8529,7 +8665,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 29,
+      deployedOnBlock: 25,
     },
     AdminFacet: {
       address: "0x33b1b5aa9aa4da83a332f0bc5cac6a903fde5d92",
@@ -8752,7 +8888,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 30,
+      deployedOnBlock: 26,
     },
     RaceLifecycleFacet: {
       address: "0x19a1c09fe3399c4daaa2c98b936a8e460fc5eaa4",
@@ -8861,6 +8997,25 @@ const deployedContracts = {
               type: "uint64",
               indexed: false,
               internalType: "uint64",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "GasCheckpoint",
+          inputs: [
+            {
+              name: "label",
+              type: "string",
+              indexed: false,
+              internalType: "string",
+            },
+            {
+              name: "gasUsed",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
             },
           ],
           anonymous: false,
@@ -9067,7 +9222,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 31,
+      deployedOnBlock: 27,
     },
     BettingFacet: {
       address: "0x49b8e3b089d4ebf9f37b1da9b839ec013c2cd8c9",
@@ -9391,6 +9546,25 @@ const deployedContracts = {
         },
         {
           type: "event",
+          name: "GasCheckpoint",
+          inputs: [
+            {
+              name: "label",
+              type: "string",
+              indexed: false,
+              internalType: "string",
+            },
+            {
+              name: "gasUsed",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
           name: "RaceSettled",
           inputs: [
             {
@@ -9512,7 +9686,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 32,
+      deployedOnBlock: 28,
     },
     GiraffeSubmissionFacet: {
       address: "0x067c804bb006836469379d4a2a69a81803bd1f45",
@@ -9699,7 +9873,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 33,
+      deployedOnBlock: 29,
     },
     RaceViewsFacet: {
       address: "0x45009dd3abbe29db54fc5d893ceaa98a624882df",
@@ -10125,7 +10299,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 34,
+      deployedOnBlock: 30,
     },
     GiraffeRace: {
       address: "0xf56aa3aceddf88ab12e494d0b96da3c09a5d264e",
@@ -11677,7 +11851,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 35,
+      deployedOnBlock: 31,
     },
   },
 } as const;
