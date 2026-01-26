@@ -1,5 +1,4 @@
-import { DeterministicDice } from "./deterministicDice";
-import { Hex } from "viem";
+import { Hex, encodePacked, keccak256 } from "viem";
 
 export type RaceSimulation = {
   winner: number; // Primary winner (first in tie order, for backwards compatibility)
@@ -29,9 +28,17 @@ const scoreBps = (score: number) => {
   return minBps + Math.floor(((r - 1) * range) / 9);
 };
 
+/**
+ * OPTIMIZED: Uses direct modulo (matches new Solidity GiraffeRaceSimulator).
+ * One keccak256 per tick, direct byte extraction + modulo.
+ *
+ * Entropy layout per tick (32 bytes):
+ *   Bytes 0-5:   Speed rolls for lanes 0-5 (1 byte each, % 10)
+ *   Bytes 6-17:  Rounding rolls for lanes 0-5 (2 bytes each, % 10000)
+ */
 export function simulateRaceFromSeed({
   seed,
-  laneCount = 4,
+  laneCount = 6,
   maxTicks = 500,
   speedRange = 10,
   trackLength = 1000,
@@ -44,7 +51,6 @@ export function simulateRaceFromSeed({
   trackLength?: number;
   score?: number[]; // length should match laneCount; defaults to all 10 (full score)
 }): RaceSimulation {
-  const dice = new DeterministicDice(seed);
   const distances = Array.from({ length: laneCount }, () => 0);
   const frames: number[][] = [distances.slice()];
   const bps = Array.from({ length: laneCount }, (_, i) => scoreBps(score?.[i] ?? 10));
@@ -53,17 +59,29 @@ export function simulateRaceFromSeed({
   let ticks = 0;
 
   for (let t = 0; t < maxTicks; t++) {
+    // One hash per tick - all entropy we need
+    const tickEntropy = keccak256(encodePacked(["bytes32", "uint256"], [seed, BigInt(t)]));
+    const entropyBytes = hexToBytes(tickEntropy);
+
     for (let a = 0; a < laneCount; a++) {
-      const r = dice.roll(BigInt(speedRange)); // 0..speedRange-1
-      const baseSpeed = Number(r + 1n); // 1..speedRange
-      // Probabilistic rounding (matches Solidity): avoids a chunky handicap from floor().
+      // Speed roll: 1 byte, % speedRange, gives 0-(speedRange-1), then +1
+      const baseSpeed = (entropyBytes[a]! % speedRange) + 1;
+
+      // Apply handicap
       const raw = baseSpeed * bps[a]!;
       let q = Math.floor(raw / 10_000);
       const rem = raw % 10_000;
+
+      // Probabilistic rounding using 2 bytes for rounding decision
       if (rem > 0) {
-        const pick = Number(dice.roll(10_000n)); // 0..9999
-        if (pick < rem) q += 1;
+        // Extract 2 bytes for this lane's rounding roll (bytes 6-17)
+        const roundingRoll = (entropyBytes[6 + a * 2]! << 8) | entropyBytes[7 + a * 2]!;
+        // % 10000 gives 0-9999
+        if (roundingRoll % 10_000 < rem) {
+          q += 1;
+        }
       }
+
       distances[a] += Math.max(1, q);
     }
     frames.push(distances.slice());
@@ -90,4 +108,14 @@ export function simulateRaceFromSeed({
   const deadHeatCount = winners.length;
 
   return { winner, winners, deadHeatCount, distances, frames, ticks };
+}
+
+// Helper to convert hex string to byte array
+function hexToBytes(hex: Hex): number[] {
+  const h = hex.startsWith("0x") ? hex.slice(2) : hex;
+  const bytes: number[] = [];
+  for (let i = 0; i < h.length; i += 2) {
+    bytes.push(parseInt(h.slice(i, i + 2), 16));
+  }
+  return bytes;
 }

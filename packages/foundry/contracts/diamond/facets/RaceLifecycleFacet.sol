@@ -4,7 +4,6 @@ pragma solidity ^0.8.19;
 import { GiraffeRaceStorage } from "../libraries/GiraffeRaceStorage.sol";
 import { SettlementLib } from "../libraries/SettlementLib.sol";
 import { OddsLib } from "../libraries/OddsLib.sol";
-import { DeterministicDice } from "../../libraries/DeterministicDice.sol";
 
 /**
  * @title RaceLifecycleFacet
@@ -12,7 +11,24 @@ import { DeterministicDice } from "../../libraries/DeterministicDice.sol";
  * @dev Core race lifecycle management
  */
 contract RaceLifecycleFacet {
-    using DeterministicDice for DeterministicDice.Dice;
+    // ============ Optimized Simple RNG (for small selections) ============
+    // Uses direct modulo - fine for selecting from small sets (max ~128 entries)
+    
+    struct SimpleRng {
+        bytes32 seed;
+        uint256 counter;
+    }
+    
+    function _createRng(bytes32 seed) internal pure returns (SimpleRng memory) {
+        return SimpleRng({ seed: seed, counter: 0 });
+    }
+    
+    function _roll(SimpleRng memory rng, uint256 n) internal pure returns (uint256 result, SimpleRng memory) {
+        bytes32 entropy = keccak256(abi.encodePacked(rng.seed, rng.counter));
+        rng.counter++;
+        result = uint256(entropy) % n;
+        return (result, rng);
+    }
 
     // ============ Race Creation ============
 
@@ -143,7 +159,7 @@ contract RaceLifecycleFacet {
         delete s.raceGiraffes[raceId];
         GiraffeRaceStorage.RaceGiraffes storage ra = s.raceGiraffes[raceId];
 
-        DeterministicDice.Dice memory dice = DeterministicDice.create(fillSeed);
+        SimpleRng memory rng = _createRng(fillSeed);
 
         uint8[6] memory availableIdx = [0, 1, 2, 3, 4, 5];
         uint8 availableCount = GiraffeRaceStorage.LANE_COUNT;
@@ -178,8 +194,8 @@ contract RaceLifecycleFacet {
         } else {
             for (uint8 lane = 0; lane < GiraffeRaceStorage.LANE_COUNT; ) {
                 uint256 remaining = validCount - uint256(lane);
-                (uint256 pick, DeterministicDice.Dice memory updatedDice) = dice.roll(remaining);
-                dice = updatedDice;
+                uint256 pick;
+                (pick, rng) = _roll(rng, remaining);
 
                 uint256 chosenPos = uint256(lane) + pick;
                 uint256 entryIdx = validIdx[chosenPos];
@@ -197,8 +213,8 @@ contract RaceLifecycleFacet {
         // Fill remaining lanes with house giraffes
         for (uint8 lane = ra.assignedCount; lane < GiraffeRaceStorage.LANE_COUNT; ) {
             if (availableCount == 0) revert GiraffeRaceStorage.InvalidHouseGiraffe();
-            (uint256 pick, DeterministicDice.Dice memory updatedDice) = dice.roll(availableCount);
-            dice = updatedDice;
+            uint256 pick;
+            (pick, rng) = _roll(rng, availableCount);
 
             uint8 idx = availableIdx[uint8(pick)];
             availableCount--;

@@ -1,64 +1,51 @@
 import fs from "fs/promises";
 import path from "path";
-import { hexToBytes, keccak256, toHex } from "viem";
+import { hexToBytes, keccak256, toHex, encodePacked } from "viem";
 
 // -----------------------
-// Deterministic dice (matches TS + Solidity)
+// Optimized Deterministic Dice (direct modulo)
 // -----------------------
 
 class DeterministicDice {
   constructor(seed) {
+    this.baseSeed = seed;
     this.entropy = hexToBytes(seed);
-    this.position = 0; // nibble position 0..63
+    this.position = 0; // byte position 0..31
+    this.counter = 0;
   }
 
   roll(n) {
     if (n <= 0n) throw new Error("DeterministicDice: n must be > 0");
-    const bitsNeeded = ceilLog2(n);
-    let hexCharsNeeded = Number((bitsNeeded + 3n) / 4n);
-    if (hexCharsNeeded === 0) hexCharsNeeded = 1;
+    if (n === 1n) return 0n;
 
-    const maxValue = 16n ** BigInt(hexCharsNeeded);
-    const threshold = maxValue - (maxValue % n);
-
-    let value;
-    do {
-      value = this.consumeNibbles(hexCharsNeeded);
-    } while (value >= threshold);
-
+    const bytesNeeded = this.bytesForRange(n);
+    let value = 0n;
+    for (let i = 0; i < bytesNeeded; i++) {
+      value = (value << 8n) | BigInt(this.nextByte());
+    }
     return value % n;
   }
 
-  consumeNibbles(count) {
-    let value = 0n;
-    for (let i = 0; i < count; i++) {
-      if (this.position >= 64) {
-        this.entropy = hexToBytes(keccak256(this.entropy));
-        this.position = 0;
-      }
-      const nibble = getNibble(this.entropy, this.position);
-      value = (value << 4n) + BigInt(nibble);
-      this.position++;
+  nextByte() {
+    if (this.position >= 32) {
+      this.refreshEntropy();
     }
-    return value;
+    return this.entropy[this.position++];
   }
-}
 
-function getNibble(bytes, pos) {
-  const byteIndex = Math.floor(pos / 2);
-  const byteValue = bytes[byteIndex] ?? 0;
-  return pos % 2 === 0 ? byteValue >> 4 : byteValue & 0x0f;
-}
-
-function ceilLog2(n) {
-  if (n <= 1n) return 0n;
-  let result = 0n;
-  let temp = n - 1n;
-  while (temp > 0n) {
-    result++;
-    temp >>= 1n;
+  refreshEntropy() {
+    this.counter++;
+    const newHash = keccak256(encodePacked(["bytes32", "uint256"], [this.baseSeed, BigInt(this.counter)]));
+    this.entropy = hexToBytes(newHash);
+    this.position = 0;
   }
-  return result;
+
+  bytesForRange(n) {
+    if (n <= 256n) return 1;
+    if (n <= 65536n) return 2;
+    if (n <= 16777216n) return 3;
+    return 4;
+  }
 }
 
 /**
