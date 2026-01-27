@@ -84,28 +84,6 @@ export const RaceTrack = memo(function RaceTrack({
 }: RaceTrackProps) {
   return (
     <>
-      {/* Fixed lane labels - repositioned for side view */}
-      <div className="absolute left-3 top-3 z-20 flex flex-col gap-1 pointer-events-none">
-        {Array.from({ length: LANE_COUNT }).map((_, i) => {
-          const d = Number(currentDistances[i] ?? 0);
-          return (
-            <div
-              key={i}
-              className="flex items-center gap-2 text-xs"
-              style={{
-                opacity: 0.6 + i * 0.06,
-                transform: `scale(${0.9 + i * 0.02})`,
-              }}
-            >
-              <span className="tabular-nums w-8 text-right">{d}</span>
-              <span className="truncate max-w-[80px]">
-                {parsedGiraffes ? <LaneName tokenId={parsedGiraffes.tokenIds[i] ?? 0n} fallback={`#${i + 1}`} /> : null}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-
       {/* Camera viewport */}
       <div className="absolute inset-0">
         <div ref={cameraScrollRefCb} className="absolute inset-0 overflow-hidden">
@@ -257,6 +235,25 @@ export const RaceTrack = memo(function RaceTrack({
                             playing={simulation ? isPlaying && raceStarted && frame < lastFrameIndex : false}
                             sizePx={GIRAFFE_SIZE_PX}
                           />
+                          {/* Name label - positioned to the right of the giraffe's face */}
+                          {parsedGiraffes?.tokenIds?.[i] ? (
+                            <div
+                              className="absolute pointer-events-none select-none whitespace-nowrap"
+                              style={{
+                                left: `${GIRAFFE_SIZE_PX * 1.05}px`,
+                                top: `${GIRAFFE_SIZE_PX * 0.1}px`,
+                              }}
+                            >
+                              <span
+                                className="inline-flex items-center px-1.5 py-0.5 text-xs font-semibold"
+                                style={{
+                                  textShadow: "0 1px 2px rgba(0,0,0,0.1)",
+                                }}
+                              >
+                                <LaneName tokenId={parsedGiraffes.tokenIds[i]} fallback={`#${i + 1}`} />
+                              </span>
+                            </div>
+                          ) : null}
                         </div>
                       </div>
                     );
