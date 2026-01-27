@@ -23,7 +23,6 @@ interface EnterNftCardProps {
 
   // Actions
   onEnterQueue: () => Promise<void>;
-  onLeaveQueue: () => Promise<void>;
 }
 
 export const EnterNftCard = ({
@@ -39,15 +38,14 @@ export const EnterNftCard = ({
   userQueuePosition,
   giraffeRaceContract,
   onEnterQueue,
-  onLeaveQueue,
 }: EnterNftCardProps) => {
   return (
     <div className="card bg-base-100 border border-base-300">
       <div className="card-body gap-3">
         <h3 className="font-semibold">Enter the Race Queue</h3>
         <p className="text-sm opacity-70">
-          Join the queue to have your giraffe compete in future races. First come, first served — the next 6 giraffes in
-          queue race when someone creates a race.
+          Join the queue to have your giraffe compete in future races. First come, first served — races start
+          automatically when 6 giraffes are ready.
         </p>
 
         {userInQueue && userQueuedToken ? (
@@ -70,9 +68,7 @@ export const EnterNftCard = ({
                 </span>
               </div>
             </div>
-            <button className="btn btn-outline btn-sm" onClick={onLeaveQueue}>
-              Leave Queue
-            </button>
+            <div className="text-xs text-success">✓ Your giraffe is committed to race!</div>
           </div>
         ) : (
           // User is not in queue - show entry form
@@ -122,7 +118,7 @@ export const EnterNftCard = ({
         )}
 
         <div className="text-xs opacity-70">
-          You can have one giraffe in the queue at a time. Leave the queue anytime before a race picks your giraffe.
+          You can have one giraffe in the queue at a time. Once entered, your giraffe is committed until it races.
         </div>
       </div>
     </div>

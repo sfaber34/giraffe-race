@@ -38,8 +38,7 @@ interface RaceTrackProps {
   playbackSpeed: PlaybackSpeed;
   svgResetNonce: number;
 
-  // Winner/bet state
-  revealedWinner: number | null;
+  // Bet state
   myBet: MyBet | null;
 }
 
@@ -79,7 +78,6 @@ export const RaceTrack = memo(function RaceTrack({
   lastFrameIndex,
   playbackSpeed,
   svgResetNonce,
-  revealedWinner,
   myBet,
 }: RaceTrackProps) {
   return (
@@ -180,7 +178,6 @@ export const RaceTrack = memo(function RaceTrack({
                     const d = simulation ? Number(currentDistances[i] ?? 0) : 0;
                     const prev = simulation ? Number(prevDistances[i] ?? 0) : 0;
                     const delta = Math.max(0, d - prev);
-                    const isWinner = revealedWinner === i;
                     const isUserBetLane = !!myBet?.hasBet && myBet.lane === i;
 
                     const MIN_ANIMATION_SPEED_FACTOR = 2.0;
@@ -210,9 +207,6 @@ export const RaceTrack = memo(function RaceTrack({
                             : undefined,
                           willChange: simulation ? "transform" : undefined,
                           zIndex,
-                          filter: isWinner
-                            ? "drop-shadow(0 0 12px rgba(255, 215, 0, 0.9)) drop-shadow(0 0 24px rgba(255, 215, 0, 0.6))"
-                            : undefined,
                         }}
                       >
                         <div className="relative">

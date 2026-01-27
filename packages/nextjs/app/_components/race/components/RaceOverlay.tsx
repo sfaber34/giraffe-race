@@ -190,7 +190,7 @@ export const RaceOverlay = ({
           ) : (
             <>
               <div className="text-3xl font-black text-primary drop-shadow">Betting open</div>
-              <div className="text-lg font-semibold text-base-content/70">Pick a giraffe to win</div>
+              <div className="text-lg font-semibold text-base-content/70">Place your bets!</div>
             </>
           )}
           <div className="w-full mt-2">
@@ -228,7 +228,7 @@ export const RaceOverlay = ({
           ) : (
             <>
               <div className="text-3xl font-black text-primary drop-shadow">Betting closed</div>
-              <div className="text-lg font-semibold text-base-content/70">Waiting for settlement</div>
+              <div className="text-lg font-semibold text-base-content/70">Race starts soon!</div>
             </>
           )}
         </div>

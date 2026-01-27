@@ -264,8 +264,6 @@ export const RaceDashboard = () => {
   }, [parsedOdds?.oddsSet, parsedOdds?.oddsBps, placeBetValue, betLane, myBet?.hasBet, myBet?.lane, myBet?.amount]);
 
   // Revealed state
-  const verifiedWinner = parsed?.settled ? parsed.winner : null;
-  const revealedWinner = replay.raceIsOver ? verifiedWinner : null;
   const hasRevealedClaimSnapshot = claimSnapshot !== null;
   const displayedNextWinningClaim = claimUiUnlocked ? nextWinningClaim : (claimSnapshot?.nextWinningClaim ?? null);
   const displayedWinningClaimRemaining = claimUiUnlocked
@@ -281,12 +279,6 @@ export const RaceDashboard = () => {
     } as any);
     setSelectedTokenId(null);
   }, [selectedTokenId, writeGiraffeRaceAsync]);
-
-  const handleLeaveQueue = useCallback(async () => {
-    await writeGiraffeRaceAsync({
-      functionName: "leaveQueue" as any,
-    } as any);
-  }, [writeGiraffeRaceAsync]);
 
   const handleApprove = useCallback(async () => {
     if (!placeBetValue || !treasuryContract?.address) return;
@@ -376,22 +368,6 @@ export const RaceDashboard = () => {
             </div>
 
             <div className="flex flex-col gap-3">
-              {!parsed ? (
-                <div className="alert alert-info">
-                  <span className="text-sm">Start a race to see status and replay.</span>
-                </div>
-              ) : !parsed.settled ? (
-                <div className="alert alert-info">
-                  <span className="text-sm">
-                    Race isn&apos;t settled yet, so the seed is unknown. Settle it to replay.
-                  </span>
-                </div>
-              ) : !replay.simulation ? (
-                <div className="alert alert-warning">
-                  <span className="text-sm">Missing/invalid seed. Try settling the race again.</span>
-                </div>
-              ) : null}
-
               {replay.simulation ? (
                 <div className="flex justify-between text-sm opacity-70">
                   <span>
@@ -402,7 +378,7 @@ export const RaceDashboard = () => {
 
               <div
                 ref={camera.viewportRefCb}
-                className="relative w-full rounded-2xl bg-base-100 border border-base-300 overflow-hidden"
+                className="relative w-full bg-base-100 border border-base-300 overflow-hidden"
                 style={{ height: `${TRACK_HEIGHT_PX}px` }}
               >
                 {/* Center overlay */}
@@ -441,7 +417,6 @@ export const RaceDashboard = () => {
                   lastFrameIndex={replay.lastFrameIndex}
                   playbackSpeed={replay.playbackSpeed}
                   svgResetNonce={replay.svgResetNonce}
-                  revealedWinner={revealedWinner}
                   myBet={myBet}
                 />
               </div>
@@ -609,15 +584,8 @@ export const RaceDashboard = () => {
           </div>
         </div>
 
-        <div className="card bg-base-200 shadow">
+        <div>
           <div className="card-body gap-4">
-            <div className="flex items-center justify-between">
-              <h2 className="card-title">Play</h2>
-              <div className="text-xs opacity-70">
-                {status === "no_race" ? "No race yet" : parsed?.settled ? "Settled (replay available)" : "Not settled"}
-              </div>
-            </div>
-
             <div className="grid grid-cols-1 gap-4">
               {showPlaceBetCard ? (
                 <PlaceBetCard
@@ -672,7 +640,6 @@ export const RaceDashboard = () => {
                     userQueuePosition={userQueuePosition}
                     giraffeRaceContract={giraffeRaceContract}
                     onEnterQueue={handleEnterQueue}
-                    onLeaveQueue={handleLeaveQueue}
                   />
 
                   <RaceQueueCard
