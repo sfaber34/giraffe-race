@@ -368,14 +368,6 @@ export const RaceDashboard = () => {
             </div>
 
             <div className="flex flex-col gap-3">
-              {replay.simulation ? (
-                <div className="flex justify-between text-sm opacity-70">
-                  <span>
-                    Tick: <span className="font-semibold opacity-100">{replay.frame}</span> / {replay.lastFrameIndex}
-                  </span>
-                </div>
-              ) : null}
-
               <div
                 ref={camera.viewportRefCb}
                 className="relative w-full bg-base-100 border border-base-300 overflow-hidden"

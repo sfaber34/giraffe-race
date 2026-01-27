@@ -148,7 +148,8 @@ export const PlaceBetCard = ({
       <div className="card-body gap-3">
         <h3 className="font-semibold">Place a bet</h3>
         <p className="text-sm opacity-70">
-          Choose a giraffe and bet type. You can place up to 1 Win, 1 Place, and 1 Show bet per race.
+          You can place up to 1 Win (1st place), 1 Place (1st or 2nd place), and 1 Show (1st, 2nd, or 3rd place) bet per
+          race.
         </p>
 
         {/* Bet amount input - always visible */}
@@ -268,9 +269,9 @@ export const PlaceBetCard = ({
 
                   {/* Right: Stats */}
                   <div className="flex flex-col items-end text-[10px] opacity-70 flex-shrink-0 leading-tight">
-                    <span>Z:{laneStats[lane]?.zip ?? 10}</span>
-                    <span>M:{laneStats[lane]?.moxie ?? 10}</span>
-                    <span>H:{laneStats[lane]?.hustle ?? 10}</span>
+                    <span>Zip:{laneStats[lane]?.zip ?? 10}</span>
+                    <span>Moxie:{laneStats[lane]?.moxie ?? 10}</span>
+                    <span>Hustle:{laneStats[lane]?.hustle ?? 10}</span>
                   </div>
                 </div>
               </div>

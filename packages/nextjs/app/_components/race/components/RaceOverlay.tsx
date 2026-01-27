@@ -150,19 +150,8 @@ export const RaceOverlay = ({
           className="flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-base-100/90 backdrop-blur-sm shadow-lg"
           style={{ minWidth: 320 }}
         >
-          <div className="text-3xl font-black text-warning drop-shadow">⏳ Awaiting bot</div>
-          <div className="text-lg font-semibold text-base-content/70">Bot must set probabilities</div>
-          <div className="text-sm text-base-content/50">Betting opens after probabilities are set</div>
-          {parsedSchedule?.oddsDeadlineBlock && (
-            <div className="w-full mt-2">
-              <BlockCountdownBar
-                label="Deadline"
-                current={blockNumber}
-                start={parsedSchedule.oddsDeadlineBlock - 10n}
-                end={parsedSchedule.oddsDeadlineBlock}
-              />
-            </div>
-          )}
+          <div className="text-3xl font-black text-primary drop-shadow">⏳ Setting odds</div>
+          <div className="text-lg font-semibold text-base-content/70">Betting opens soon!</div>
         </div>
       ) : status === "betting_open" ? (
         <div
@@ -270,8 +259,7 @@ export const RaceOverlay = ({
           className="flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-base-100/90 backdrop-blur-sm shadow-lg pointer-events-auto"
           style={{ minWidth: 320 }}
         >
-          <div className="text-3xl font-black text-primary drop-shadow">No race active</div>
-          <div className="text-lg font-semibold text-base-content/70">Waiting for the next race to be created…</div>
+          <div className="text-3xl font-black text-primary drop-shadow">Loading...</div>
         </div>
       ) : null}
     </>
