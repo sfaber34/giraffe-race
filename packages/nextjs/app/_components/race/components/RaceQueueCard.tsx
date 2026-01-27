@@ -60,12 +60,6 @@ export const RaceQueueCard = ({
             })}
           </div>
         )}
-
-        <div className="text-xs opacity-70">
-          {activeQueueLength >= 6
-            ? "Queue has enough giraffes for a race! Anyone can create one."
-            : `Need ${6 - activeQueueLength} more giraffe${6 - activeQueueLength !== 1 ? "s" : ""} to start a race.`}
-        </div>
       </div>
     </div>
   );
