@@ -1,6 +1,12 @@
 import { Hex } from "viem";
 
-export type RaceStatus = "no_race" | "cooldown" | "betting_open" | "betting_closed" | "settled";
+export type RaceStatus =
+  | "no_race"
+  | "awaiting_probabilities"
+  | "betting_open"
+  | "betting_closed"
+  | "settled"
+  | "cooldown";
 
 export type PlaybackSpeed = 1 | 2 | 3;
 
@@ -14,8 +20,9 @@ export interface ParsedRace {
 }
 
 export interface ParsedSchedule {
-  bettingCloseBlock: bigint;
-  settledAtBlock: bigint;
+  oddsDeadlineBlock: bigint; // Block by which bot must call setProbabilities()
+  bettingCloseBlock: bigint; // Block when betting window closes (0 if probabilities not set yet)
+  settledAtBlock: bigint; // Block when race was settled (0 if not settled)
 }
 
 export interface ParsedGiraffes {

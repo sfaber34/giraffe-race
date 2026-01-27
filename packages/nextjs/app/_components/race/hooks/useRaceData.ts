@@ -384,9 +384,13 @@ export const useRaceDetails = (
 
   const parsedSchedule = useMemo<ParsedSchedule | null>(() => {
     if (!raceScheduleData) return null;
-    // New contract returns only [bettingCloseBlock, settledAtBlock]
-    const [bettingCloseBlock, settledAtBlock] = raceScheduleData as unknown as [bigint, bigint];
-    return { bettingCloseBlock, settledAtBlock };
+    // Contract returns [oddsDeadlineBlock, bettingCloseBlock, settledAtBlock]
+    const [oddsDeadlineBlock, bettingCloseBlock, settledAtBlock] = raceScheduleData as unknown as [
+      bigint,
+      bigint,
+      bigint,
+    ];
+    return { oddsDeadlineBlock, bettingCloseBlock, settledAtBlock };
   }, [raceScheduleData]);
 
   const parsedGiraffes = useMemo<ParsedGiraffes | null>(() => {
@@ -539,9 +543,9 @@ export const useRaceStatus = (
   giraffeRaceContract: any,
   hasAnyRace: boolean,
   parsed: ParsedRace | null,
+  parsedSchedule: ParsedSchedule | null,
   cooldownStatus: CooldownStatus | null,
   blockNumber: bigint | undefined,
-  bettingCloseBlock: bigint | null,
 ): RaceStatus => {
   return useMemo(() => {
     if (!giraffeRaceContract) return "no_race";
@@ -554,20 +558,29 @@ export const useRaceStatus = (
       return "settled";
     }
 
-    if (blockNumber === undefined) return "betting_closed";
+    if (blockNumber === undefined) return "no_race";
 
-    // With the new queue system, races go directly to betting_open when created
-    if (!bettingCloseBlock) {
-      // Race exists but no betting close block yet - shouldn't happen with new system
-      return "betting_closed";
+    // New flow: createRace() sets oddsDeadlineBlock, then bot calls setProbabilities() which sets bettingCloseBlock
+    const oddsDeadlineBlock = parsedSchedule?.oddsDeadlineBlock ?? 0n;
+    const bettingCloseBlock = parsedSchedule?.bettingCloseBlock ?? 0n;
+
+    // Race created but probabilities not yet set by bot
+    if (oddsDeadlineBlock > 0n && bettingCloseBlock === 0n) {
+      return "awaiting_probabilities";
     }
 
-    if (blockNumber < bettingCloseBlock) {
+    // Probabilities set, betting window open
+    if (bettingCloseBlock > 0n && blockNumber < bettingCloseBlock) {
       return "betting_open";
     }
 
-    return "betting_closed";
-  }, [giraffeRaceContract, hasAnyRace, parsed, blockNumber, bettingCloseBlock, cooldownStatus]);
+    // Betting window closed, waiting for settlement
+    if (bettingCloseBlock > 0n && blockNumber >= bettingCloseBlock) {
+      return "betting_closed";
+    }
+
+    return "no_race";
+  }, [giraffeRaceContract, hasAnyRace, parsed, parsedSchedule, blockNumber, cooldownStatus]);
 };
 
 export const useMyBet = (

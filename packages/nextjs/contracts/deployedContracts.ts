@@ -2354,7 +2354,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 13,
+      deployedOnBlock: 34,
     },
     GiraffeNFT: {
       address: "0xb19b36b1456e65e3a6d514d3f715f204bd59f431",
@@ -3704,7 +3704,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 15,
+      deployedOnBlock: 36,
     },
     GiraffeRaceSimulator: {
       address: "0x8ce361602b935680e8dec218b820ff5056beb7af",
@@ -3946,7 +3946,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 16,
+      deployedOnBlock: 37,
     },
     HouseTreasury: {
       address: "0xe1aa25618fa0c7a1cfdab5d6b456af611873b629",
@@ -4351,7 +4351,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 17,
+      deployedOnBlock: 38,
     },
     GiraffeRace: {
       address: "0x196dbcbb54b8ec4958c959d8949ebfe87ac2aaaf",
@@ -4498,7 +4498,7 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "BOT_ACTION_SET_ODDS",
+          name: "BOT_ACTION_SET_PROBABILITIES",
           inputs: [],
           outputs: [
             {
@@ -5846,7 +5846,7 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "setOdds",
+          name: "setProbabilities",
           inputs: [
             {
               name: "raceId",
@@ -5854,19 +5854,19 @@ const deployedContracts = {
               internalType: "uint256",
             },
             {
-              name: "winOddsBps",
-              type: "uint32[6]",
-              internalType: "uint32[6]",
+              name: "winProbBps",
+              type: "uint16[6]",
+              internalType: "uint16[6]",
             },
             {
-              name: "placeOddsBps",
-              type: "uint32[6]",
-              internalType: "uint32[6]",
+              name: "placeProbBps",
+              type: "uint16[6]",
+              internalType: "uint16[6]",
             },
             {
-              name: "showOddsBps",
-              type: "uint32[6]",
-              internalType: "uint32[6]",
+              name: "showProbBps",
+              type: "uint16[6]",
+              internalType: "uint16[6]",
             },
           ],
           outputs: [],
@@ -6332,13 +6332,31 @@ const deployedContracts = {
         },
         {
           type: "event",
-          name: "RaceOddsSet",
+          name: "RaceProbabilitiesSet",
           inputs: [
             {
               name: "raceId",
               type: "uint256",
               indexed: true,
               internalType: "uint256",
+            },
+            {
+              name: "winProbBps",
+              type: "uint16[6]",
+              indexed: false,
+              internalType: "uint16[6]",
+            },
+            {
+              name: "placeProbBps",
+              type: "uint16[6]",
+              indexed: false,
+              internalType: "uint16[6]",
+            },
+            {
+              name: "showProbBps",
+              type: "uint16[6]",
+              indexed: false,
+              internalType: "uint16[6]",
             },
             {
               name: "winOddsBps",
@@ -6505,11 +6523,6 @@ const deployedContracts = {
         },
         {
           type: "error",
-          name: "InvalidOdds",
-          inputs: [],
-        },
-        {
-          type: "error",
           name: "InvalidRace",
           inputs: [],
         },
@@ -6565,6 +6578,11 @@ const deployedContracts = {
         },
         {
           type: "error",
+          name: "OddsWindowExpired",
+          inputs: [],
+        },
+        {
+          type: "error",
           name: "OddsWindowNotExpired",
           inputs: [],
         },
@@ -6600,7 +6618,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 24,
+      deployedOnBlock: 45,
     },
   },
 } as const;

@@ -99,9 +99,9 @@ export const RaceDashboard = () => {
     giraffeRaceContract,
     hasAnyRace,
     parsed,
+    parsedSchedule,
     cooldownStatus,
     activeBlockNumber,
-    bettingCloseBlock,
   );
 
   // Camera hook

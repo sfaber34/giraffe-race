@@ -128,20 +128,30 @@ export const RaceStatusCard = ({
             <div className="flex justify-between">
               <span className="opacity-70">Status</span>
               <span className="font-semibold">
-                {status === "betting_open"
-                  ? "Betting open"
-                  : status === "betting_closed"
-                    ? "Betting closed"
-                    : "Settled"}
+                {status === "awaiting_probabilities"
+                  ? "⏳ Awaiting bot"
+                  : status === "betting_open"
+                    ? "Betting open"
+                    : status === "betting_closed"
+                      ? "Betting closed"
+                      : "Settled"}
               </span>
             </div>
             <div className="flex justify-between">
               <span className="opacity-70">Current block</span>
               <span className="font-mono">{blockNumber !== undefined ? blockNumber.toString() : "-"}</span>
             </div>
+            {status === "awaiting_probabilities" && parsedSchedule?.oddsDeadlineBlock && (
+              <div className="flex justify-between">
+                <span className="opacity-70">Prob. deadline</span>
+                <span className="font-mono">{parsedSchedule.oddsDeadlineBlock.toString()}</span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="opacity-70">Betting closes</span>
-              <span className="font-mono">{bettingCloseBlock?.toString() ?? "-"}</span>
+              <span className="font-mono">
+                {bettingCloseBlock?.toString() ?? (status === "awaiting_probabilities" ? "—" : "-")}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="opacity-70">Pot</span>
@@ -153,18 +163,34 @@ export const RaceStatusCard = ({
         <div className="divider my-1" />
 
         <div className="flex flex-col gap-3">
-          <BlockCountdownBar
-            label="Until betting closes"
-            current={blockNumber}
-            start={bettingCloseBlock ? bettingCloseBlock - 30n : undefined}
-            end={bettingCloseBlock ?? undefined}
-          />
-          <BlockCountdownBar
-            label="Until settlement available"
-            current={blockNumber}
-            start={bettingCloseBlock ?? undefined}
-            end={bettingCloseBlock ? bettingCloseBlock + 1n : undefined}
-          />
+          {/* Probabilities window countdown (only during awaiting_probabilities phase) */}
+          {status === "awaiting_probabilities" && parsedSchedule?.oddsDeadlineBlock && (
+            <BlockCountdownBar
+              label="⏳ Bot must set probabilities"
+              current={blockNumber}
+              start={parsedSchedule.oddsDeadlineBlock - 10n}
+              end={parsedSchedule.oddsDeadlineBlock}
+            />
+          )}
+          {/* Betting countdown (only after probabilities are set) */}
+          {bettingCloseBlock && bettingCloseBlock > 0n && (
+            <BlockCountdownBar
+              label="Until betting closes"
+              current={blockNumber}
+              start={bettingCloseBlock - 30n}
+              end={bettingCloseBlock}
+            />
+          )}
+          {/* Settlement countdown (only after betting closes) */}
+          {bettingCloseBlock && bettingCloseBlock > 0n && blockNumber && blockNumber >= bettingCloseBlock && (
+            <BlockCountdownBar
+              label="Until settlement available"
+              current={blockNumber}
+              start={bettingCloseBlock}
+              end={bettingCloseBlock + 1n}
+            />
+          )}
+          {/* Cooldown countdown (after settlement) */}
           {(status === "settled" || status === "cooldown") &&
             cooldownStatus &&
             cooldownStatus.cooldownEndsAtBlock > 0n && (
@@ -218,7 +244,9 @@ export const RaceStatusCard = ({
             </button>
           </div>
           <div className="text-xs opacity-70">
-            Lineup is selected from the queue when a race is created. Odds are fixed at creation time.
+            {status === "awaiting_probabilities"
+              ? "Waiting for bot to send probabilities (10 block window). Betting opens after."
+              : "Lineup from queue → Bot sends probabilities → Contract calculates odds → Betting opens."}
           </div>
         </div>
 
