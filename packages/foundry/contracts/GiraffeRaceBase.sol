@@ -101,7 +101,9 @@ abstract contract GiraffeRaceBase {
         uint8 deadHeatCount;
         bytes32 seed;
         uint256 totalPot;
-        uint256[6] totalOnLane;
+        uint256[6] totalOnLane;      // Win bets per lane
+        uint256[6] totalPlaceOnLane; // Place bets per lane
+        uint256[6] totalShowOnLane;  // Show bets per lane
         uint32[6] decimalOddsBps;
         uint8[6] winners;
         // Finish order for Win/Place/Show betting

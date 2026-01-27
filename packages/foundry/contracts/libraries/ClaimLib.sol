@@ -142,7 +142,7 @@ library ClaimLib {
         }
     }
 
-    /// @notice Calculate total liability for a settled race (sum of winning lane payouts / deadHeatCount)
+    /// @notice Calculate total liability for a settled race (Win bets only - legacy)
     /// @param race The race struct
     /// @return liability Total liability for the race
     function calculateRaceLiability(
@@ -153,6 +153,68 @@ library ClaimLib {
             uint8 w = race.winners[i];
             uint256 lanePayout = (race.totalOnLane[w] * uint256(race.decimalOddsBps[w])) / ODDS_SCALE;
             liability += lanePayout / uint256(winnerCount);
+            unchecked { ++i; }
+        }
+    }
+
+    /// @notice Calculate total liability for Place bets (1st or 2nd place)
+    /// @param race The race struct
+    /// @param placeOddsBps Fixed odds for Place bets
+    /// @return liability Total Place bet liability
+    function calculatePlaceLiability(
+        GiraffeRaceBase.Race storage race,
+        uint32 placeOddsBps
+    ) internal view returns (uint256 liability) {
+        // 1st place lanes get full payout
+        for (uint8 i = 0; i < race.firstPlace.count; ) {
+            uint8 lane = race.firstPlace.lanes[i];
+            uint256 lanePayout = (race.totalPlaceOnLane[lane] * uint256(placeOddsBps)) / ODDS_SCALE;
+            liability += lanePayout;
+            unchecked { ++i; }
+        }
+        
+        // 2nd place lanes: split if dead heat
+        uint8 secondCount = race.secondPlace.count;
+        for (uint8 i = 0; i < secondCount; ) {
+            uint8 lane = race.secondPlace.lanes[i];
+            uint256 lanePayout = (race.totalPlaceOnLane[lane] * uint256(placeOddsBps)) / ODDS_SCALE;
+            // Split payout if dead heat for 2nd
+            liability += lanePayout / uint256(secondCount > 1 ? secondCount : 1);
+            unchecked { ++i; }
+        }
+    }
+
+    /// @notice Calculate total liability for Show bets (1st, 2nd, or 3rd place)
+    /// @param race The race struct
+    /// @param showOddsBps Fixed odds for Show bets
+    /// @return liability Total Show bet liability
+    function calculateShowLiability(
+        GiraffeRaceBase.Race storage race,
+        uint32 showOddsBps
+    ) internal view returns (uint256 liability) {
+        // 1st place lanes get full payout
+        for (uint8 i = 0; i < race.firstPlace.count; ) {
+            uint8 lane = race.firstPlace.lanes[i];
+            uint256 lanePayout = (race.totalShowOnLane[lane] * uint256(showOddsBps)) / ODDS_SCALE;
+            liability += lanePayout;
+            unchecked { ++i; }
+        }
+        
+        // 2nd place lanes get full payout
+        for (uint8 i = 0; i < race.secondPlace.count; ) {
+            uint8 lane = race.secondPlace.lanes[i];
+            uint256 lanePayout = (race.totalShowOnLane[lane] * uint256(showOddsBps)) / ODDS_SCALE;
+            liability += lanePayout;
+            unchecked { ++i; }
+        }
+        
+        // 3rd place lanes: split if dead heat
+        uint8 thirdCount = race.thirdPlace.count;
+        for (uint8 i = 0; i < thirdCount; ) {
+            uint8 lane = race.thirdPlace.lanes[i];
+            uint256 lanePayout = (race.totalShowOnLane[lane] * uint256(showOddsBps)) / ODDS_SCALE;
+            // Split payout if dead heat for 3rd
+            liability += lanePayout / uint256(thirdCount > 1 ? thirdCount : 1);
             unchecked { ++i; }
         }
     }

@@ -62,9 +62,13 @@ abstract contract GiraffeRaceBetting is GiraffeRaceBase {
         b.lane = lane;
 
         r.totalPot += amount;
-        // Track by lane for Win bets (for existing odds calculation)
+        // Track by lane for each bet type
         if (betType == BET_TYPE_WIN) {
             r.totalOnLane[lane] += amount;
+        } else if (betType == BET_TYPE_PLACE) {
+            r.totalPlaceOnLane[lane] += amount;
+        } else {
+            r.totalShowOnLane[lane] += amount;
         }
 
         // Track bettor for claims (only add once per race)

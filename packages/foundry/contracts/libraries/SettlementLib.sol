@@ -4,6 +4,7 @@ pragma solidity ^0.8.19;
 import { GiraffeRaceBase } from "../GiraffeRaceBase.sol";
 import { GiraffeRaceSimulator } from "../GiraffeRaceSimulator.sol";
 import { ClaimLib } from "./ClaimLib.sol";
+import { GiraffeRaceConstants as C } from "./GiraffeRaceConstants.sol";
 
 /**
  * @title SettlementLib
@@ -74,10 +75,15 @@ library SettlementLib {
             race.finalDistances[i] = finishOrder.distances[i];
         }
 
-        // Record liability for payouts
+        // Record liability for payouts (Win + Place + Show)
         newSettledLiability = settledLiability;
         if (race.totalPot != 0) {
+            // Win bet liability
             newSettledLiability += ClaimLib.calculateRaceLiability(race);
+            // Place bet liability
+            newSettledLiability += ClaimLib.calculatePlaceLiability(race, C.TEMP_FIXED_PLACE_ODDS_BPS);
+            // Show bet liability
+            newSettledLiability += ClaimLib.calculateShowLiability(race, C.TEMP_FIXED_SHOW_ODDS_BPS);
         }
 
         // Emit appropriate event
