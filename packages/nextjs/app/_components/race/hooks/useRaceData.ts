@@ -405,11 +405,18 @@ export const useRaceDetails = (
 
   const parsedOdds = useMemo<ParsedOdds | null>(() => {
     if (!raceOddsData) return null;
-    const [oddsSet, oddsBps] = raceOddsData as any;
-    const arr = (Array.isArray(oddsBps) ? oddsBps : []) as any[];
+    // Contract returns: (oddsSet, winOddsBps[6], placeOddsBps[6], showOddsBps[6])
+    const [oddsSet, winOddsBps, placeOddsBps, showOddsBps] = raceOddsData as any;
+    const winArr = (Array.isArray(winOddsBps) ? winOddsBps : []) as any[];
+    const placeArr = (Array.isArray(placeOddsBps) ? placeOddsBps : []) as any[];
+    const showArr = (Array.isArray(showOddsBps) ? showOddsBps : []) as any[];
+    const winOdds = Array.from({ length: LANE_COUNT }, (_, i) => BigInt(winArr[i] ?? 0)) as bigint[];
     return {
       oddsSet: Boolean(oddsSet),
-      oddsBps: Array.from({ length: LANE_COUNT }, (_, i) => BigInt(arr[i] ?? 0)) as bigint[],
+      winOddsBps: winOdds,
+      placeOddsBps: Array.from({ length: LANE_COUNT }, (_, i) => BigInt(placeArr[i] ?? 0)) as bigint[],
+      showOddsBps: Array.from({ length: LANE_COUNT }, (_, i) => BigInt(showArr[i] ?? 0)) as bigint[],
+      oddsBps: winOdds, // Backwards compat alias
     };
   }, [raceOddsData]);
 

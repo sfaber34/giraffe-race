@@ -33,7 +33,11 @@ export interface ParsedGiraffes {
 
 export interface ParsedOdds {
   oddsSet: boolean;
-  oddsBps: bigint[];
+  winOddsBps: bigint[]; // Win odds per lane (from setProbabilities)
+  placeOddsBps: bigint[]; // Place odds per lane (from setProbabilities)
+  showOddsBps: bigint[]; // Show odds per lane (from setProbabilities)
+  /** @deprecated Use winOddsBps instead */
+  oddsBps: bigint[]; // Backwards compat alias for winOddsBps
 }
 
 export interface LaneStats {

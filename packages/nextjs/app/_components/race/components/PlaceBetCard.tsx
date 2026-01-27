@@ -1,13 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import {
-  LANE_COUNT,
-  ODDS_SCALE,
-  TEMP_FIXED_PLACE_ODDS_BPS,
-  TEMP_FIXED_SHOW_ODDS_BPS,
-  USDC_DECIMALS,
-} from "../constants";
+import { LANE_COUNT, ODDS_SCALE, USDC_DECIMALS } from "../constants";
 import { BET_TYPE, BetType, LaneStats, MyBets, ParsedGiraffes, ParsedOdds } from "../types";
 import { LaneName } from "./LaneName";
 import { formatUnits } from "viem";
@@ -76,29 +70,36 @@ export const PlaceBetCard = ({
 
   const winOddsLabelForLane = (lane: number) => {
     if (!parsedOdds?.oddsSet) return "—";
-    const bps = Number(parsedOdds.oddsBps[lane] ?? 0n);
+    const bps = Number(parsedOdds.winOddsBps[lane] ?? 0n);
     if (!Number.isFinite(bps) || bps <= 0) return "—";
     return `${(bps / ODDS_SCALE).toFixed(2)}x`;
   };
 
-  const placeOddsLabel = () => {
-    return `${(Number(TEMP_FIXED_PLACE_ODDS_BPS) / ODDS_SCALE).toFixed(2)}x`;
+  const placeOddsLabelForLane = (lane: number) => {
+    if (!parsedOdds?.oddsSet) return "—";
+    const bps = Number(parsedOdds.placeOddsBps[lane] ?? 0n);
+    if (!Number.isFinite(bps) || bps <= 0) return "—";
+    return `${(bps / ODDS_SCALE).toFixed(2)}x`;
   };
 
-  const showOddsLabel = () => {
-    return `${(Number(TEMP_FIXED_SHOW_ODDS_BPS) / ODDS_SCALE).toFixed(2)}x`;
+  const showOddsLabelForLane = (lane: number) => {
+    if (!parsedOdds?.oddsSet) return "—";
+    const bps = Number(parsedOdds.showOddsBps[lane] ?? 0n);
+    if (!Number.isFinite(bps) || bps <= 0) return "—";
+    return `${(bps / ODDS_SCALE).toFixed(2)}x`;
   };
 
   const calculateEstimatedPayout = (betType: BetType, lane: number): bigint | null => {
     if (!placeBetValue || placeBetValue <= 0n) return null;
+    if (!parsedOdds?.oddsSet) return null;
 
     let oddsBps: bigint;
     if (betType === BET_TYPE.WIN) {
-      oddsBps = parsedOdds?.oddsBps[lane] ?? 0n;
+      oddsBps = parsedOdds.winOddsBps[lane] ?? 0n;
     } else if (betType === BET_TYPE.PLACE) {
-      oddsBps = TEMP_FIXED_PLACE_ODDS_BPS;
+      oddsBps = parsedOdds.placeOddsBps[lane] ?? 0n;
     } else {
-      oddsBps = TEMP_FIXED_SHOW_ODDS_BPS;
+      oddsBps = parsedOdds.showOddsBps[lane] ?? 0n;
     }
 
     if (oddsBps <= 0n) return null;
@@ -290,14 +291,14 @@ export const PlaceBetCard = ({
                         lane,
                         BET_TYPE.PLACE,
                         "Place",
-                        placeOddsLabel(),
+                        placeOddsLabelForLane(lane),
                         !giraffeRaceContract || !connectedAddress || !canBet || !isViewingLatest,
                       )}
                       {renderBetButton(
                         lane,
                         BET_TYPE.SHOW,
                         "Show",
-                        showOddsLabel(),
+                        showOddsLabelForLane(lane),
                         !giraffeRaceContract || !connectedAddress || !canBet || !isViewingLatest,
                       )}
                     </div>
