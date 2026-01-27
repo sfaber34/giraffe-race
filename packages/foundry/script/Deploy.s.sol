@@ -118,6 +118,10 @@ contract DeployScript is ScaffoldETHDeploy {
         giraffeNft.setTreasury(usdcAddress, address(treasury));
         console.log("GiraffeNFT configured with race contract and treasury");
 
+        // 7. Transfer GiraffeNFT ownership to treasuryOwner
+        giraffeNft.transferOwnership(treasuryOwner);
+        console.log("GiraffeNFT ownership transferred to:", treasuryOwner);
+
         console.log("\n=== Deployment Summary ===");
         console.log("GiraffeRace:          ", address(giraffeRace));
         console.log("USDC:                 ", usdcAddress);
