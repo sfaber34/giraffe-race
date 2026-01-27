@@ -174,6 +174,7 @@ abstract contract GiraffeRaceBase {
     
     // Admin
     address public treasuryOwner;
+    address public raceBot;  // Only address that can call setOdds
     uint16 public houseEdgeBps;
     uint256 public maxBetAmount;
     
@@ -235,6 +236,7 @@ abstract contract GiraffeRaceBase {
     error InvalidBetType();
     error OddsWindowActive();
     error OddsWindowNotExpired();
+    error NotRaceBot();
     
     // Queue errors
     error AlreadyInQueue();
@@ -256,6 +258,7 @@ abstract contract GiraffeRaceBase {
     event HouseGiraffeAssigned(uint256 indexed raceId, uint256 indexed tokenId, uint8 lane);
     event HouseEdgeUpdated(uint16 oldEdgeBps, uint16 newEdgeBps);
     event MaxBetUpdated(uint256 oldMaxBet, uint256 newMaxBet);
+    event RaceBotUpdated(address oldBot, address newBot);
     event RaceCancelled(uint256 indexed raceId);
     
     // Queue events
@@ -268,6 +271,11 @@ abstract contract GiraffeRaceBase {
     
     modifier onlyTreasuryOwner() {
         if (msg.sender != treasuryOwner) revert NotTreasuryOwner();
+        _;
+    }
+    
+    modifier onlyRaceBot() {
+        if (msg.sender != raceBot) revert NotRaceBot();
         _;
     }
 

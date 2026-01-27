@@ -34,12 +34,14 @@ contract GiraffeRace is
     constructor(
         address _giraffeNft,
         address _treasuryOwner,
+        address _raceBot,
         uint256[6] memory _houseGiraffeTokenIds,
         address _simulator,
         address _treasury
     ) {
         giraffeNft = IGiraffeNFT(_giraffeNft);
         treasuryOwner = _treasuryOwner;
+        raceBot = _raceBot;
         simulator = GiraffeRaceSimulator(_simulator);
         treasury = HouseTreasury(_treasury);
         houseGiraffeTokenIds = _houseGiraffeTokenIds;

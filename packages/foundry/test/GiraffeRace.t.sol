@@ -23,7 +23,8 @@ contract GiraffeRaceTest is Test {
     HouseTreasury treasury;
 
     // Test addresses
-    address owner = address(0x1);
+    address owner = address(0x1);      // treasuryOwner
+    address bot = address(0x5);        // raceBot
     address user1 = address(0x2);
     address user2 = address(0x3);
     address user3 = address(0x4);
@@ -55,7 +56,8 @@ contract GiraffeRaceTest is Test {
         // Deploy GiraffeRace (single contract - no Diamond)
         giraffeRace = new GiraffeRace(
             address(giraffeNft),
-            owner,
+            owner,  // treasuryOwner
+            bot,    // raceBot
             houseGiraffeTokenIds,
             address(simulator),
             address(treasury)
@@ -91,6 +93,8 @@ contract GiraffeRaceTest is Test {
     /// @notice Create a race and set odds (simulates bot behavior)
     function _createRaceAndSetOdds() internal returns (uint256 raceId) {
         raceId = giraffeRace.createRace();
+        // setOdds requires raceBot
+        vm.prank(bot);
         giraffeRace.setOdds(raceId, defaultWinOdds, defaultPlaceOdds, defaultShowOdds);
     }
 
@@ -122,6 +126,40 @@ contract GiraffeRaceTest is Test {
         vm.prank(user1);
         vm.expectRevert();
         giraffeRace.setHouseEdgeBps(700);
+    }
+    
+    function test_RaceBotAccessControl() public {
+        // Check initial raceBot
+        assertEq(giraffeRace.raceBot(), bot);
+        
+        // Create a race
+        vm.prank(owner);
+        uint256 raceId = giraffeRace.createRace();
+        
+        // Non-raceBot cannot set odds
+        vm.prank(user1);
+        vm.expectRevert();
+        giraffeRace.setOdds(raceId, defaultWinOdds, defaultPlaceOdds, defaultShowOdds);
+        
+        // treasuryOwner (not raceBot) also cannot set odds
+        vm.prank(owner);
+        vm.expectRevert();
+        giraffeRace.setOdds(raceId, defaultWinOdds, defaultPlaceOdds, defaultShowOdds);
+        
+        // raceBot can set odds
+        vm.prank(bot);
+        giraffeRace.setOdds(raceId, defaultWinOdds, defaultPlaceOdds, defaultShowOdds);
+        
+        // treasuryOwner can change raceBot
+        address newBot = address(0x999);
+        vm.prank(owner);
+        giraffeRace.setRaceBot(newBot);
+        assertEq(giraffeRace.raceBot(), newBot);
+        
+        // Non-owner cannot change raceBot
+        vm.prank(user1);
+        vm.expectRevert();
+        giraffeRace.setRaceBot(address(0x888));
     }
 
     // ============ Queue Tests ============
@@ -207,7 +245,8 @@ contract GiraffeRaceTest is Test {
         vm.prank(owner);
         uint256 raceId = giraffeRace.createRace();
         
-        // Set odds
+        // Set odds (as raceBot)
+        vm.prank(bot);
         giraffeRace.setOdds(raceId, defaultWinOdds, defaultPlaceOdds, defaultShowOdds);
         
         // Check odds are set
@@ -228,7 +267,8 @@ contract GiraffeRaceTest is Test {
         // Roll past odds deadline (10 blocks)
         vm.roll(block.number + 11);
         
-        // Should fail to set odds
+        // Should fail to set odds (even as raceBot, deadline has passed)
+        vm.prank(bot);
         vm.expectRevert();
         giraffeRace.setOdds(raceId, defaultWinOdds, defaultPlaceOdds, defaultShowOdds);
     }
@@ -306,7 +346,8 @@ contract GiraffeRaceTest is Test {
         assertFalse(oddsSet);
         assertFalse(cancelled);
         
-        // Set odds (simulates bot)
+        // Set odds (as raceBot)
+        vm.prank(bot);
         giraffeRace.setOdds(raceId, defaultWinOdds, defaultPlaceOdds, defaultShowOdds);
         
         // Check flags - odds set, betting open
@@ -366,6 +407,7 @@ contract GiraffeRaceTest is Test {
         // Create race and set odds
         vm.prank(owner);
         uint256 raceId = giraffeRace.createRace();
+        vm.prank(bot);
         giraffeRace.setOdds(raceId, defaultWinOdds, defaultPlaceOdds, defaultShowOdds);
         
         // Roll past original deadline (doesn't matter since odds are set)

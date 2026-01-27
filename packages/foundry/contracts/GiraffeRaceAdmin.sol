@@ -31,6 +31,15 @@ abstract contract GiraffeRaceAdmin is GiraffeRaceBase {
         emit MaxBetUpdated(oldMaxBet, newMaxBet);
     }
 
+    /// @notice Update the raceBot address (the only address that can call setOdds).
+    /// @param newRaceBot The new raceBot address.
+    function setRaceBot(address newRaceBot) external onlyTreasuryOwner {
+        address oldBot = raceBot;
+        raceBot = newRaceBot;
+        
+        emit RaceBotUpdated(oldBot, newRaceBot);
+    }
+
     /// @notice Cancel a stuck race and enable refunds for all bettors
     /// @dev Only callable by treasuryOwner. Use when a race cannot be settled (e.g., blockhash expired).
     ///      After cancellation, bettors can claim() to receive their original bet back.

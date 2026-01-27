@@ -16,6 +16,7 @@ import { MockUSDC } from "../contracts/MockUSDC.sol";
  * Environment variables:
  *   TREASURY_OWNER   - Controls treasury withdrawals AND owns house NFTs.
  *                      Should be a multisig in production.
+ *   RACE_BOT         - Address that can call setOdds() to set race odds.
  *   USDC_ADDRESS     - USDC contract address. If not set, deploys MockUSDC (local testing only).
  *
  * Network-specific defaults:
@@ -30,19 +31,16 @@ contract DeployScript is ScaffoldETHDeploy {
     
     // Production treasury owner (multisig)
     address constant PRODUCTION_TREASURY_OWNER = 0x6935d26Ba98b86e07Bedf4FFBded0eA8a9eDD5Fb;
+    
+    // Production race bot (odds setter)
+    address constant PRODUCTION_RACE_BOT = 0xbA7106581320DCCF42189682EF35ab523f4D97D1;
 
     function run() external ScaffoldEthDeployerRunner {
         // Treasury owner: controls treasury AND owns house NFTs.
-        // For production networks (Base), use the production multisig.
-        // For local testing, use the deployer address.
-        address treasuryOwner;
-        if (block.chainid == 8453 || block.chainid == 84532) {
-            // Base Mainnet or Base Sepolia - use production treasury owner
-            treasuryOwner = vm.envOr("TREASURY_OWNER", PRODUCTION_TREASURY_OWNER);
-        } else {
-            // Local testing - use deployer by default
-            treasuryOwner = vm.envOr("TREASURY_OWNER", deployer);
-        }
+        // Race bot: only address that can call setOdds().
+        // Use the same addresses for all deployments (local and production).
+        address treasuryOwner = vm.envOr("TREASURY_OWNER", PRODUCTION_TREASURY_OWNER);
+        address raceBotAddress = vm.envOr("RACE_BOT", PRODUCTION_RACE_BOT);
 
         // USDC address - use network-specific defaults or env override.
         address usdcAddress = vm.envOr("USDC_ADDRESS", address(0));
@@ -97,6 +95,7 @@ contract DeployScript is ScaffoldETHDeploy {
         GiraffeRace giraffeRace = new GiraffeRace(
             address(giraffeNft),
             treasuryOwner,
+            raceBotAddress,
             houseGiraffeTokenIds,
             address(simulator),
             address(treasury)
@@ -126,5 +125,6 @@ contract DeployScript is ScaffoldETHDeploy {
         console.log("Treasury:             ", address(treasury));
         console.log("Simulator:            ", address(simulator));
         console.log("Treasury Owner:       ", treasuryOwner);
+        console.log("Race Bot:             ", raceBotAddress);
     }
 }

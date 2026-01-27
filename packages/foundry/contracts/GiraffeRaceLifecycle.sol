@@ -93,8 +93,8 @@ abstract contract GiraffeRaceLifecycle is GiraffeRaceBase {
 
     // ============ Odds Setting ============
 
-    /// @notice Set odds for a race - called by bot within odds window
-    /// @dev Opens betting window after odds are set
+    /// @notice Set odds for a race - called by raceBot within odds window
+    /// @dev Opens betting window after odds are set. Only callable by raceBot address.
     /// @param raceId The race to set odds for
     /// @param winOddsBps Win odds for each lane in basis points (e.g., 57000 = 5.70x)
     /// @param placeOddsBps Place odds for each lane in basis points
@@ -104,7 +104,7 @@ abstract contract GiraffeRaceLifecycle is GiraffeRaceBase {
         uint32[6] calldata winOddsBps,
         uint32[6] calldata placeOddsBps,
         uint32[6] calldata showOddsBps
-    ) external {
+    ) external onlyRaceBot {
         if (raceId >= nextRaceId) revert InvalidRace();
         
         Race storage r = _races[raceId];
