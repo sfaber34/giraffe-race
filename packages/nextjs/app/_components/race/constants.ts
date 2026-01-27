@@ -2,6 +2,13 @@
 
 export const USDC_DECIMALS = 6;
 export const LANE_COUNT = 6 as const;
+export const ODDS_SCALE = 10000;
+
+// Fixed odds in basis points (temporary until dynamic odds)
+// Win: 5.70x, Place: 2.40x, Show: 1.60x
+export const TEMP_FIXED_WIN_ODDS_BPS = 57000n;
+export const TEMP_FIXED_PLACE_ODDS_BPS = 24000n;
+export const TEMP_FIXED_SHOW_ODDS_BPS = 16000n;
 
 // Window sizes
 export const BETTING_WINDOW_BLOCKS = 30n;

@@ -4402,6 +4402,45 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "BET_TYPE_PLACE",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint8",
+              internalType: "uint8",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "BET_TYPE_SHOW",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint8",
+              internalType: "uint8",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "BET_TYPE_WIN",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint8",
+              internalType: "uint8",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "CLAIM_STATUS_BLOCKHASH_UNAVAILABLE",
           inputs: [],
           outputs: [
@@ -4572,6 +4611,32 @@ const deployedContracts = {
         {
           type: "function",
           name: "TEMP_FIXED_DECIMAL_ODDS_BPS",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint32",
+              internalType: "uint32",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "TEMP_FIXED_PLACE_ODDS_BPS",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint32",
+              internalType: "uint32",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "TEMP_FIXED_SHOW_ODDS_BPS",
           inputs: [],
           outputs: [
             {
@@ -5257,6 +5322,70 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "getUserBetsById",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "bettor",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "winAmount",
+              type: "uint128",
+              internalType: "uint128",
+            },
+            {
+              name: "winLane",
+              type: "uint8",
+              internalType: "uint8",
+            },
+            {
+              name: "winClaimed",
+              type: "bool",
+              internalType: "bool",
+            },
+            {
+              name: "placeAmount",
+              type: "uint128",
+              internalType: "uint128",
+            },
+            {
+              name: "placeLane",
+              type: "uint8",
+              internalType: "uint8",
+            },
+            {
+              name: "placeClaimed",
+              type: "bool",
+              internalType: "bool",
+            },
+            {
+              name: "showAmount",
+              type: "uint128",
+              internalType: "uint128",
+            },
+            {
+              name: "showLane",
+              type: "uint8",
+              internalType: "uint8",
+            },
+            {
+              name: "showClaimed",
+              type: "bool",
+              internalType: "bool",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "getUserQueuePosition",
           inputs: [
             {
@@ -5455,6 +5584,11 @@ const deployedContracts = {
               type: "uint256",
               internalType: "uint256",
             },
+            {
+              name: "betType",
+              type: "uint8",
+              internalType: "uint8",
+            },
           ],
           outputs: [],
           stateMutability: "nonpayable",
@@ -5648,7 +5782,13 @@ const deployedContracts = {
             {
               name: "lane",
               type: "uint8",
-              indexed: true,
+              indexed: false,
+              internalType: "uint8",
+            },
+            {
+              name: "betType",
+              type: "uint8",
+              indexed: false,
               internalType: "uint8",
             },
             {
@@ -6024,6 +6164,11 @@ const deployedContracts = {
         {
           type: "error",
           name: "InsufficientBankroll",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "InvalidBetType",
           inputs: [],
         },
         {

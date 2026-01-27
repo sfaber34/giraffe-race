@@ -277,9 +277,9 @@ contract GiraffeRaceTest is Test {
         assertTrue(oddsSet);
         assertFalse(cancelled);
 
-        // Place bet during betting window
+        // Place bet during betting window (Win bet on lane 0)
         vm.prank(user1);
-        giraffeRace.placeBet(0, 1_000_000); // 1 USDC on lane 0
+        giraffeRace.placeBet(0, 1_000_000, 0); // 1 USDC Win bet on lane 0
 
         // Mine to just past betting close block
         vm.roll(bettingCloseBlock + 1);

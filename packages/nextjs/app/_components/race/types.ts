@@ -41,11 +41,36 @@ export interface CooldownStatus {
   cooldownEndsAtBlock: bigint;
 }
 
+// Single bet (for backwards compatibility)
 export interface MyBet {
   amount: bigint;
   lane: number;
   claimed: boolean;
   hasBet: boolean;
+}
+
+// Bet types enum (matches contract)
+export const BET_TYPE = {
+  WIN: 0,
+  PLACE: 1,
+  SHOW: 2,
+} as const;
+
+export type BetType = (typeof BET_TYPE)[keyof typeof BET_TYPE];
+
+// Individual bet info
+export interface BetInfo {
+  amount: bigint;
+  lane: number;
+  claimed: boolean;
+  hasBet: boolean;
+}
+
+// All bets for a user in a race (Win/Place/Show)
+export interface MyBets {
+  win: BetInfo;
+  place: BetInfo;
+  show: BetInfo;
 }
 
 export interface NextWinningClaim {

@@ -3,9 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { LANE_COUNT } from "../constants";
 import {
+  BetInfo,
   CooldownStatus,
   LaneStats,
   MyBet,
+  MyBets,
   NextWinningClaim,
   ParsedFinishOrder,
   ParsedGiraffes,
@@ -593,6 +595,45 @@ export const useMyBet = (
       hasBet: amt !== 0n,
     };
   }, [myBetData]);
+};
+
+// New hook for Win/Place/Show bets
+export const useMyBets = (
+  viewingRaceId: bigint | null,
+  connectedAddress: `0x${string}` | undefined,
+  giraffeRaceContract: any,
+  hasAnyRace: boolean,
+) => {
+  const { data: myBetsData } = useScaffoldReadContract({
+    contractName: "GiraffeRace",
+    functionName: "getUserBetsById" as any,
+    args: [viewingRaceId ?? 0n, connectedAddress],
+    query: { enabled: !!giraffeRaceContract && !!connectedAddress && hasAnyRace && viewingRaceId !== null },
+    // Watch to detect bet confirmation
+  } as any);
+
+  return useMemo<MyBets | null>(() => {
+    if (!myBetsData) return null;
+    const data = myBetsData as unknown as [bigint, number, boolean, bigint, number, boolean, bigint, number, boolean];
+    const [winAmount, winLane, winClaimed, placeAmount, placeLane, placeClaimed, showAmount, showLane, showClaimed] =
+      data;
+
+    const parseBet = (amount: bigint, lane: number, claimed: boolean): BetInfo => {
+      const amt = BigInt(amount ?? 0);
+      return {
+        amount: amt,
+        lane: Number(lane ?? 0),
+        claimed: Boolean(claimed),
+        hasBet: amt !== 0n,
+      };
+    };
+
+    return {
+      win: parseBet(winAmount, winLane, winClaimed),
+      place: parseBet(placeAmount, placeLane, placeClaimed),
+      show: parseBet(showAmount, showLane, showClaimed),
+    };
+  }, [myBetsData]);
 };
 
 export const useWinningClaims = (connectedAddress: `0x${string}` | undefined, giraffeRaceContract: any) => {

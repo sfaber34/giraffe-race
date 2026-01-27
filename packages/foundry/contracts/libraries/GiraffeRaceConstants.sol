@@ -44,6 +44,18 @@ library GiraffeRaceConstants {
     
     /// @notice Fallback fixed odds when no probability table (5.70x)
     uint32 internal constant TEMP_FIXED_DECIMAL_ODDS_BPS = 57000;
+    
+    /// @notice Fixed Place odds (2.40x) - temporary until dynamic odds
+    uint32 internal constant TEMP_FIXED_PLACE_ODDS_BPS = 24000;
+    
+    /// @notice Fixed Show odds (1.60x) - temporary until dynamic odds
+    uint32 internal constant TEMP_FIXED_SHOW_ODDS_BPS = 16000;
+
+    // ============ Bet Types ============
+    
+    uint8 internal constant BET_TYPE_WIN = 0;
+    uint8 internal constant BET_TYPE_PLACE = 1;
+    uint8 internal constant BET_TYPE_SHOW = 2;
 
     // ============ Phase Schedule ============
     

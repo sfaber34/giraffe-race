@@ -70,6 +70,36 @@ library ClaimLib {
         return false;
     }
 
+    /// @notice Check if a lane is in a specific position (1st, 2nd, or 3rd)
+    /// @param position The position info struct
+    /// @param lane The lane to check
+    /// @return True if the lane is in this position
+    function isLaneInPosition(
+        GiraffeRaceBase.PositionInfo storage position,
+        uint8 lane
+    ) internal view returns (bool) {
+        for (uint8 i = 0; i < position.count; ) {
+            if (position.lanes[i] == lane) return true;
+            unchecked { ++i; }
+        }
+        return false;
+    }
+
+    /// @notice Check if a lane is in a specific position (memory version)
+    /// @param position The position info struct
+    /// @param lane The lane to check
+    /// @return True if the lane is in this position
+    function isLaneInPositionMemory(
+        GiraffeRaceBase.PositionInfo memory position,
+        uint8 lane
+    ) internal pure returns (bool) {
+        for (uint8 i = 0; i < position.count; ) {
+            if (position.lanes[i] == lane) return true;
+            unchecked { ++i; }
+        }
+        return false;
+    }
+
     /// @notice Calculate the maximum potential payout across all lanes for a race
     /// @param totalOnLane Array of total bets on each lane
     /// @param decimalOddsBps Array of decimal odds for each lane

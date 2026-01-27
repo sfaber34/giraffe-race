@@ -6,6 +6,7 @@ import { LaneName } from "./race/components/LaneName";
 import { LANE_COUNT, TRACK_HEIGHT_PX, TRACK_LENGTH, USDC_DECIMALS } from "./race/constants";
 import {
   useMyBet,
+  useMyBets,
   useRaceCamera,
   useRaceData,
   useRaceDetails,
@@ -15,7 +16,7 @@ import {
   useViewingRace,
   useWinningClaims,
 } from "./race/hooks";
-import { ClaimSnapshot, PlaybackSpeed } from "./race/types";
+import { BetType, ClaimSnapshot, PlaybackSpeed } from "./race/types";
 import { parseUnits, toHex } from "viem";
 import { useBlockNumber } from "wagmi";
 import { useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
@@ -69,8 +70,11 @@ export const RaceDashboard = () => {
   const queue = useRaceQueue(giraffeRaceContract, connectedAddress);
   const { activeQueueLength, userInQueue, userQueuedToken, userQueuePosition, queueEntries } = queue;
 
-  // My bet
+  // My bet (legacy single bet - for backwards compatibility)
   const myBet = useMyBet(viewingRaceId, connectedAddress, giraffeRaceContract, hasAnyRace);
+
+  // My bets (Win/Place/Show)
+  const myBets = useMyBets(viewingRaceId, connectedAddress, giraffeRaceContract, hasAnyRace);
 
   // Winning claims
   const { nextWinningClaim, winningClaimRemaining } = useWinningClaims(connectedAddress, giraffeRaceContract);
@@ -171,8 +175,6 @@ export const RaceDashboard = () => {
     bettingCloseBlock !== null &&
     activeBlockNumber !== undefined &&
     activeBlockNumber > bettingCloseBlock;
-  const isBetLocked = !!myBet?.hasBet;
-  const selectedBetLane = isBetLocked ? myBet?.lane : betLane;
   const activeRaceExists = status !== "no_race" && status !== "cooldown" && status !== "settled" && !parsed?.settled;
   const isInCooldown =
     status === "cooldown" || (cooldownStatus && !cooldownStatus.canCreate && cooldownStatus.blocksRemaining > 0n);
@@ -426,15 +428,18 @@ export const RaceDashboard = () => {
     }
   }, [placeBetValue, treasuryContract?.address, writeUsdcAsync]);
 
-  const handlePlaceBet = useCallback(async () => {
-    if (!placeBetValue) return;
-    if (betLane === null) return;
-    await writeGiraffeRaceAsync({
-      functionName: "placeBet",
-      args: [BigInt(Math.max(0, Math.min(Number(LANE_COUNT - 1), Math.floor(betLane)))), placeBetValue],
-    } as any);
-    setBetAmountUsdc("");
-  }, [placeBetValue, betLane, writeGiraffeRaceAsync]);
+  const handlePlaceBet = useCallback(
+    async (lane: number, betType: BetType) => {
+      if (!placeBetValue) return;
+      const validLane = BigInt(Math.max(0, Math.min(Number(LANE_COUNT - 1), Math.floor(lane))));
+      await writeGiraffeRaceAsync({
+        functionName: "placeBet",
+        args: [validLane, placeBetValue, BigInt(betType)],
+      } as any);
+      // Don't clear bet amount - user might want to place multiple bets with same amount
+    },
+    [placeBetValue, writeGiraffeRaceAsync],
+  );
 
   const handleClaimPayout = useCallback(async () => {
     await writeGiraffeRaceAsync({ functionName: "claimNextWinningPayout" } as any);
@@ -791,19 +796,14 @@ export const RaceDashboard = () => {
                     laneStats={laneStats}
                     parsedGiraffes={parsedGiraffes}
                     parsedOdds={parsedOdds}
-                    betLane={betLane}
-                    setBetLane={setBetLane}
                     betAmountUsdc={betAmountUsdc}
                     setBetAmountUsdc={setBetAmountUsdc}
                     placeBetValue={placeBetValue}
-                    estimatedPayoutWei={estimatedPayoutWei}
                     connectedAddress={connectedAddress}
                     userUsdcBalance={userUsdcBalance}
                     maxBetAmount={maxBetAmount}
-                    myBet={myBet}
-                    selectedBetLane={selectedBetLane}
+                    myBets={myBets}
                     canBet={canBet}
-                    isBetLocked={isBetLocked}
                     isViewingLatest={isViewingLatest}
                     giraffeRaceContract={giraffeRaceContract}
                     needsApproval={needsApproval}

@@ -1,7 +1,14 @@
 "use client";
 
-import { LANE_COUNT, USDC_DECIMALS } from "../constants";
-import { LaneStats, MyBet, ParsedGiraffes, ParsedOdds } from "../types";
+import { useState } from "react";
+import {
+  LANE_COUNT,
+  ODDS_SCALE,
+  TEMP_FIXED_PLACE_ODDS_BPS,
+  TEMP_FIXED_SHOW_ODDS_BPS,
+  USDC_DECIMALS,
+} from "../constants";
+import { BET_TYPE, BetType, LaneStats, MyBets, ParsedGiraffes, ParsedOdds } from "../types";
 import { LaneName } from "./LaneName";
 import { formatUnits } from "viem";
 import { GiraffeAnimated } from "~~/components/assets/GiraffeAnimated";
@@ -15,24 +22,14 @@ interface PlaceBetCardProps {
   parsedGiraffes: ParsedGiraffes | null;
   parsedOdds: ParsedOdds | null;
 
-  // Bet state
-  betLane: number | null;
-  setBetLane: (lane: number | null) => void;
-  betAmountUsdc: string;
-  setBetAmountUsdc: (amount: string) => void;
-  placeBetValue: bigint | null;
-  estimatedPayoutWei: bigint | null;
-
   // User state
   connectedAddress: `0x${string}` | undefined;
   userUsdcBalance: bigint | undefined;
   maxBetAmount: bigint | null;
-  myBet: MyBet | null;
-  selectedBetLane: number | null | undefined;
+  myBets: MyBets | null;
 
   // Flags
   canBet: boolean;
-  isBetLocked: boolean;
   isViewingLatest: boolean;
   giraffeRaceContract: any;
   needsApproval: boolean;
@@ -40,9 +37,14 @@ interface PlaceBetCardProps {
   exceedsMaxBet: boolean;
   isApproving: boolean;
 
+  // Bet amount state
+  betAmountUsdc: string;
+  setBetAmountUsdc: (amount: string) => void;
+  placeBetValue: bigint | null;
+
   // Actions
   onApprove: () => Promise<void>;
-  onPlaceBet: () => Promise<void>;
+  onPlaceBet: (lane: number, betType: BetType) => Promise<void>;
 }
 
 export const PlaceBetCard = ({
@@ -52,188 +54,304 @@ export const PlaceBetCard = ({
   laneStats,
   parsedGiraffes,
   parsedOdds,
-  betLane,
-  setBetLane,
-  betAmountUsdc,
-  setBetAmountUsdc,
-  placeBetValue,
-  estimatedPayoutWei,
   connectedAddress,
   userUsdcBalance,
   maxBetAmount,
-  myBet,
-  selectedBetLane,
+  myBets,
   canBet,
-  isBetLocked,
   isViewingLatest,
   giraffeRaceContract,
   needsApproval,
   hasEnoughUsdc,
   exceedsMaxBet,
   isApproving,
+  betAmountUsdc,
+  setBetAmountUsdc,
+  placeBetValue,
   onApprove,
   onPlaceBet,
 }: PlaceBetCardProps) => {
-  const oddsLabelForLane = (lane: number) => {
-    if (!parsedOdds?.oddsSet) return "Odds —";
+  // Track which lane is expanded (showing bet options)
+  const [expandedLane, setExpandedLane] = useState<number | null>(null);
+
+  const winOddsLabelForLane = (lane: number) => {
+    if (!parsedOdds?.oddsSet) return "—";
     const bps = Number(parsedOdds.oddsBps[lane] ?? 0n);
-    if (!Number.isFinite(bps) || bps <= 0) return "Odds —";
-    return `${(bps / 10_000).toFixed(2)}x`;
+    if (!Number.isFinite(bps) || bps <= 0) return "—";
+    return `${(bps / ODDS_SCALE).toFixed(2)}x`;
+  };
+
+  const placeOddsLabel = () => {
+    return `${(Number(TEMP_FIXED_PLACE_ODDS_BPS) / ODDS_SCALE).toFixed(2)}x`;
+  };
+
+  const showOddsLabel = () => {
+    return `${(Number(TEMP_FIXED_SHOW_ODDS_BPS) / ODDS_SCALE).toFixed(2)}x`;
+  };
+
+  const calculateEstimatedPayout = (betType: BetType, lane: number): bigint | null => {
+    if (!placeBetValue || placeBetValue <= 0n) return null;
+
+    let oddsBps: bigint;
+    if (betType === BET_TYPE.WIN) {
+      oddsBps = parsedOdds?.oddsBps[lane] ?? 0n;
+    } else if (betType === BET_TYPE.PLACE) {
+      oddsBps = TEMP_FIXED_PLACE_ODDS_BPS;
+    } else {
+      oddsBps = TEMP_FIXED_SHOW_ODDS_BPS;
+    }
+
+    if (oddsBps <= 0n) return null;
+    return (placeBetValue * oddsBps) / BigInt(ODDS_SCALE);
+  };
+
+  // Check if user already has a specific bet type
+  const hasWinBet = myBets?.win.hasBet ?? false;
+  const hasPlaceBet = myBets?.place.hasBet ?? false;
+  const hasShowBet = myBets?.show.hasBet ?? false;
+
+  // Get the lane for each bet type if placed
+  const winBetLane = hasWinBet ? myBets?.win.lane : null;
+  const placeBetLane = hasPlaceBet ? myBets?.place.lane : null;
+  const showBetLane = hasShowBet ? myBets?.show.lane : null;
+
+  const handlePlaceBet = async (lane: number, betType: BetType) => {
+    await onPlaceBet(lane, betType);
+    setExpandedLane(null);
+  };
+
+  const renderBetButton = (lane: number, betType: BetType, label: string, odds: string, disabled: boolean) => {
+    // Check if THIS bet type on THIS lane is already placed
+    let isThisBetPlaced = false;
+    if (betType === BET_TYPE.WIN && hasWinBet && winBetLane === lane) isThisBetPlaced = true;
+    if (betType === BET_TYPE.PLACE && hasPlaceBet && placeBetLane === lane) isThisBetPlaced = true;
+    if (betType === BET_TYPE.SHOW && hasShowBet && showBetLane === lane) isThisBetPlaced = true;
+
+    // Check if bet type is disabled (already placed on any lane)
+    let isBetTypeDisabled = false;
+    if (betType === BET_TYPE.WIN && hasWinBet) isBetTypeDisabled = true;
+    if (betType === BET_TYPE.PLACE && hasPlaceBet) isBetTypeDisabled = true;
+    if (betType === BET_TYPE.SHOW && hasShowBet) isBetTypeDisabled = true;
+
+    const btnDisabled = disabled || isBetTypeDisabled || !placeBetValue || needsApproval;
+
+    return (
+      <button
+        key={betType}
+        className={`btn btn-sm flex-1 ${isThisBetPlaced ? "btn-primary" : "btn-outline"} ${
+          isBetTypeDisabled && !isThisBetPlaced ? "opacity-50" : ""
+        }`}
+        disabled={btnDisabled}
+        onClick={() => handlePlaceBet(lane, betType)}
+      >
+        <div className="flex flex-col items-center text-xs">
+          <span className="font-semibold">{label}</span>
+          <span className="opacity-70">{odds}</span>
+          {isThisBetPlaced && <span className="badge badge-xs badge-primary mt-1">PLACED</span>}
+        </div>
+      </button>
+    );
+  };
+
+  // Get any existing bet markers for a lane
+  const getBetMarkers = (lane: number) => {
+    const markers: string[] = [];
+    if (winBetLane === lane) markers.push("W");
+    if (placeBetLane === lane) markers.push("P");
+    if (showBetLane === lane) markers.push("S");
+    return markers;
   };
 
   return (
     <div className="card bg-base-100 border border-base-300">
       <div className="card-body gap-3">
         <h3 className="font-semibold">Place a bet</h3>
-        <p className="text-sm opacity-70">Betting opens after submissions close and the lineup is finalized.</p>
+        <p className="text-sm opacity-70">
+          Choose a giraffe and bet type. You can place up to 1 Win, 1 Place, and 1 Show bet per race.
+        </p>
 
+        {/* Bet amount input - always visible */}
+        <div className={!canBet ? "opacity-50 pointer-events-none" : ""}>
+          <div className="flex flex-col gap-1">
+            <div className="relative">
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                className="input input-bordered w-full pr-16"
+                placeholder="Bet amount"
+                value={betAmountUsdc}
+                onChange={e => {
+                  if (!canBet) return;
+                  setBetAmountUsdc(e.target.value);
+                }}
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm opacity-70">USDC</span>
+            </div>
+            {connectedAddress && userUsdcBalance !== undefined && (
+              <div className="text-xs opacity-60">Balance: {formatUnits(userUsdcBalance, USDC_DECIMALS)} USDC</div>
+            )}
+            {lineupFinalized && maxBetAmount !== null && (
+              <div className="text-xs opacity-70">Max bet: {formatUnits(maxBetAmount, USDC_DECIMALS)} USDC</div>
+            )}
+            {exceedsMaxBet && maxBetAmount !== null && (
+              <div className="text-xs text-error">
+                Bet exceeds max bet of {formatUnits(maxBetAmount, USDC_DECIMALS)} USDC
+              </div>
+            )}
+            {placeBetValue && userUsdcBalance !== undefined && !hasEnoughUsdc && (
+              <div className="text-xs text-error">Insufficient USDC balance</div>
+            )}
+          </div>
+        </div>
+
+        {/* Approval button if needed */}
+        {needsApproval && placeBetValue && (
+          <button
+            className="btn btn-outline w-full"
+            disabled={isApproving || !hasEnoughUsdc || exceedsMaxBet}
+            onClick={onApprove}
+          >
+            {isApproving ? <span className="loading loading-spinner loading-xs" /> : null}
+            Approve USDC
+          </button>
+        )}
+
+        {!needsApproval && placeBetValue && <div className="text-xs text-success">✓ Approved — ready to place bet</div>}
+
+        {/* Lane selection with bet type buttons */}
         <div className="flex flex-col gap-2 w-full">
           {Array.from({ length: LANE_COUNT }).map((_, lane) => {
-            const isUserLockedBet = isBetLocked && selectedBetLane === lane;
+            const isExpanded = expandedLane === lane;
+            const betMarkers = getBetMarkers(lane);
+            const hasBetOnLane = betMarkers.length > 0;
+
             return (
-              <button
+              <div
                 key={lane}
-                className={`btn w-full justify-between h-auto py-3 min-h-[4.5rem] relative ${
-                  selectedBetLane === lane ? "btn-primary" : "btn-outline"
-                } ${
-                  isUserLockedBet
-                    ? "ring-2 ring-primary ring-offset-2 ring-offset-base-100 disabled:opacity-100 !bg-primary/20"
-                    : ""
-                }`}
-                onClick={() => setBetLane(lane)}
-                disabled={!canBet || isBetLocked}
-                type="button"
+                className={`border rounded-lg overflow-hidden transition-all ${
+                  isExpanded ? "border-primary bg-base-200" : "border-base-300"
+                } ${hasBetOnLane ? "ring-2 ring-primary/30" : ""}`}
               >
-                {isUserLockedBet ? (
-                  <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <span className="badge badge-primary">YOUR BET</span>
+                {/* Lane header (clickable to expand) */}
+                <button
+                  className={`w-full flex items-center justify-between p-3 hover:bg-base-200 transition-colors ${
+                    isExpanded ? "bg-base-200" : ""
+                  }`}
+                  onClick={() => setExpandedLane(isExpanded ? null : lane)}
+                  disabled={!canBet}
+                  type="button"
+                >
+                  <span className="flex items-center gap-2">
+                    <GiraffeAnimated
+                      idPrefix={`bet-${(viewingRaceId ?? 0n).toString()}-${lane}-${(laneTokenIds[lane] ?? 0n).toString()}`}
+                      tokenId={laneTokenIds[lane] ?? 0n}
+                      playbackRate={1}
+                      playing={false}
+                      sizePx={48}
+                    />
+                    <div className="flex flex-col items-start">
+                      {lineupFinalized && parsedGiraffes?.tokenIds?.[lane] && parsedGiraffes.tokenIds[lane] !== 0n ? (
+                        <LaneName tokenId={parsedGiraffes.tokenIds[lane]} fallback={`Lane ${lane}`} />
+                      ) : (
+                        <span>Lane {lane}</span>
+                      )}
+                      {betMarkers.length > 0 && (
+                        <div className="flex gap-1 mt-1">
+                          {betMarkers.map(m => (
+                            <span key={m} className="badge badge-xs badge-primary">
+                              {m === "W" ? "WIN" : m === "P" ? "PLACE" : "SHOW"}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </span>
-                ) : null}
-                <span className="flex items-center gap-2">
-                  <GiraffeAnimated
-                    idPrefix={`bet-${(viewingRaceId ?? 0n).toString()}-${lane}-${(laneTokenIds[lane] ?? 0n).toString()}`}
-                    tokenId={laneTokenIds[lane] ?? 0n}
-                    playbackRate={1}
-                    playing={false}
-                    sizePx={56}
-                  />
-                  {lineupFinalized && parsedGiraffes?.tokenIds?.[lane] && parsedGiraffes.tokenIds[lane] !== 0n ? (
-                    <LaneName tokenId={parsedGiraffes.tokenIds[lane]} fallback={`Lane ${lane}`} />
-                  ) : (
-                    <span>Lane {lane}</span>
-                  )}
-                </span>
-                <span className="flex flex-col items-end text-xs opacity-80">
-                  <span>Zip {laneStats[lane]?.zip ?? 10}/10</span>
-                  <span>Moxie {laneStats[lane]?.moxie ?? 10}/10</span>
-                  <span>Hustle {laneStats[lane]?.hustle ?? 10}/10</span>
-                  {lineupFinalized ? <span className="font-mono opacity-90">{oddsLabelForLane(lane)}</span> : null}
-                </span>
-              </button>
+                  <span className="flex flex-col items-end text-xs opacity-80">
+                    <span>Zip {laneStats[lane]?.zip ?? 10}/10</span>
+                    <span>Moxie {laneStats[lane]?.moxie ?? 10}/10</span>
+                    <span>Hustle {laneStats[lane]?.hustle ?? 10}/10</span>
+                  </span>
+                </button>
+
+                {/* Expanded bet options */}
+                {isExpanded && (
+                  <div className="p-3 pt-0 border-t border-base-300">
+                    <div className="text-xs opacity-70 mb-2">Choose bet type:</div>
+                    <div className="flex gap-2">
+                      {renderBetButton(
+                        lane,
+                        BET_TYPE.WIN,
+                        "Win",
+                        winOddsLabelForLane(lane),
+                        !giraffeRaceContract || !connectedAddress || !canBet || !isViewingLatest,
+                      )}
+                      {renderBetButton(
+                        lane,
+                        BET_TYPE.PLACE,
+                        "Place",
+                        placeOddsLabel(),
+                        !giraffeRaceContract || !connectedAddress || !canBet || !isViewingLatest,
+                      )}
+                      {renderBetButton(
+                        lane,
+                        BET_TYPE.SHOW,
+                        "Show",
+                        showOddsLabel(),
+                        !giraffeRaceContract || !connectedAddress || !canBet || !isViewingLatest,
+                      )}
+                    </div>
+
+                    {/* Payout estimates */}
+                    {placeBetValue && (
+                      <div className="mt-2 text-xs opacity-70">
+                        <div className="grid grid-cols-3 gap-2 text-center">
+                          <div>
+                            <span className="block">Win payout</span>
+                            <span className="font-mono">
+                              {calculateEstimatedPayout(BET_TYPE.WIN, lane)
+                                ? formatUnits(calculateEstimatedPayout(BET_TYPE.WIN, lane)!, USDC_DECIMALS)
+                                : "—"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="block">Place payout</span>
+                            <span className="font-mono">
+                              {calculateEstimatedPayout(BET_TYPE.PLACE, lane)
+                                ? formatUnits(calculateEstimatedPayout(BET_TYPE.PLACE, lane)!, USDC_DECIMALS)
+                                : "—"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="block">Show payout</span>
+                            <span className="font-mono">
+                              {calculateEstimatedPayout(BET_TYPE.SHOW, lane)
+                                ? formatUnits(calculateEstimatedPayout(BET_TYPE.SHOW, lane)!, USDC_DECIMALS)
+                                : "—"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>
 
-        {lineupFinalized && maxBetAmount !== null ? (
-          <div className="text-xs opacity-70">Max bet: {formatUnits(maxBetAmount, USDC_DECIMALS)} USDC</div>
-        ) : null}
-
-        {isBetLocked ? (
-          <input
-            type="text"
-            className="input input-bordered w-full"
-            placeholder="Bet amount (USDC)"
-            value={myBet?.amount ? formatUnits(myBet.amount, USDC_DECIMALS) : ""}
-            disabled
-          />
-        ) : (
-          <div className={!canBet ? "opacity-50 pointer-events-none" : ""}>
-            <div className="flex flex-col gap-1">
-              <div className="relative">
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  className="input input-bordered w-full pr-16"
-                  placeholder="Bet amount"
-                  value={betAmountUsdc}
-                  disabled={(!!placeBetValue && !needsApproval) || !!myBet?.hasBet}
-                  onChange={e => {
-                    if (!canBet) return;
-                    setBetAmountUsdc(e.target.value);
-                  }}
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm opacity-70">USDC</span>
-              </div>
-              {connectedAddress && userUsdcBalance !== undefined && (
-                <div className="text-xs opacity-60">Balance: {formatUnits(userUsdcBalance, USDC_DECIMALS)} USDC</div>
-              )}
-              {!needsApproval && placeBetValue && !myBet?.hasBet && (
-                <div className="text-xs text-success">✓ Approved — ready to place bet</div>
-              )}
-            </div>
+        {/* Bet type explanations */}
+        <div className="text-xs opacity-60 space-y-1 pt-2 border-t border-base-300">
+          <div>
+            <strong>Win:</strong> Giraffe must finish 1st
           </div>
-        )}
-
-        <div className="text-sm">
-          <div className="flex justify-between">
-            <span className="opacity-70">Estimated payout</span>
-            <span className="font-mono">
-              {estimatedPayoutWei === null ? "—" : `${formatUnits(estimatedPayoutWei, USDC_DECIMALS)} USDC`}
-            </span>
+          <div>
+            <strong>Place:</strong> Giraffe must finish 1st or 2nd
           </div>
-          <div className="text-xs opacity-60">Includes your stake. Fixed odds are locked at bet time.</div>
-        </div>
-
-        {exceedsMaxBet && maxBetAmount !== null && (
-          <div className="text-xs text-error">
-            Bet exceeds max bet of {formatUnits(maxBetAmount, USDC_DECIMALS)} USDC
+          <div>
+            <strong>Show:</strong> Giraffe must finish 1st, 2nd, or 3rd
           </div>
-        )}
-
-        {placeBetValue && userUsdcBalance !== undefined && userUsdcBalance !== null && !hasEnoughUsdc && (
-          <div className="text-xs text-error">Insufficient USDC balance</div>
-        )}
-
-        <div className="flex flex-col gap-2">
-          <button
-            className={`btn w-full ${needsApproval ? "btn-outline" : "btn-success"}`}
-            disabled={
-              isApproving ||
-              !needsApproval ||
-              betLane === null ||
-              !placeBetValue ||
-              !hasEnoughUsdc ||
-              !!myBet?.hasBet ||
-              exceedsMaxBet
-            }
-            onClick={onApprove}
-          >
-            {isApproving ? (
-              <span className="loading loading-spinner loading-xs" />
-            ) : !needsApproval && placeBetValue ? (
-              <span>✓</span>
-            ) : null}
-            {!needsApproval && placeBetValue ? "Approved" : "Approve USDC"}
-          </button>
-          <button
-            className="btn btn-primary w-full"
-            disabled={
-              !giraffeRaceContract ||
-              !connectedAddress ||
-              !canBet ||
-              betLane === null ||
-              !placeBetValue ||
-              needsApproval ||
-              !!myBet?.hasBet ||
-              !isViewingLatest ||
-              !hasEnoughUsdc ||
-              exceedsMaxBet
-            }
-            onClick={onPlaceBet}
-          >
-            Place bet
-          </button>
+          <div className="italic pt-1">Dead heat rules apply for ties at qualifying positions.</div>
         </div>
       </div>
     </div>
