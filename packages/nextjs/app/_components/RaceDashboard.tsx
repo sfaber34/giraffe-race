@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { EnterNftCard, PlaceBetCard, RaceOverlay, RaceQueueCard, RaceStatusCard, RaceTrack } from "./race/components";
-import { LANE_COUNT, TRACK_HEIGHT_PX, USDC_DECIMALS } from "./race/constants";
+import { LaneName } from "./race/components/LaneName";
+import { LANE_COUNT, TRACK_HEIGHT_PX, TRACK_LENGTH, USDC_DECIMALS } from "./race/constants";
 import {
   useMyBet,
   useRaceCamera,
@@ -205,6 +206,60 @@ export const RaceDashboard = () => {
     if (userUsdcBalance === undefined || userUsdcBalance === null) return true;
     return userUsdcBalance >= placeBetValue;
   }, [placeBetValue, userUsdcBalance]);
+
+  // Track live finish order as animals cross the finish line during replay
+  const liveFinishOrder = useMemo(() => {
+    const result: { first: number[]; second: number[]; third: number[] } = {
+      first: [],
+      second: [],
+      third: [],
+    };
+
+    if (!replay.simulation || !replay.raceStarted) return result;
+
+    const distances = replay.currentDistances;
+    if (!distances || distances.length === 0) return result;
+
+    // Find all lanes that have crossed the finish line, sorted by distance (descending)
+    const crossedLanes = distances
+      .map((d, i) => ({ lane: i, distance: d }))
+      .filter(x => x.distance >= TRACK_LENGTH)
+      .sort((a, b) => b.distance - a.distance);
+
+    if (crossedLanes.length === 0) return result;
+
+    // Assign positions accounting for ties (dead heats)
+    let positionIdx = 0; // 0 = 1st, 1 = 2nd, 2 = 3rd
+    let i = 0;
+
+    while (i < crossedLanes.length && positionIdx < 3) {
+      const currentDist = crossedLanes[i]!.distance;
+      const tieGroup: number[] = [];
+
+      // Collect all lanes with the same distance (dead heat)
+      while (i < crossedLanes.length && crossedLanes[i]!.distance === currentDist) {
+        tieGroup.push(crossedLanes[i]!.lane);
+        i++;
+      }
+
+      // Assign to current position
+      if (positionIdx === 0) {
+        result.first = tieGroup;
+        positionIdx++;
+        if (tieGroup.length >= 2) positionIdx++; // Skip 2nd
+        if (tieGroup.length >= 3) positionIdx++; // Skip 3rd
+      } else if (positionIdx === 1) {
+        result.second = tieGroup;
+        positionIdx++;
+        if (tieGroup.length >= 2) positionIdx++; // Skip 3rd
+      } else if (positionIdx === 2) {
+        result.third = tieGroup;
+        positionIdx++;
+      }
+    }
+
+    return result;
+  }, [replay.simulation, replay.raceStarted, replay.currentDistances]);
 
   const exceedsMaxBet = useMemo(() => {
     if (!placeBetValue) return false;
@@ -514,8 +569,65 @@ export const RaceDashboard = () => {
                 />
               </div>
 
+              {/* Live Finish Order - revealed as animals cross the finish line */}
+              {replay.simulation && replay.raceStarted ? (
+                <div className="bg-base-100 rounded-lg p-3 mt-2">
+                  <div className="text-sm font-semibold mb-2">Race Results</div>
+                  <div className="flex gap-4 text-sm">
+                    <div className="flex items-center gap-1">
+                      <span className="text-warning font-bold">1st:</span>
+                      {liveFinishOrder.first.length > 0 ? (
+                        <span className="font-medium">
+                          {liveFinishOrder.first.map((lane, idx) => (
+                            <span key={lane}>
+                              {idx > 0 && ", "}
+                              <LaneName tokenId={parsedGiraffes?.tokenIds[lane] ?? 0n} fallback={`Lane ${lane}`} />
+                            </span>
+                          ))}
+                          {liveFinishOrder.first.length > 1 && <span className="text-error text-xs ml-1">(tie!)</span>}
+                        </span>
+                      ) : (
+                        <span className="opacity-50">-</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-info font-bold">2nd:</span>
+                      {liveFinishOrder.second.length > 0 ? (
+                        <span className="font-medium">
+                          {liveFinishOrder.second.map((lane, idx) => (
+                            <span key={lane}>
+                              {idx > 0 && ", "}
+                              <LaneName tokenId={parsedGiraffes?.tokenIds[lane] ?? 0n} fallback={`Lane ${lane}`} />
+                            </span>
+                          ))}
+                          {liveFinishOrder.second.length > 1 && <span className="text-error text-xs ml-1">(tie!)</span>}
+                        </span>
+                      ) : (
+                        <span className="opacity-50">-</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-success font-bold">3rd:</span>
+                      {liveFinishOrder.third.length > 0 ? (
+                        <span className="font-medium">
+                          {liveFinishOrder.third.map((lane, idx) => (
+                            <span key={lane}>
+                              {idx > 0 && ", "}
+                              <LaneName tokenId={parsedGiraffes?.tokenIds[lane] ?? 0n} fallback={`Lane ${lane}`} />
+                            </span>
+                          ))}
+                          {liveFinishOrder.third.length > 1 && <span className="text-error text-xs ml-1">(tie!)</span>}
+                        </span>
+                      ) : (
+                        <span className="opacity-50">-</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
               {parsed?.settled ? (
-                <details className="collapse collapse-arrow bg-base-100">
+                <details className="collapse collapse-arrow bg-base-100 mt-2">
                   <summary className="collapse-title text-sm font-medium">Seed (bytes32)</summary>
                   <div className="collapse-content">
                     <code className="text-xs break-all">{parsed.seed}</code>
