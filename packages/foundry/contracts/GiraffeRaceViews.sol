@@ -9,6 +9,15 @@ import { GiraffeRaceBase } from "./GiraffeRaceBase.sol";
  * @dev Consolidates all view functions for UI/bot consumption
  */
 abstract contract GiraffeRaceViews is GiraffeRaceBase {
+    // ============ Bot Action Enum ============
+    
+    /// @notice Actions the bot should take
+    uint8 public constant BOT_ACTION_NONE = 0;           // Nothing to do
+    uint8 public constant BOT_ACTION_CREATE_RACE = 1;    // Call createRace()
+    uint8 public constant BOT_ACTION_SET_ODDS = 2;       // Call setOdds()
+    uint8 public constant BOT_ACTION_SETTLE_RACE = 3;    // Call settleRace()
+    uint8 public constant BOT_ACTION_CANCEL_RACE = 4;    // Call cancelRaceNoOdds() (optional, createRace auto-cancels)
+
     // ============ Race State ============
 
     function getRaceById(uint256 raceId)
@@ -33,29 +42,31 @@ abstract contract GiraffeRaceViews is GiraffeRaceBase {
         returns (bool settled, bool oddsSet, bool cancelled)
     {
         Race storage r = _races[raceId];
-        if (r.bettingCloseBlock == 0) return (false, false, false);
+        if (r.oddsDeadlineBlock == 0) return (false, false, false);
         return (r.settled, r.oddsSet, r.cancelled);
     }
 
     function getRaceScheduleById(uint256 raceId)
         external
         view
-        returns (uint64 bettingCloseBlock, uint64 settledAtBlock)
+        returns (uint64 oddsDeadlineBlock, uint64 bettingCloseBlock, uint64 settledAtBlock)
     {
         Race storage r = _races[raceId];
-        bettingCloseBlock = r.bettingCloseBlock;
-        if (bettingCloseBlock == 0) return (0, 0);
-        settledAtBlock = r.settledAtBlock;
-        return (bettingCloseBlock, settledAtBlock);
+        return (r.oddsDeadlineBlock, r.bettingCloseBlock, r.settledAtBlock);
     }
 
     function getRaceOddsById(uint256 raceId)
         external
         view
-        returns (bool oddsSet, uint32[6] memory decimalOddsBps)
+        returns (
+            bool oddsSet, 
+            uint32[6] memory winOddsBps,
+            uint32[6] memory placeOddsBps,
+            uint32[6] memory showOddsBps
+        )
     {
         Race storage r = _races[raceId];
-        return (r.oddsSet, r.decimalOddsBps);
+        return (r.oddsSet, r.decimalOddsBps, r.placeOddsBps, r.showOddsBps);
     }
 
     function getRaceDeadHeatById(uint256 raceId)
@@ -101,7 +112,112 @@ abstract contract GiraffeRaceViews is GiraffeRaceBase {
         );
     }
 
-    // ============ Race Actionability (for bots) ============
+    // ============ Bot Status (comprehensive view for bot decision-making) ============
+
+    /// @notice Get the current status for bot decision-making
+    /// @dev This is the primary function the bot should poll to know what action to take
+    /// @return action The recommended bot action (BOT_ACTION_*)
+    /// @return raceId The race ID relevant to the action (0 if creating new race)
+    /// @return blocksRemaining Blocks until action becomes available/expires (context-dependent)
+    /// @return scores Lane scores (only populated for SET_ODDS action)
+    function getBotStatus()
+        external
+        view
+        returns (
+            uint8 action,
+            uint256 raceId,
+            uint64 blocksRemaining,
+            uint8[6] memory scores
+        )
+    {
+        // No races yet - can create
+        if (nextRaceId == 0) {
+            return (BOT_ACTION_CREATE_RACE, 0, 0, scores);
+        }
+        
+        raceId = nextRaceId - 1;
+        Race storage r = _races[raceId];
+        
+        // Race is settled - check cooldown for next race
+        if (r.settled) {
+            uint64 cooldownEndsAt = r.settledAtBlock + POST_RACE_COOLDOWN_BLOCKS;
+            if (block.number >= cooldownEndsAt) {
+                return (BOT_ACTION_CREATE_RACE, raceId + 1, 0, scores);
+            } else {
+                blocksRemaining = uint64(cooldownEndsAt - block.number);
+                return (BOT_ACTION_NONE, raceId, blocksRemaining, scores);
+            }
+        }
+        
+        // Race is cancelled - can create new race
+        if (r.cancelled) {
+            return (BOT_ACTION_CREATE_RACE, raceId + 1, 0, scores);
+        }
+        
+        // Race exists but odds not set
+        if (!r.oddsSet) {
+            if (block.number <= r.oddsDeadlineBlock) {
+                // Still in odds window - bot should set odds
+                blocksRemaining = uint64(r.oddsDeadlineBlock - block.number);
+                scores = _raceScore[raceId];
+                return (BOT_ACTION_SET_ODDS, raceId, blocksRemaining, scores);
+            } else {
+                // Odds window expired - can cancel (or auto-cancel via createRace)
+                return (BOT_ACTION_CANCEL_RACE, raceId, 0, scores);
+            }
+        }
+        
+        // Odds are set - check betting/settlement status
+        if (block.number <= r.bettingCloseBlock) {
+            // Betting still open - nothing for bot to do
+            blocksRemaining = uint64(r.bettingCloseBlock - block.number);
+            return (BOT_ACTION_NONE, raceId, blocksRemaining, scores);
+        }
+        
+        // Betting closed - check if can settle
+        bool settleBhAvailable = blockhash(r.bettingCloseBlock) != bytes32(0);
+        if (settleBhAvailable) {
+            return (BOT_ACTION_SETTLE_RACE, raceId, 0, scores);
+        }
+        
+        // Blockhash expired - race may be stuck (edge case)
+        // In this case, the race would need admin intervention or special handling
+        return (BOT_ACTION_NONE, raceId, 0, scores);
+    }
+
+    /// @notice Get detailed race data for odds calculation
+    /// @dev Bot calls this after seeing BOT_ACTION_SET_ODDS
+    /// @param raceId The race ID
+    /// @return scores Effective scores for each lane (1-10)
+    /// @return tokenIds Token IDs in each lane
+    /// @return originalOwners Original owners of each NFT
+    /// @return oddsDeadlineBlock Block by which odds must be set
+    /// @return blocksRemaining Blocks remaining in odds window
+    function getRaceDataForOdds(uint256 raceId)
+        external
+        view
+        returns (
+            uint8[6] memory scores,
+            uint256[6] memory tokenIds,
+            address[6] memory originalOwners,
+            uint64 oddsDeadlineBlock,
+            uint64 blocksRemaining
+        )
+    {
+        Race storage r = _races[raceId];
+        RaceGiraffes storage ra = _raceGiraffes[raceId];
+        
+        scores = _raceScore[raceId];
+        tokenIds = ra.tokenIds;
+        originalOwners = ra.originalOwners;
+        oddsDeadlineBlock = r.oddsDeadlineBlock;
+        
+        if (block.number < r.oddsDeadlineBlock) {
+            blocksRemaining = uint64(r.oddsDeadlineBlock - block.number);
+        }
+    }
+
+    // ============ Race Actionability (legacy, still useful) ============
 
     function getRaceActionabilityById(uint256 raceId)
         external
@@ -115,6 +231,8 @@ abstract contract GiraffeRaceViews is GiraffeRaceBase {
     {
         Race storage r = _races[raceId];
         bettingCloseBlock = r.bettingCloseBlock;
+        
+        // No betting block means race not ready for settlement consideration
         if (bettingCloseBlock == 0) {
             return (false, 0, 0, 0);
         }
@@ -129,9 +247,8 @@ abstract contract GiraffeRaceViews is GiraffeRaceBase {
 
         bool settleBhAvailable = blockhash(uint256(bettingCloseBlock)) != bytes32(0);
         bool settleTimeReached = block.number > bettingCloseBlock;
-        bool oddsOk = r.totalPot == 0 || r.oddsSet;
 
-        canSettleNow = !r.settled && settleTimeReached && settleBhAvailable && oddsOk;
+        canSettleNow = !r.settled && !r.cancelled && r.oddsSet && settleTimeReached && settleBhAvailable;
     }
 
     // ============ Giraffe Assignments ============

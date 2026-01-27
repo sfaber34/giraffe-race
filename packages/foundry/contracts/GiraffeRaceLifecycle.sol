@@ -3,12 +3,16 @@ pragma solidity ^0.8.19;
 
 import { GiraffeRaceBase } from "./GiraffeRaceBase.sol";
 import { SettlementLib } from "./libraries/SettlementLib.sol";
-import { OddsLib } from "./libraries/OddsLib.sol"; // Used for calculateEffectiveScore
+import { OddsLib } from "./libraries/OddsLib.sol";
 
 /**
  * @title GiraffeRaceLifecycle
- * @notice Handles race creation and settlement
- * @dev Race creation now selects lineup from persistent queue (FIFO)
+ * @notice Handles race creation, odds setting, cancellation, and settlement
+ * @dev New flow:
+ *      1. createRace() - selects lineup, starts odds window (10 blocks)
+ *      2. setOdds() - bot sets odds within window, opens betting
+ *      3. If no odds within window, race can be cancelled (auto or explicit)
+ *      4. settleRace() - settles after betting closes
  */
 abstract contract GiraffeRaceLifecycle is GiraffeRaceBase {
     // ============ Optimized Simple RNG (for house giraffe selection) ============
@@ -31,24 +35,43 @@ abstract contract GiraffeRaceLifecycle is GiraffeRaceBase {
 
     // ============ Race Creation ============
 
-    /// @notice Create a new race - selects lineup from queue and opens betting immediately
-    /// @dev Lineup is selected FIFO from the persistent queue. Empty lanes filled with house giraffes.
+    /// @notice Create a new race - selects lineup from queue, starts odds window
+    /// @dev Lineup is selected FIFO from priority queue then main queue.
+    ///      Empty lanes filled with random house giraffes.
+    ///      Bot has ODDS_WINDOW_BLOCKS to call setOdds(), otherwise race is cancelled.
     function createRace() external returns (uint256 raceId) {
-        // Only allow one open race at a time
+        // Handle previous race state
         if (nextRaceId > 0) {
             Race storage prev = _races[nextRaceId - 1];
-            if (!prev.settled) revert PreviousRaceNotSettled();
             
-            // Cooldown check
-            if (block.number < uint256(prev.settledAtBlock) + POST_RACE_COOLDOWN_BLOCKS) {
-                revert CooldownNotElapsed();
+            if (prev.settled) {
+                // Normal case: previous race finished, check cooldown
+                if (block.number < uint256(prev.settledAtBlock) + POST_RACE_COOLDOWN_BLOCKS) {
+                    revert CooldownNotElapsed();
+                }
+            } else if (prev.cancelled) {
+                // Previous race was cancelled, no cooldown needed
+                // Can proceed
+            } else if (!prev.oddsSet) {
+                // Race exists but odds never set
+                if (block.number > prev.oddsDeadlineBlock) {
+                    // Deadline passed - auto cancel previous race
+                    _cancelRace(nextRaceId - 1);
+                    emit RaceAutoCancelled(nextRaceId - 1);
+                } else {
+                    // Still in odds window - can't create new race yet
+                    revert OddsWindowActive();
+                }
+            } else {
+                // Odds set but not settled - need to settle first
+                revert PreviousRaceNotSettled();
             }
         }
 
         raceId = nextRaceId++;
         Race storage r = _races[raceId];
         
-        // Select lineup from queue and fill with house giraffes
+        // Select lineup from queue (priority queue first, then main queue)
         _selectLineupFromQueue(raceId);
         
         // Snapshot effective score for each lane
@@ -59,33 +82,190 @@ abstract contract GiraffeRaceLifecycle is GiraffeRaceBase {
             unchecked { ++lane; }
         }
         
-        // Set fixed odds
-        _autoSetOddsFromScore(raceId);
+        // Set odds deadline - bot has ODDS_WINDOW_BLOCKS to set odds
+        r.oddsDeadlineBlock = uint64(block.number) + ODDS_WINDOW_BLOCKS;
         
-        // Open betting immediately
+        // DO NOT set odds here - bot will call setOdds()
+        // DO NOT set bettingCloseBlock - that happens in setOdds()
+        
+        emit RaceCreated(raceId, r.oddsDeadlineBlock);
+    }
+
+    // ============ Odds Setting ============
+
+    /// @notice Set odds for a race - called by bot within odds window
+    /// @dev Opens betting window after odds are set
+    /// @param raceId The race to set odds for
+    /// @param winOddsBps Win odds for each lane in basis points (e.g., 57000 = 5.70x)
+    /// @param placeOddsBps Place odds for each lane in basis points
+    /// @param showOddsBps Show odds for each lane in basis points
+    function setOdds(
+        uint256 raceId,
+        uint32[6] calldata winOddsBps,
+        uint32[6] calldata placeOddsBps,
+        uint32[6] calldata showOddsBps
+    ) external {
+        if (raceId >= nextRaceId) revert InvalidRace();
+        
+        Race storage r = _races[raceId];
+        
+        if (r.oddsSet) revert OddsAlreadySet();
+        if (r.cancelled) revert AlreadyCancelled();
+        if (r.settled) revert AlreadySettled();
+        if (block.number > r.oddsDeadlineBlock) revert OddsWindowNotExpired(); // Window expired, must cancel
+        
+        // Validate all odds meet minimum
+        for (uint8 i = 0; i < LANE_COUNT; ) {
+            if (winOddsBps[i] < MIN_DECIMAL_ODDS_BPS) revert InvalidOdds();
+            if (placeOddsBps[i] < MIN_DECIMAL_ODDS_BPS) revert InvalidOdds();
+            if (showOddsBps[i] < MIN_DECIMAL_ODDS_BPS) revert InvalidOdds();
+            unchecked { ++i; }
+        }
+        
+        // Store odds
+        r.decimalOddsBps = winOddsBps;
+        r.placeOddsBps = placeOddsBps;
+        r.showOddsBps = showOddsBps;
+        r.oddsSet = true;
+        
+        // Open betting window
         r.bettingCloseBlock = uint64(block.number) + BETTING_WINDOW_BLOCKS;
         
-        emit RaceCreated(raceId, r.bettingCloseBlock);
+        emit RaceOddsSet(raceId, winOddsBps, placeOddsBps, showOddsBps, r.bettingCloseBlock);
+    }
+
+    // ============ Race Cancellation ============
+
+    /// @notice Cancel a race that didn't receive odds in time
+    /// @dev Only works after odds deadline has passed and odds were never set.
+    ///      Restores queue entries to priority queue (front of line for next race).
+    /// @param raceId The race to cancel
+    function cancelRaceNoOdds(uint256 raceId) external {
+        if (raceId >= nextRaceId) revert InvalidRace();
+        
+        Race storage r = _races[raceId];
+        
+        if (r.oddsSet) revert OddsAlreadySet();
+        if (r.cancelled) revert AlreadyCancelled();
+        if (r.settled) revert AlreadySettled();
+        if (block.number <= r.oddsDeadlineBlock) revert OddsWindowNotExpired();
+        
+        _cancelRace(raceId);
+    }
+
+    /// @notice Internal function to cancel a race and restore queue entries
+    function _cancelRace(uint256 raceId) internal {
+        Race storage r = _races[raceId];
+        r.cancelled = true;
+        
+        // Restore user queue entries to priority queue
+        _restoreQueueEntries(raceId);
+        
+        emit RaceCancelled(raceId);
+    }
+
+    /// @notice Restore queue entries from a cancelled race to priority queue
+    /// @dev Entries go to priority queue which is processed before main queue
+    function _restoreQueueEntries(uint256 raceId) internal {
+        RaceGiraffes storage ra = _raceGiraffes[raceId];
+        
+        for (uint8 i = 0; i < ra.assignedCount; ) {
+            address owner = ra.originalOwners[i];
+            uint256 tokenId = ra.tokenIds[i];
+            
+            // Skip house giraffes - they don't go back to queue
+            if (owner == treasuryOwner) {
+                unchecked { ++i; }
+                continue;
+            }
+            
+            // Validate ownership still valid
+            if (giraffeNft.ownerOf(tokenId) != owner) {
+                unchecked { ++i; }
+                continue;
+            }
+            
+            // Add to priority queue (front of line for next race)
+            _priorityQueue.push(QueueEntry({
+                tokenId: tokenId,
+                owner: owner,
+                removed: false
+            }));
+            
+            // Mark as in queue again
+            _tokenQueueIndex[tokenId] = type(uint256).max; // Special marker for priority queue
+            userInQueue[owner] = true;
+            
+            emit QueueEntryRestored(owner, tokenId);
+            
+            unchecked { ++i; }
+        }
     }
 
     // ============ Race Settlement ============
 
     /// @notice Settle the current active race
+    /// @dev Can only be called after betting closes
     function settleRace() external {
         uint256 raceId = _activeRaceId();
-        settledLiability = SettlementLib.settleRace(_races[raceId], raceId, _raceScore[raceId], simulator, settledLiability);
+        Race storage r = _races[raceId];
+        
+        // Must have odds set to settle
+        if (!r.oddsSet) revert OddsNotSet();
+        
+        settledLiability = SettlementLib.settleRace(r, raceId, _raceScore[raceId], simulator, settledLiability);
     }
 
     // ============ Internal Helpers ============
 
     /// @notice Select lineup from queue (FIFO) and fill remaining with house giraffes
+    /// @dev Priority queue is processed first (restored entries from cancelled races)
     function _selectLineupFromQueue(uint256 raceId) internal {
         delete _raceGiraffes[raceId];
         RaceGiraffes storage ra = _raceGiraffes[raceId];
         
         uint8 assignedCount = 0;
         
-        // Select from queue FIFO (first-come-first-served)
+        // First: drain priority queue (restored entries from cancelled races)
+        while (_priorityQueue.length > 0 && assignedCount < LANE_COUNT) {
+            // Pop from end (LIFO within priority queue, but these are all "priority")
+            QueueEntry storage entry = _priorityQueue[_priorityQueue.length - 1];
+            
+            uint256 tokenId = entry.tokenId;
+            address owner = entry.owner;
+            bool removed = entry.removed;
+            
+            // Remove from priority queue
+            _priorityQueue.pop();
+            
+            // Skip removed entries
+            if (removed) {
+                continue;
+            }
+            
+            // Validate ownership
+            if (giraffeNft.ownerOf(tokenId) != owner) {
+                // Invalid - clear state and skip
+                _tokenQueueIndex[tokenId] = 0;
+                userInQueue[owner] = false;
+                continue;
+            }
+            
+            // Valid entry - assign to race
+            ra.tokenIds[assignedCount] = tokenId;
+            ra.originalOwners[assignedCount] = owner;
+            
+            emit QueueEntrySelected(raceId, owner, tokenId, assignedCount);
+            emit GiraffeAssigned(raceId, tokenId, owner, assignedCount);
+            
+            // Clear queue state (consumed)
+            _tokenQueueIndex[tokenId] = 0;
+            userInQueue[owner] = false;
+            
+            unchecked { ++assignedCount; }
+        }
+        
+        // Then: select from main queue FIFO
         while (queueHead < _raceQueue.length && assignedCount < LANE_COUNT) {
             QueueEntry storage entry = _raceQueue[queueHead];
             
@@ -173,19 +353,6 @@ abstract contract GiraffeRaceLifecycle is GiraffeRaceBase {
         ra.assignedCount = LANE_COUNT;
     }
 
-    function _autoSetOddsFromScore(uint256 raceId) internal {
-        Race storage r = _races[raceId];
-        if (r.oddsSet) return;
-
-        // Use fixed odds for all lanes
-        for (uint8 lane = 0; lane < LANE_COUNT; ) {
-            r.decimalOddsBps[lane] = TEMP_FIXED_DECIMAL_ODDS_BPS;
-            unchecked { ++lane; }
-        }
-        r.oddsSet = true;
-        emit RaceOddsSet(raceId, r.decimalOddsBps);
-    }
-
     // ============ View Functions ============
 
     function latestRaceId() public view returns (uint256 raceId) {
@@ -196,7 +363,8 @@ abstract contract GiraffeRaceLifecycle is GiraffeRaceBase {
     function getActiveRaceIdOrZero() external view returns (uint256 raceId) {
         if (nextRaceId == 0) return 0;
         raceId = nextRaceId - 1;
-        if (_races[raceId].settled) return 0;
+        Race storage r = _races[raceId];
+        if (r.settled || r.cancelled) return 0;
         return raceId;
     }
 
@@ -206,10 +374,29 @@ abstract contract GiraffeRaceLifecycle is GiraffeRaceBase {
         }
         
         Race storage prev = _races[nextRaceId - 1];
+        
+        // If cancelled, can create immediately
+        if (prev.cancelled) {
+            return (true, 0, 0);
+        }
+        
+        // If not settled, check odds situation
         if (!prev.settled) {
+            if (!prev.oddsSet) {
+                // Race waiting for odds or can be auto-cancelled
+                if (block.number > prev.oddsDeadlineBlock) {
+                    // Can auto-cancel and create
+                    return (true, 0, 0);
+                } else {
+                    // Still in odds window
+                    return (false, uint64(prev.oddsDeadlineBlock - block.number), prev.oddsDeadlineBlock);
+                }
+            }
+            // Odds set but not settled
             return (false, 0, 0);
         }
         
+        // Settled - check cooldown
         cooldownEndsAtBlock = prev.settledAtBlock + POST_RACE_COOLDOWN_BLOCKS;
         if (block.number >= cooldownEndsAtBlock) {
             return (true, 0, cooldownEndsAtBlock);

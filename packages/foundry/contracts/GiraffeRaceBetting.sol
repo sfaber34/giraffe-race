@@ -92,14 +92,14 @@ abstract contract GiraffeRaceBetting is GiraffeRaceBase {
         }
     }
     
-    /// @notice Get odds for a bet type (temporary fixed odds for Place/Show)
+    /// @notice Get odds for a bet type
     function _getOddsForBetType(Race storage r, uint8 lane, uint8 betType) internal view returns (uint32) {
         if (betType == BET_TYPE_WIN) {
             return r.decimalOddsBps[lane];
         } else if (betType == BET_TYPE_PLACE) {
-            return TEMP_FIXED_PLACE_ODDS_BPS;
+            return r.placeOddsBps[lane];
         } else {
-            return TEMP_FIXED_SHOW_ODDS_BPS;
+            return r.showOddsBps[lane];
         }
     }
 
@@ -254,7 +254,7 @@ abstract contract GiraffeRaceBetting is GiraffeRaceBase {
         
         payout = ClaimLib.calculatePayout(
             uint256(bet.amount),
-            TEMP_FIXED_PLACE_ODDS_BPS,
+            r.placeOddsBps[bet.lane],
             deadHeatCount
         );
     }
@@ -279,7 +279,7 @@ abstract contract GiraffeRaceBetting is GiraffeRaceBase {
         
         payout = ClaimLib.calculatePayout(
             uint256(bet.amount),
-            TEMP_FIXED_SHOW_ODDS_BPS,
+            r.showOddsBps[bet.lane],
             deadHeatCount
         );
     }
@@ -404,7 +404,7 @@ abstract contract GiraffeRaceBetting is GiraffeRaceBase {
                     out.betTokenId = _raceGiraffes[rid].tokenIds[ub.placeBet.lane];
                     out.betAmount = ub.placeBet.amount;
                     out.winner = r.winner;
-                    out.payout = ClaimLib.calculatePayout(uint256(ub.placeBet.amount), TEMP_FIXED_PLACE_ODDS_BPS, dh);
+                    out.payout = ClaimLib.calculatePayout(uint256(ub.placeBet.amount), r.placeOddsBps[ub.placeBet.lane], dh);
                     out.bettingCloseBlock = r.bettingCloseBlock;
                     return out;
                 }
@@ -424,7 +424,7 @@ abstract contract GiraffeRaceBetting is GiraffeRaceBase {
                     out.betTokenId = _raceGiraffes[rid].tokenIds[ub.showBet.lane];
                     out.betAmount = ub.showBet.amount;
                     out.winner = r.winner;
-                    out.payout = ClaimLib.calculatePayout(uint256(ub.showBet.amount), TEMP_FIXED_SHOW_ODDS_BPS, dh);
+                    out.payout = ClaimLib.calculatePayout(uint256(ub.showBet.amount), r.showOddsBps[ub.showBet.lane], dh);
                     out.bettingCloseBlock = r.bettingCloseBlock;
                     return out;
                 }

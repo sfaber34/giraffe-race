@@ -35,6 +35,7 @@ abstract contract GiraffeRaceBase {
     uint16 public constant MAX_HOUSE_EDGE_BPS = 3000;
     uint32 public constant MIN_DECIMAL_ODDS_BPS = 10100;
     uint32 public constant TEMP_FIXED_DECIMAL_ODDS_BPS = 57000;
+    uint64 public constant ODDS_WINDOW_BLOCKS = 10;
     uint64 public constant BETTING_WINDOW_BLOCKS = 30;
     uint64 public constant POST_RACE_COOLDOWN_BLOCKS = 30;
     uint16 public constant MAX_QUEUE_SIZE = 128;
@@ -73,6 +74,7 @@ abstract contract GiraffeRaceBase {
         assert(BET_TYPE_WIN == C.BET_TYPE_WIN);
         assert(BET_TYPE_PLACE == C.BET_TYPE_PLACE);
         assert(BET_TYPE_SHOW == C.BET_TYPE_SHOW);
+        assert(ODDS_WINDOW_BLOCKS == C.ODDS_WINDOW_BLOCKS);
         assert(BETTING_WINDOW_BLOCKS == C.BETTING_WINDOW_BLOCKS);
         assert(POST_RACE_COOLDOWN_BLOCKS == C.POST_RACE_COOLDOWN_BLOCKS);
         assert(MAX_QUEUE_SIZE == C.MAX_QUEUE_SIZE);
@@ -92,6 +94,7 @@ abstract contract GiraffeRaceBase {
     }
     
     struct Race {
+        uint64 oddsDeadlineBlock;    // Block by which odds must be set
         uint64 bettingCloseBlock;
         uint64 settledAtBlock;
         bool oddsSet;
@@ -104,7 +107,9 @@ abstract contract GiraffeRaceBase {
         uint256[6] totalOnLane;      // Win bets per lane
         uint256[6] totalPlaceOnLane; // Place bets per lane
         uint256[6] totalShowOnLane;  // Show bets per lane
-        uint32[6] decimalOddsBps;
+        uint32[6] decimalOddsBps;    // Win odds
+        uint32[6] placeOddsBps;      // Place odds
+        uint32[6] showOddsBps;       // Show odds
         uint8[6] winners;
         // Finish order for Win/Place/Show betting
         PositionInfo firstPlace;
@@ -185,6 +190,10 @@ abstract contract GiraffeRaceBase {
     mapping(uint256 => uint256) internal _tokenQueueIndex;  // tokenId => index+1 (0 means not in queue)
     mapping(address => bool) public userInQueue;  // one entry per user
     
+    // Priority queue for restored entries (from cancelled races)
+    // These are processed BEFORE the main queue
+    QueueEntry[] internal _priorityQueue;
+    
     // Mappings
     mapping(uint256 => Race) internal _races;
     mapping(uint256 => mapping(address => UserRaceBets)) internal _userBets;
@@ -224,6 +233,8 @@ abstract contract GiraffeRaceBase {
     error RaceNotCancellable();
     error AlreadyCancelled();
     error InvalidBetType();
+    error OddsWindowActive();
+    error OddsWindowNotExpired();
     
     // Queue errors
     error AlreadyInQueue();
@@ -234,8 +245,9 @@ abstract contract GiraffeRaceBase {
 
     // ============ Events ============
     
-    event RaceCreated(uint256 indexed raceId, uint64 bettingCloseBlock);
-    event RaceOddsSet(uint256 indexed raceId, uint32[6] decimalOddsBps);
+    event RaceCreated(uint256 indexed raceId, uint64 oddsDeadlineBlock);
+    event RaceOddsSet(uint256 indexed raceId, uint32[6] winOddsBps, uint32[6] placeOddsBps, uint32[6] showOddsBps, uint64 bettingCloseBlock);
+    event RaceAutoCancelled(uint256 indexed raceId);
     event BetPlaced(uint256 indexed raceId, address indexed bettor, uint8 lane, uint8 betType, uint256 amount);
     event RaceSettled(uint256 indexed raceId, bytes32 seed, uint8 winner);
     event RaceSettledDeadHeat(uint256 indexed raceId, bytes32 seed, uint8 deadHeatCount, uint8[6] winners);
@@ -250,6 +262,7 @@ abstract contract GiraffeRaceBase {
     event QueueEntered(address indexed owner, uint256 indexed tokenId, uint256 queuePosition);
     event QueueLeft(address indexed owner, uint256 indexed tokenId);
     event QueueEntrySelected(uint256 indexed raceId, address indexed owner, uint256 indexed tokenId, uint8 lane);
+    event QueueEntryRestored(address indexed owner, uint256 indexed tokenId);
 
     // ============ Modifiers ============
     

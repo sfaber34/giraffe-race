@@ -59,7 +59,10 @@ library GiraffeRaceConstants {
 
     // ============ Phase Schedule ============
     
-    /// @notice Blocks for betting window (after race creation)
+    /// @notice Blocks for bot to submit odds after race creation
+    uint64 internal constant ODDS_WINDOW_BLOCKS = 10;
+    
+    /// @notice Blocks for betting window (after odds are set)
     uint64 internal constant BETTING_WINDOW_BLOCKS = 30;
     
     /// @notice Cooldown blocks after settlement before new race

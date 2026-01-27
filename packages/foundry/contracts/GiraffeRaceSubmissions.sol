@@ -7,11 +7,14 @@ import { GiraffeRaceBase } from "./GiraffeRaceBase.sol";
  * @title GiraffeRaceSubmissions
  * @notice Handles the persistent race queue for giraffe entries
  * @dev Users enter the queue once and are automatically selected for races FIFO.
- *      One entry per user. Entries persist until the user leaves or is selected.
+ *      One entry per user. Entries persist until selected for a race.
+ *      Users CANNOT withdraw from queue once entered (commitment model).
+ *      Priority queue holds restored entries from cancelled races (processed first).
  */
 abstract contract GiraffeRaceSubmissions is GiraffeRaceBase {
     /// @notice Enter your giraffe into the persistent race queue
     /// @dev FIFO order - first to enter will be first to race
+    ///      Once entered, you CANNOT withdraw - you're committed until race runs
     /// @param tokenId The token ID of the giraffe to queue
     function enterQueue(uint256 tokenId) external {
         // One entry per user
@@ -26,11 +29,11 @@ abstract contract GiraffeRaceSubmissions is GiraffeRaceBase {
             unchecked { ++i; }
         }
         
-        // Token must not already be in queue
+        // Token must not already be in queue (main or priority)
         if (_tokenQueueIndex[tokenId] != 0) revert TokenAlreadyQueued();
         
-        // Queue size limit (count active entries from head)
-        uint256 activeCount = 0;
+        // Queue size limit (count active entries from both queues)
+        uint256 activeCount = _priorityQueue.length; // All priority queue entries count
         for (uint256 i = queueHead; i < _raceQueue.length; ) {
             if (!_raceQueue[i].removed) {
                 unchecked { ++activeCount; }
@@ -53,31 +56,11 @@ abstract contract GiraffeRaceSubmissions is GiraffeRaceBase {
         emit QueueEntered(msg.sender, tokenId, _raceQueue.length - 1);
     }
 
-    /// @notice Leave the race queue (remove your entry)
-    function leaveQueue() external {
-        if (!userInQueue[msg.sender]) revert NotInQueue();
-        
-        // Find and soft-delete the user's entry
-        for (uint256 i = queueHead; i < _raceQueue.length; ) {
-            QueueEntry storage entry = _raceQueue[i];
-            if (entry.owner == msg.sender && !entry.removed) {
-                entry.removed = true;
-                _tokenQueueIndex[entry.tokenId] = 0;
-                userInQueue[msg.sender] = false;
-                
-                emit QueueLeft(msg.sender, entry.tokenId);
-                return;
-            }
-            unchecked { ++i; }
-        }
-        
-        // Should not reach here if userInQueue was true
-        revert NotInQueue();
-    }
+    // NOTE: leaveQueue() has been removed - users cannot withdraw once entered
 
     // ============ View Functions ============
 
-    /// @notice Get the total length of the queue array (includes removed/processed entries)
+    /// @notice Get the total length of the main queue array (includes removed/processed entries)
     function getQueueLength() external view returns (uint256) {
         return _raceQueue.length;
     }
@@ -87,8 +70,24 @@ abstract contract GiraffeRaceSubmissions is GiraffeRaceBase {
         return queueHead;
     }
 
-    /// @notice Get the number of active (non-removed, non-processed) entries in the queue
+    /// @notice Get the length of the priority queue (restored entries from cancelled races)
+    function getPriorityQueueLength() external view returns (uint256) {
+        return _priorityQueue.length;
+    }
+
+    /// @notice Get the total number of active entries (priority + main queue)
+    /// @dev These are non-removed entries where owner still owns the token
     function getActiveQueueLength() external view returns (uint256 count) {
+        // Count priority queue (all entries are active since they're freshly restored)
+        for (uint256 i = 0; i < _priorityQueue.length; ) {
+            QueueEntry storage entry = _priorityQueue[i];
+            if (!entry.removed && giraffeNft.ownerOf(entry.tokenId) == entry.owner) {
+                unchecked { ++count; }
+            }
+            unchecked { ++i; }
+        }
+        
+        // Count main queue
         for (uint256 i = queueHead; i < _raceQueue.length; ) {
             QueueEntry storage entry = _raceQueue[i];
             if (!entry.removed && giraffeNft.ownerOf(entry.tokenId) == entry.owner) {
@@ -98,17 +97,42 @@ abstract contract GiraffeRaceSubmissions is GiraffeRaceBase {
         }
     }
 
-    /// @notice Check if a user is currently in the queue
+    /// @notice Check if a user is currently in the queue (main or priority)
     function isUserInQueue(address user) external view returns (bool) {
         return userInQueue[user];
     }
 
-    /// @notice Check if a token is currently in the queue
+    /// @notice Check if a token is currently in the queue (main or priority)
     function isTokenInQueue(uint256 tokenId) external view returns (bool) {
         return _tokenQueueIndex[tokenId] != 0;
     }
 
-    /// @notice Get queue entries with validity info
+    /// @notice Get priority queue entries (restored from cancelled races)
+    /// @return entries Array of queue entry views
+    function getPriorityQueueEntries() 
+        external 
+        view 
+        returns (QueueEntryView[] memory entries) 
+    {
+        entries = new QueueEntryView[](_priorityQueue.length);
+        
+        for (uint256 i = 0; i < _priorityQueue.length; ) {
+            QueueEntry storage entry = _priorityQueue[i];
+            
+            bool isValid = !entry.removed && 
+                           giraffeNft.ownerOf(entry.tokenId) == entry.owner;
+            
+            entries[i] = QueueEntryView({
+                index: i,
+                tokenId: entry.tokenId,
+                owner: entry.owner,
+                isValid: isValid
+            });
+            unchecked { ++i; }
+        }
+    }
+
+    /// @notice Get main queue entries with validity info
     /// @param start Starting index (from queueHead)
     /// @param count Maximum number of entries to return
     /// @return entries Array of queue entry views
@@ -144,9 +168,20 @@ abstract contract GiraffeRaceSubmissions is GiraffeRaceBase {
     }
 
     /// @notice Get the user's queued token ID (0 if not in queue)
+    /// @dev Checks priority queue first, then main queue
     function getUserQueuedToken(address user) external view returns (uint256 tokenId) {
         if (!userInQueue[user]) return 0;
         
+        // Check priority queue first
+        for (uint256 i = 0; i < _priorityQueue.length; ) {
+            QueueEntry storage entry = _priorityQueue[i];
+            if (entry.owner == user && !entry.removed) {
+                return entry.tokenId;
+            }
+            unchecked { ++i; }
+        }
+        
+        // Check main queue
         for (uint256 i = queueHead; i < _raceQueue.length; ) {
             QueueEntry storage entry = _raceQueue[i];
             if (entry.owner == user && !entry.removed) {
@@ -158,10 +193,25 @@ abstract contract GiraffeRaceSubmissions is GiraffeRaceBase {
     }
     
     /// @notice Get the user's position in the queue (0 if not in queue, 1 = first)
+    /// @dev Priority queue entries are positions 1-N, then main queue continues
     function getUserQueuePosition(address user) external view returns (uint256 position) {
         if (!userInQueue[user]) return 0;
         
         uint256 validPosition = 0;
+        
+        // Check priority queue first
+        for (uint256 i = 0; i < _priorityQueue.length; ) {
+            QueueEntry storage entry = _priorityQueue[i];
+            if (!entry.removed && giraffeNft.ownerOf(entry.tokenId) == entry.owner) {
+                unchecked { ++validPosition; }
+                if (entry.owner == user) {
+                    return validPosition;
+                }
+            }
+            unchecked { ++i; }
+        }
+        
+        // Then main queue
         for (uint256 i = queueHead; i < _raceQueue.length; ) {
             QueueEntry storage entry = _raceQueue[i];
             if (!entry.removed && giraffeNft.ownerOf(entry.tokenId) == entry.owner) {
@@ -173,5 +223,17 @@ abstract contract GiraffeRaceSubmissions is GiraffeRaceBase {
             unchecked { ++i; }
         }
         return 0;
+    }
+
+    /// @notice Check if a user is in the priority queue (restored from cancelled race)
+    function isUserInPriorityQueue(address user) external view returns (bool) {
+        for (uint256 i = 0; i < _priorityQueue.length; ) {
+            QueueEntry storage entry = _priorityQueue[i];
+            if (entry.owner == user && !entry.removed) {
+                return true;
+            }
+            unchecked { ++i; }
+        }
+        return false;
     }
 }
