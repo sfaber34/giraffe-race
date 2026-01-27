@@ -260,8 +260,14 @@ export const RaceDashboard = () => {
   );
 
   const handleCreateRace = useCallback(async () => {
-    await writeGiraffeRaceAsync({ functionName: "createRace" } as any);
-  }, [writeGiraffeRaceAsync]);
+    const txHash = await writeGiraffeRaceAsync({ functionName: "createRace" } as any);
+    console.log("🏁 createRace TX Hash:", txHash);
+
+    if (publicClient && txHash) {
+      const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+      console.log("⛽ TOTAL Gas Used:", receipt.gasUsed.toString());
+    }
+  }, [writeGiraffeRaceAsync, publicClient]);
 
   const handleSettleRace = useCallback(async () => {
     const txHash = await writeGiraffeRaceAsync({ functionName: "settleRace" } as any);

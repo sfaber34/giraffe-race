@@ -9,6 +9,7 @@ export const BETTING_WINDOW_BLOCKS = 30n;
 // Race simulation parameters
 export const SPEED_RANGE = 10;
 export const TRACK_LENGTH = 1000;
+export const FINISH_OVERSHOOT = 10; // Race runs until all are 10 units past finish
 export const MAX_TICKS = 500;
 
 // Replay speed baseline multiplier:

@@ -5,6 +5,7 @@ import {
   BASE_REPLAY_SPEED_MULTIPLIER,
   GIRAFFE_SIZE_PX,
   LANE_COUNT,
+  PX_PER_UNIT,
   SPEED_RANGE,
   TRACK_BASE_Y_PX,
   TRACK_HEIGHT_PX,
@@ -213,10 +214,9 @@ export const RaceTrack = memo(function RaceTrack({
                       ? MIN_ANIMATION_SPEED_FACTOR + t * (MAX_ANIMATION_SPEED_FACTOR - MIN_ANIMATION_SPEED_FACTOR)
                       : 1;
 
-                    const x =
-                      WORLD_PADDING_LEFT_PX +
-                      (Math.min(TRACK_LENGTH, Math.max(0, d)) / TRACK_LENGTH) * TRACK_LENGTH_PX -
-                      GIRAFFE_SIZE_PX / 2;
+                    // Allow giraffes to run past the finish line to their actual distances
+                    // Distance is in race units, convert to pixels directly (no upper clamp)
+                    const x = WORLD_PADDING_LEFT_PX + Math.max(0, d) * PX_PER_UNIT - GIRAFFE_SIZE_PX / 2;
                     const y = getLaneY(i);
                     const scale = getLaneScale(i);
                     const zIndex = getLaneZIndex(i);

@@ -1390,6 +1390,88 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "simulateFullRace",
+          inputs: [
+            {
+              name: "seed",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+            {
+              name: "scores",
+              type: "uint8[6]",
+              internalType: "uint8[6]",
+            },
+          ],
+          outputs: [
+            {
+              name: "finishOrder",
+              type: "tuple",
+              internalType: "struct GiraffeRaceSimulator.FinishOrder",
+              components: [
+                {
+                  name: "first",
+                  type: "tuple",
+                  internalType: "struct GiraffeRaceSimulator.PositionInfo",
+                  components: [
+                    {
+                      name: "lanes",
+                      type: "uint8[6]",
+                      internalType: "uint8[6]",
+                    },
+                    {
+                      name: "count",
+                      type: "uint8",
+                      internalType: "uint8",
+                    },
+                  ],
+                },
+                {
+                  name: "second",
+                  type: "tuple",
+                  internalType: "struct GiraffeRaceSimulator.PositionInfo",
+                  components: [
+                    {
+                      name: "lanes",
+                      type: "uint8[6]",
+                      internalType: "uint8[6]",
+                    },
+                    {
+                      name: "count",
+                      type: "uint8",
+                      internalType: "uint8",
+                    },
+                  ],
+                },
+                {
+                  name: "third",
+                  type: "tuple",
+                  internalType: "struct GiraffeRaceSimulator.PositionInfo",
+                  components: [
+                    {
+                      name: "lanes",
+                      type: "uint8[6]",
+                      internalType: "uint8[6]",
+                    },
+                    {
+                      name: "count",
+                      type: "uint8",
+                      internalType: "uint8",
+                    },
+                  ],
+                },
+                {
+                  name: "distances",
+                  type: "uint16[6]",
+                  internalType: "uint16[6]",
+                },
+              ],
+            },
+          ],
+          stateMutability: "pure",
+        },
+        {
+          type: "function",
           name: "simulateWithScore",
           inputs: [
             {
@@ -2272,7 +2354,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 6,
+      deployedOnBlock: 7,
     },
     GiraffeNFT: {
       address: "0xb19b36b1456e65e3a6d514d3f715f204bd59f431",
@@ -3622,7 +3704,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 8,
+      deployedOnBlock: 9,
     },
     GiraffeRaceSimulator: {
       address: "0x8ce361602b935680e8dec218b820ff5056beb7af",
@@ -3652,6 +3734,88 @@ const deployedContracts = {
               name: "distances",
               type: "uint16[6]",
               internalType: "uint16[6]",
+            },
+          ],
+          stateMutability: "pure",
+        },
+        {
+          type: "function",
+          name: "simulateFullRace",
+          inputs: [
+            {
+              name: "seed",
+              type: "bytes32",
+              internalType: "bytes32",
+            },
+            {
+              name: "scores",
+              type: "uint8[6]",
+              internalType: "uint8[6]",
+            },
+          ],
+          outputs: [
+            {
+              name: "finishOrder",
+              type: "tuple",
+              internalType: "struct GiraffeRaceSimulator.FinishOrder",
+              components: [
+                {
+                  name: "first",
+                  type: "tuple",
+                  internalType: "struct GiraffeRaceSimulator.PositionInfo",
+                  components: [
+                    {
+                      name: "lanes",
+                      type: "uint8[6]",
+                      internalType: "uint8[6]",
+                    },
+                    {
+                      name: "count",
+                      type: "uint8",
+                      internalType: "uint8",
+                    },
+                  ],
+                },
+                {
+                  name: "second",
+                  type: "tuple",
+                  internalType: "struct GiraffeRaceSimulator.PositionInfo",
+                  components: [
+                    {
+                      name: "lanes",
+                      type: "uint8[6]",
+                      internalType: "uint8[6]",
+                    },
+                    {
+                      name: "count",
+                      type: "uint8",
+                      internalType: "uint8",
+                    },
+                  ],
+                },
+                {
+                  name: "third",
+                  type: "tuple",
+                  internalType: "struct GiraffeRaceSimulator.PositionInfo",
+                  components: [
+                    {
+                      name: "lanes",
+                      type: "uint8[6]",
+                      internalType: "uint8[6]",
+                    },
+                    {
+                      name: "count",
+                      type: "uint8",
+                      internalType: "uint8",
+                    },
+                  ],
+                },
+                {
+                  name: "distances",
+                  type: "uint16[6]",
+                  internalType: "uint16[6]",
+                },
+              ],
             },
           ],
           stateMutability: "pure",
@@ -3782,7 +3946,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 9,
+      deployedOnBlock: 10,
     },
     HouseTreasury: {
       address: "0xe1aa25618fa0c7a1cfdab5d6b456af611873b629",
@@ -4187,7 +4351,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 10,
+      deployedOnBlock: 11,
     },
     GiraffeRace: {
       address: "0x196dbcbb54b8ec4958c959d8949ebfe87ac2aaaf",
@@ -4913,6 +5077,55 @@ const deployedContracts = {
               name: "winners",
               type: "uint8[6]",
               internalType: "uint8[6]",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getRaceFinishOrderById",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "firstLanes",
+              type: "uint8[6]",
+              internalType: "uint8[6]",
+            },
+            {
+              name: "firstCount",
+              type: "uint8",
+              internalType: "uint8",
+            },
+            {
+              name: "secondLanes",
+              type: "uint8[6]",
+              internalType: "uint8[6]",
+            },
+            {
+              name: "secondCount",
+              type: "uint8",
+              internalType: "uint8",
+            },
+            {
+              name: "thirdLanes",
+              type: "uint8[6]",
+              internalType: "uint8[6]",
+            },
+            {
+              name: "thirdCount",
+              type: "uint8",
+              internalType: "uint8",
+            },
+            {
+              name: "finalDistances",
+              type: "uint16[6]",
+              internalType: "uint16[6]",
             },
           ],
           stateMutability: "view",
@@ -5905,7 +6118,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 17,
+      deployedOnBlock: 18,
     },
   },
 } as const;
