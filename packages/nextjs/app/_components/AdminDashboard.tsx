@@ -3,11 +3,13 @@
 import { useCallback, useState } from "react";
 import { AdminStatusCard } from "./race/components";
 import { useRaceData, useRaceDetails, useRaceStatus, useViewingRace } from "./race/hooks";
-import { parseUnits, toHex } from "viem";
+import { Address } from "@scaffold-ui/components";
+import { formatUnits, isAddress, parseUnits, toHex } from "viem";
 import { useBlockNumber } from "wagmi";
-import { useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
+import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 
 const USDC_DECIMALS = 6;
+const MAX_HOUSE_EDGE_BPS = 3000; // 30%
 
 export const AdminDashboard = () => {
   // Core data hooks
@@ -47,6 +49,41 @@ export const AdminDashboard = () => {
   const [isMining, setIsMining] = useState(false);
   const [fundAmountUsdc, setFundAmountUsdc] = useState("");
   const [isFundingRace, setIsFundingRace] = useState(false);
+
+  // Admin settings state
+  const [newHouseEdgeBps, setNewHouseEdgeBps] = useState("");
+  const [newMaxBetUsdc, setNewMaxBetUsdc] = useState("");
+  const [newRaceBot, setNewRaceBot] = useState("");
+  const [cancelRaceId, setCancelRaceId] = useState("");
+  const [isUpdatingHouseEdge, setIsUpdatingHouseEdge] = useState(false);
+  const [isUpdatingMaxBet, setIsUpdatingMaxBet] = useState(false);
+  const [isUpdatingRaceBot, setIsUpdatingRaceBot] = useState(false);
+  const [isCancellingRace, setIsCancellingRace] = useState(false);
+
+  // Read current admin settings
+  const { data: currentHouseEdgeBps } = useScaffoldReadContract({
+    contractName: "GiraffeRace",
+    functionName: "houseEdgeBps",
+  });
+
+  const { data: currentMaxBetAmount } = useScaffoldReadContract({
+    contractName: "GiraffeRace",
+    functionName: "maxBetAmount",
+  });
+
+  const { data: currentRaceBot } = useScaffoldReadContract({
+    contractName: "GiraffeRace",
+    functionName: "raceBot",
+  });
+
+  const { data: treasuryOwner } = useScaffoldReadContract({
+    contractName: "HouseTreasury",
+    functionName: "owner",
+  });
+
+  // Check if connected address is treasury owner
+  const isTreasuryOwner =
+    connectedAddress && treasuryOwner && connectedAddress.toLowerCase() === treasuryOwner.toLowerCase();
 
   // Write hooks
   const { writeContractAsync: writeGiraffeRaceAsync } = useScaffoldWriteContract({ contractName: "GiraffeRace" });
@@ -135,6 +172,78 @@ export const AdminDashboard = () => {
     }
   }, [treasuryContract?.address, fundAmountUsdc, writeUsdcAsync]);
 
+  // Admin settings handlers
+  const handleSetHouseEdge = useCallback(async () => {
+    const v = newHouseEdgeBps.trim();
+    if (!v) return;
+    const bps = parseInt(v, 10);
+    if (isNaN(bps) || bps < 0 || bps > MAX_HOUSE_EDGE_BPS) return;
+    try {
+      setIsUpdatingHouseEdge(true);
+      await writeGiraffeRaceAsync({
+        functionName: "setHouseEdgeBps",
+        args: [bps],
+      } as any);
+      setNewHouseEdgeBps("");
+    } finally {
+      setIsUpdatingHouseEdge(false);
+    }
+  }, [newHouseEdgeBps, writeGiraffeRaceAsync]);
+
+  const handleSetMaxBet = useCallback(async () => {
+    const v = newMaxBetUsdc.trim();
+    if (!v) return;
+    let amount: bigint;
+    try {
+      amount = parseUnits(v as `${number}`, USDC_DECIMALS);
+    } catch {
+      return;
+    }
+    if (amount <= 0n) return;
+    try {
+      setIsUpdatingMaxBet(true);
+      await writeGiraffeRaceAsync({
+        functionName: "setMaxBetAmount",
+        args: [amount],
+      } as any);
+      setNewMaxBetUsdc("");
+    } finally {
+      setIsUpdatingMaxBet(false);
+    }
+  }, [newMaxBetUsdc, writeGiraffeRaceAsync]);
+
+  const handleSetRaceBot = useCallback(async () => {
+    const addr = newRaceBot.trim();
+    if (!addr || !isAddress(addr)) return;
+    try {
+      setIsUpdatingRaceBot(true);
+      await writeGiraffeRaceAsync({
+        functionName: "setRaceBot",
+        args: [addr],
+      } as any);
+      setNewRaceBot("");
+    } finally {
+      setIsUpdatingRaceBot(false);
+    }
+  }, [newRaceBot, writeGiraffeRaceAsync]);
+
+  const handleAdminCancelRace = useCallback(async () => {
+    const v = cancelRaceId.trim();
+    if (!v) return;
+    const raceId = parseInt(v, 10);
+    if (isNaN(raceId) || raceId < 1) return;
+    try {
+      setIsCancellingRace(true);
+      await writeGiraffeRaceAsync({
+        functionName: "adminCancelRace",
+        args: [BigInt(raceId)],
+      } as any);
+      setCancelRaceId("");
+    } finally {
+      setIsCancellingRace(false);
+    }
+  }, [cancelRaceId, writeGiraffeRaceAsync]);
+
   return (
     <div className="flex flex-col w-full">
       <div className="flex flex-col gap-8 w-full max-w-4xl mx-auto px-[30px] py-8">
@@ -207,6 +316,195 @@ export const AdminDashboard = () => {
           canSettle={canSettle}
           isMining={isMining}
         />
+
+        {/* Treasury Owner Settings */}
+        <div className="card bg-base-200 shadow">
+          <div className="card-body gap-4">
+            <div className="flex items-center justify-between">
+              <h2 className="card-title">Treasury Owner Settings</h2>
+              {isTreasuryOwner ? (
+                <div className="badge badge-success badge-sm">Owner</div>
+              ) : (
+                <div className="badge badge-warning badge-sm">Not Owner</div>
+              )}
+            </div>
+
+            {treasuryOwner && (
+              <div className="text-xs">
+                <div className="flex justify-between items-center">
+                  <span className="opacity-70">Treasury Owner</span>
+                  <Address address={treasuryOwner as `0x${string}`} />
+                </div>
+              </div>
+            )}
+
+            {!isTreasuryOwner && (
+              <div className="alert alert-warning">
+                <span className="text-sm">
+                  Only the treasury owner can modify these settings. Connect with the owner wallet.
+                </span>
+              </div>
+            )}
+
+            <div className="divider my-1" />
+
+            {/* House Edge Setting */}
+            <div className="flex flex-col gap-2">
+              <div className="text-sm font-medium">House Edge</div>
+              <div className="text-xs">
+                <div className="flex justify-between">
+                  <span className="opacity-70">Current value</span>
+                  <span className="font-mono">
+                    {currentHouseEdgeBps !== undefined
+                      ? `${(Number(currentHouseEdgeBps) / 100).toFixed(2)}% (${currentHouseEdgeBps} bps)`
+                      : "Loading..."}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="opacity-70">Max allowed</span>
+                  <span className="font-mono">30% ({MAX_HOUSE_EDGE_BPS} bps)</span>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    max={MAX_HOUSE_EDGE_BPS}
+                    className="input input-bordered input-sm w-full pr-12"
+                    placeholder="e.g. 500"
+                    value={newHouseEdgeBps}
+                    onChange={e => setNewHouseEdgeBps(e.target.value)}
+                    disabled={!isTreasuryOwner}
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs opacity-70">bps</span>
+                </div>
+                <button
+                  className="btn btn-sm btn-outline"
+                  disabled={!isTreasuryOwner || isUpdatingHouseEdge || !newHouseEdgeBps.trim()}
+                  onClick={handleSetHouseEdge}
+                >
+                  {isUpdatingHouseEdge ? <span className="loading loading-spinner loading-xs" /> : "Set"}
+                </button>
+              </div>
+              <div className="text-xs opacity-70">1 bps = 0.01%. Enter 500 for 5% house edge.</div>
+            </div>
+
+            <div className="divider my-1" />
+
+            {/* Max Bet Setting */}
+            <div className="flex flex-col gap-2">
+              <div className="text-sm font-medium">Max Bet Amount</div>
+              <div className="text-xs">
+                <div className="flex justify-between">
+                  <span className="opacity-70">Current value</span>
+                  <span className="font-mono">
+                    {currentMaxBetAmount !== undefined
+                      ? `${formatUnits(currentMaxBetAmount as bigint, USDC_DECIMALS)} USDC`
+                      : "Loading..."}
+                  </span>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    className="input input-bordered input-sm w-full pr-16"
+                    placeholder="e.g. 100"
+                    value={newMaxBetUsdc}
+                    onChange={e => setNewMaxBetUsdc(e.target.value)}
+                    disabled={!isTreasuryOwner}
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs opacity-70">USDC</span>
+                </div>
+                <button
+                  className="btn btn-sm btn-outline"
+                  disabled={!isTreasuryOwner || isUpdatingMaxBet || !newMaxBetUsdc.trim()}
+                  onClick={handleSetMaxBet}
+                >
+                  {isUpdatingMaxBet ? <span className="loading loading-spinner loading-xs" /> : "Set"}
+                </button>
+              </div>
+              <div className="text-xs opacity-70">Maximum amount a user can bet on a single race.</div>
+            </div>
+
+            <div className="divider my-1" />
+
+            {/* Race Bot Setting */}
+            <div className="flex flex-col gap-2">
+              <div className="text-sm font-medium">Race Bot Address</div>
+              <div className="text-xs">
+                <div className="flex justify-between items-center">
+                  <span className="opacity-70">Current bot</span>
+                  {currentRaceBot ? (
+                    <Address address={currentRaceBot as `0x${string}`} />
+                  ) : (
+                    <span className="font-mono">Loading...</span>
+                  )}
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  className="input input-bordered input-sm flex-1 font-mono text-xs"
+                  placeholder="0x..."
+                  value={newRaceBot}
+                  onChange={e => setNewRaceBot(e.target.value)}
+                  disabled={!isTreasuryOwner}
+                />
+                <button
+                  className="btn btn-sm btn-outline"
+                  disabled={
+                    !isTreasuryOwner || isUpdatingRaceBot || !newRaceBot.trim() || !isAddress(newRaceBot.trim())
+                  }
+                  onClick={handleSetRaceBot}
+                >
+                  {isUpdatingRaceBot ? <span className="loading loading-spinner loading-xs" /> : "Set"}
+                </button>
+              </div>
+              <div className="text-xs opacity-70">
+                The bot address that can call setProbabilities() to set race odds.
+              </div>
+            </div>
+
+            <div className="divider my-1" />
+
+            {/* Cancel Race */}
+            <div className="flex flex-col gap-2">
+              <div className="text-sm font-medium text-error">Cancel Race (Emergency)</div>
+              <div className="text-xs opacity-70">
+                Cancel a stuck race to enable refunds for all bettors. Use only if a race cannot be settled normally.
+              </div>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <input
+                    type="number"
+                    step="1"
+                    min="1"
+                    className="input input-bordered input-sm w-full"
+                    placeholder="Race ID to cancel"
+                    value={cancelRaceId}
+                    onChange={e => setCancelRaceId(e.target.value)}
+                    disabled={!isTreasuryOwner}
+                  />
+                </div>
+                <button
+                  className="btn btn-sm btn-error btn-outline"
+                  disabled={!isTreasuryOwner || isCancellingRace || !cancelRaceId.trim()}
+                  onClick={handleAdminCancelRace}
+                >
+                  {isCancellingRace ? <span className="loading loading-spinner loading-xs" /> : "Cancel Race"}
+                </button>
+              </div>
+              <div className="text-xs text-error/70">
+                ⚠️ This action cannot be undone. Bettors will be able to claim refunds.
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
