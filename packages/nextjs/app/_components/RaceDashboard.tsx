@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { EnterNftCard, PlaceBetCard, RaceOverlay, RaceQueueCard, RaceStatusCard, RaceTrack } from "./race/components";
+import { ClaimPayoutCard, EnterNftCard, PlaceBetCard, RaceOverlay, RaceQueueCard, RaceTrack } from "./race/components";
 import { LaneName } from "./race/components/LaneName";
 import { LANE_COUNT, TRACK_HEIGHT_PX, TRACK_LENGTH, USDC_DECIMALS } from "./race/constants";
 import {
@@ -17,7 +17,7 @@ import {
   useWinningClaims,
 } from "./race/hooks";
 import { BetType, ClaimSnapshot, PlaybackSpeed } from "./race/types";
-import { parseUnits, toHex } from "viem";
+import { parseUnits } from "viem";
 import { useBlockNumber } from "wagmi";
 import { useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 
@@ -30,10 +30,8 @@ export const RaceDashboard = () => {
     blockNumber,
     giraffeRaceContract,
     giraffeNftContract,
-    usdcContract,
     usdcContractName,
     treasuryContract,
-    isGiraffeRaceLoading,
     ownedTokenIds,
     ownedTokenNameById,
     isOwnedTokensLoading,
@@ -41,11 +39,9 @@ export const RaceDashboard = () => {
     hasAnyRace,
     latestRaceId,
     cooldownStatus,
-    settledLiability,
     maxBetAmount,
     userUsdcBalance,
     userUsdcAllowance,
-    treasuryBalance,
   } = raceData;
 
   // Viewing state
@@ -112,12 +108,9 @@ export const RaceDashboard = () => {
   });
 
   // Local UI state
-  const [isMining, setIsMining] = useState(false);
   const [selectedTokenId, setSelectedTokenId] = useState<bigint | null>(null);
   const [betLane, setBetLane] = useState<number | null>(null);
   const [betAmountUsdc, setBetAmountUsdc] = useState("");
-  const [fundAmountUsdc, setFundAmountUsdc] = useState("");
-  const [isFundingRace, setIsFundingRace] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
 
   // Claim snapshot state
@@ -169,15 +162,6 @@ export const RaceDashboard = () => {
 
   // Derived state
   const canBet = status === "betting_open" && lineupFinalized && parsedOdds?.oddsSet === true;
-  const canSettle =
-    !!parsed &&
-    !parsed.settled &&
-    bettingCloseBlock !== null &&
-    activeBlockNumber !== undefined &&
-    activeBlockNumber > bettingCloseBlock;
-  const activeRaceExists = status !== "no_race" && status !== "cooldown" && status !== "settled" && !parsed?.settled;
-  const isInCooldown =
-    status === "cooldown" || (cooldownStatus && !cooldownStatus.canCreate && cooldownStatus.blocksRemaining > 0n);
 
   // Show/hide cards - simplified for new queue system
   // Always show bet card and queue cards - they are persistent across races
@@ -290,32 +274,6 @@ export const RaceDashboard = () => {
     : (claimSnapshot?.winningClaimRemaining ?? null);
 
   // Actions
-  const mineBlocks = useCallback(
-    async (count: number) => {
-      if (!publicClient) return;
-      setIsMining(true);
-      try {
-        const hexCount = toHex(count);
-        try {
-          await publicClient.request({ method: "anvil_mine" as any, params: [hexCount] as any });
-          return;
-        } catch {
-          try {
-            await publicClient.request({ method: "hardhat_mine" as any, params: [hexCount] as any });
-            return;
-          } catch {
-            for (let i = 0; i < count; i++) {
-              await publicClient.request({ method: "evm_mine" as any, params: [] as any });
-            }
-          }
-        }
-      } finally {
-        setIsMining(false);
-      }
-    },
-    [publicClient],
-  );
-
   const handleCreateRace = useCallback(async () => {
     const txHash = await writeGiraffeRaceAsync({ functionName: "createRace" } as any);
     console.log("🏁 createRace TX Hash:", txHash);
@@ -325,57 +283,6 @@ export const RaceDashboard = () => {
       console.log("⛽ TOTAL Gas Used:", receipt.gasUsed.toString());
     }
   }, [writeGiraffeRaceAsync, publicClient]);
-
-  const handleSettleRace = useCallback(async () => {
-    const txHash = await writeGiraffeRaceAsync({ functionName: "settleRace" } as any);
-    console.log("🏁 settleRace TX Hash:", txHash);
-
-    if (publicClient && txHash) {
-      const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
-      console.log("⛽ TOTAL Gas Used:", receipt.gasUsed.toString());
-
-      // GasCheckpoint event topic: keccak256("GasCheckpoint(string,uint256)")
-      const gasCheckpointTopic = "0x7fd61c220461f2c47e0b5052f6e584193320f4d0cd137c3e9602fe44e5e48e17";
-
-      console.log("\n========== GAS BREAKDOWN ==========");
-
-      receipt.logs.forEach(log => {
-        if (log.topics[0] === gasCheckpointTopic) {
-          // Decode GasCheckpoint(string label, uint256 gasUsed)
-          // Data layout: offset(32) + gasUsed(32) + stringLength(32) + stringData
-          const data = log.data.slice(2); // remove 0x
-          const gasUsed = BigInt("0x" + data.slice(64, 128));
-          const stringLength = parseInt(data.slice(128, 192), 16);
-          const labelHex = data.slice(192, 192 + stringLength * 2);
-          const label = Buffer.from(labelHex, "hex").toString("utf8");
-
-          console.log(`⛽ ${label.padEnd(20)}: ${gasUsed.toLocaleString()} gas`);
-        }
-      });
-
-      // Find SimulationGasProfile from simulator (any address that's NOT the diamond)
-      const diamondAddress = giraffeRaceContract?.address?.toLowerCase();
-      const simulatorLog = receipt.logs.find(log => log.address.toLowerCase() !== diamondAddress);
-
-      if (simulatorLog) {
-        const data = simulatorLog.data.slice(2);
-        const totalTicks = BigInt("0x" + data.slice(0, 64));
-        const setupGas = BigInt("0x" + data.slice(64, 128));
-        const mainLoopGas = BigInt("0x" + data.slice(128, 192));
-        const winnerCalcGas = BigInt("0x" + data.slice(192, 256));
-        const hashCount = BigInt("0x" + data.slice(256, 320));
-
-        console.log("\n========== SIMULATION DETAILS ==========");
-        console.log(`🎲 Total Ticks:        ${totalTicks}`);
-        console.log(`🔑 Hashes (1/tick):    ${hashCount}`);
-        console.log(`⛽ Setup:              ${setupGas.toLocaleString()} gas`);
-        console.log(`⛽ Main Loop:          ${mainLoopGas.toLocaleString()} gas`);
-        console.log(`⛽ Winner Calc:        ${winnerCalcGas.toLocaleString()} gas`);
-      }
-
-      console.log("=====================================\n");
-    }
-  }, [writeGiraffeRaceAsync, publicClient, giraffeRaceContract?.address]);
 
   const handleEnterQueue = useCallback(async () => {
     if (selectedTokenId === null) return;
@@ -391,29 +298,6 @@ export const RaceDashboard = () => {
       functionName: "leaveQueue" as any,
     } as any);
   }, [writeGiraffeRaceAsync]);
-
-  const handleFundTreasury = useCallback(async () => {
-    if (!treasuryContract?.address) return;
-    const v = fundAmountUsdc.trim();
-    if (!v) return;
-    let amount: bigint;
-    try {
-      amount = parseUnits(v as `${number}`, USDC_DECIMALS);
-    } catch {
-      return;
-    }
-    if (amount <= 0n) return;
-    try {
-      setIsFundingRace(true);
-      await (writeUsdcAsync as any)({
-        functionName: "transfer",
-        args: [treasuryContract.address, amount],
-      });
-      setFundAmountUsdc("");
-    } finally {
-      setIsFundingRace(false);
-    }
-  }, [treasuryContract?.address, fundAmountUsdc, writeUsdcAsync]);
 
   const handleApprove = useCallback(async () => {
     if (!placeBetValue || !treasuryContract?.address) return;
@@ -737,111 +621,80 @@ export const RaceDashboard = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <RaceStatusCard
-            isGiraffeRaceLoading={isGiraffeRaceLoading}
-            giraffeRaceContract={giraffeRaceContract}
-            treasuryContract={treasuryContract}
-            usdcContract={usdcContract}
-            status={status}
-            viewingRaceId={viewingRaceId}
-            latestRaceId={latestRaceId}
-            isViewingLatest={isViewingLatest}
-            parsed={parsed}
-            parsedSchedule={parsedSchedule}
-            blockNumber={activeBlockNumber}
-            bettingCloseBlock={bettingCloseBlock}
-            cooldownStatus={cooldownStatus}
-            treasuryBalance={treasuryBalance}
-            settledLiability={settledLiability}
-            userUsdcBalance={userUsdcBalance}
-            connectedAddress={connectedAddress}
-            claimUiUnlocked={claimUiUnlocked}
-            hasRevealedClaimSnapshot={hasRevealedClaimSnapshot}
-            displayedNextWinningClaim={displayedNextWinningClaim}
-            displayedWinningClaimRemaining={displayedWinningClaimRemaining}
-            fundAmountUsdc={fundAmountUsdc}
-            setFundAmountUsdc={setFundAmountUsdc}
-            isFundingRace={isFundingRace}
-            onCreateRace={handleCreateRace}
-            onSettleRace={handleSettleRace}
-            onMineBlocks={mineBlocks}
-            onFundTreasury={handleFundTreasury}
-            onClaimPayout={handleClaimPayout}
-            activeRaceExists={activeRaceExists}
-            isInCooldown={!!isInCooldown}
-            canSettle={canSettle}
-            isMining={isMining}
-          />
-
-          <div className="card bg-base-200 shadow lg:col-span-2">
-            <div className="card-body gap-4">
-              <div className="flex items-center justify-between">
-                <h2 className="card-title">Play</h2>
-                <div className="text-xs opacity-70">
-                  {status === "no_race"
-                    ? "No race yet"
-                    : parsed?.settled
-                      ? "Settled (replay available)"
-                      : "Not settled"}
-                </div>
+        <div className="card bg-base-200 shadow">
+          <div className="card-body gap-4">
+            <div className="flex items-center justify-between">
+              <h2 className="card-title">Play</h2>
+              <div className="text-xs opacity-70">
+                {status === "no_race" ? "No race yet" : parsed?.settled ? "Settled (replay available)" : "Not settled"}
               </div>
+            </div>
 
-              <div className="grid grid-cols-1 gap-4">
-                {showPlaceBetCard ? (
-                  <PlaceBetCard
-                    viewingRaceId={viewingRaceId}
-                    lineupFinalized={lineupFinalized}
-                    laneTokenIds={laneTokenIds}
-                    laneStats={laneStats}
-                    parsedGiraffes={parsedGiraffes}
-                    parsedOdds={parsedOdds}
-                    betAmountUsdc={betAmountUsdc}
-                    setBetAmountUsdc={setBetAmountUsdc}
-                    placeBetValue={placeBetValue}
+            <div className="grid grid-cols-1 gap-4">
+              {showPlaceBetCard ? (
+                <PlaceBetCard
+                  viewingRaceId={viewingRaceId}
+                  lineupFinalized={lineupFinalized}
+                  laneTokenIds={laneTokenIds}
+                  laneStats={laneStats}
+                  parsedGiraffes={parsedGiraffes}
+                  parsedOdds={parsedOdds}
+                  betAmountUsdc={betAmountUsdc}
+                  setBetAmountUsdc={setBetAmountUsdc}
+                  placeBetValue={placeBetValue}
+                  connectedAddress={connectedAddress}
+                  userUsdcBalance={userUsdcBalance}
+                  maxBetAmount={maxBetAmount}
+                  myBets={myBets}
+                  canBet={canBet}
+                  isViewingLatest={isViewingLatest}
+                  giraffeRaceContract={giraffeRaceContract}
+                  needsApproval={needsApproval}
+                  hasEnoughUsdc={hasEnoughUsdc}
+                  exceedsMaxBet={exceedsMaxBet}
+                  isApproving={isApproving}
+                  onApprove={handleApprove}
+                  onPlaceBet={handlePlaceBet}
+                />
+              ) : null}
+
+              {/* Claim payout card - between Place a bet and Enter Queue */}
+              <ClaimPayoutCard
+                connectedAddress={connectedAddress}
+                giraffeRaceContract={giraffeRaceContract}
+                claimUiUnlocked={claimUiUnlocked}
+                hasRevealedClaimSnapshot={hasRevealedClaimSnapshot}
+                displayedNextWinningClaim={displayedNextWinningClaim}
+                displayedWinningClaimRemaining={displayedWinningClaimRemaining}
+                onClaimPayout={handleClaimPayout}
+              />
+
+              {showQueueSection ? (
+                <>
+                  <EnterNftCard
                     connectedAddress={connectedAddress}
-                    userUsdcBalance={userUsdcBalance}
-                    maxBetAmount={maxBetAmount}
-                    myBets={myBets}
-                    canBet={canBet}
-                    isViewingLatest={isViewingLatest}
+                    ownedTokenIds={ownedTokenIds}
+                    ownedTokenNameById={ownedTokenNameById}
+                    isOwnedTokensLoading={isOwnedTokensLoading}
+                    isLoadingOwnedTokenNames={isLoadingOwnedTokenNames}
+                    selectedTokenId={selectedTokenId}
+                    setSelectedTokenId={setSelectedTokenId}
+                    userInQueue={userInQueue}
+                    userQueuedToken={userQueuedToken}
+                    userQueuePosition={userQueuePosition}
                     giraffeRaceContract={giraffeRaceContract}
-                    needsApproval={needsApproval}
-                    hasEnoughUsdc={hasEnoughUsdc}
-                    exceedsMaxBet={exceedsMaxBet}
-                    isApproving={isApproving}
-                    onApprove={handleApprove}
-                    onPlaceBet={handlePlaceBet}
+                    onEnterQueue={handleEnterQueue}
+                    onLeaveQueue={handleLeaveQueue}
                   />
-                ) : null}
 
-                {showQueueSection ? (
-                  <>
-                    <EnterNftCard
-                      connectedAddress={connectedAddress}
-                      ownedTokenIds={ownedTokenIds}
-                      ownedTokenNameById={ownedTokenNameById}
-                      isOwnedTokensLoading={isOwnedTokensLoading}
-                      isLoadingOwnedTokenNames={isLoadingOwnedTokenNames}
-                      selectedTokenId={selectedTokenId}
-                      setSelectedTokenId={setSelectedTokenId}
-                      userInQueue={userInQueue}
-                      userQueuedToken={userQueuedToken}
-                      userQueuePosition={userQueuePosition}
-                      giraffeRaceContract={giraffeRaceContract}
-                      onEnterQueue={handleEnterQueue}
-                      onLeaveQueue={handleLeaveQueue}
-                    />
-
-                    <RaceQueueCard
-                      queueEntries={queueEntries}
-                      activeQueueLength={activeQueueLength}
-                      userInQueue={userInQueue}
-                      userQueuedToken={userQueuedToken}
-                    />
-                  </>
-                ) : null}
-              </div>
+                  <RaceQueueCard
+                    queueEntries={queueEntries}
+                    activeQueueLength={activeQueueLength}
+                    userInQueue={userInQueue}
+                    userQueuedToken={userQueuedToken}
+                  />
+                </>
+              ) : null}
             </div>
           </div>
         </div>
