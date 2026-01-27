@@ -112,15 +112,15 @@ abstract contract GiraffeRaceViews is GiraffeRaceBase {
         );
     }
 
-    // ============ Bot Status (comprehensive view for bot decision-making) ============
+    // ============ Bot Dashboard (comprehensive view for bot decision-making) ============
 
-    /// @notice Get the current status for bot decision-making
+    /// @notice Get everything the bot needs to know in one call
     /// @dev This is the primary function the bot should poll to know what action to take
     /// @return action The recommended bot action (BOT_ACTION_*)
     /// @return raceId The race ID relevant to the action (0 if creating new race)
     /// @return blocksRemaining Blocks until action becomes available/expires (context-dependent)
     /// @return scores Lane scores (only populated for SET_ODDS action)
-    function getBotStatus()
+    function getBotDashboard()
         external
         view
         returns (
@@ -185,39 +185,7 @@ abstract contract GiraffeRaceViews is GiraffeRaceBase {
         return (BOT_ACTION_NONE, raceId, 0, scores);
     }
 
-    /// @notice Get detailed race data for odds calculation
-    /// @dev Bot calls this after seeing BOT_ACTION_SET_ODDS
-    /// @param raceId The race ID
-    /// @return scores Effective scores for each lane (1-10)
-    /// @return tokenIds Token IDs in each lane
-    /// @return originalOwners Original owners of each NFT
-    /// @return oddsDeadlineBlock Block by which odds must be set
-    /// @return blocksRemaining Blocks remaining in odds window
-    function getRaceDataForOdds(uint256 raceId)
-        external
-        view
-        returns (
-            uint8[6] memory scores,
-            uint256[6] memory tokenIds,
-            address[6] memory originalOwners,
-            uint64 oddsDeadlineBlock,
-            uint64 blocksRemaining
-        )
-    {
-        Race storage r = _races[raceId];
-        RaceGiraffes storage ra = _raceGiraffes[raceId];
-        
-        scores = _raceScore[raceId];
-        tokenIds = ra.tokenIds;
-        originalOwners = ra.originalOwners;
-        oddsDeadlineBlock = r.oddsDeadlineBlock;
-        
-        if (block.number < r.oddsDeadlineBlock) {
-            blocksRemaining = uint64(r.oddsDeadlineBlock - block.number);
-        }
-    }
-
-    // ============ Race Actionability (legacy, still useful) ============
+    // ============ Race Actionability ============
 
     function getRaceActionabilityById(uint256 raceId)
         external

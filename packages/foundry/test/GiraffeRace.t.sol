@@ -514,27 +514,27 @@ contract GiraffeRaceTest is Test {
         }
     }
     
-    // ============ Bot Status Tests ============
+    // ============ Bot Dashboard Tests ============
     
-    function test_BotStatusCreateRace() public {
+    function test_BotDashboardCreateRace() public {
         // No races - should indicate CREATE_RACE
-        (uint8 action, uint256 raceId,,) = giraffeRace.getBotStatus();
+        (uint8 action, uint256 raceId,,) = giraffeRace.getBotDashboard();
         assertEq(action, giraffeRace.BOT_ACTION_CREATE_RACE());
     }
     
-    function test_BotStatusSetOdds() public {
+    function test_BotDashboardSetOdds() public {
         // Create race
         vm.prank(owner);
         giraffeRace.createRace();
         
         // Should indicate SET_ODDS
-        (uint8 action, uint256 raceId, uint64 blocksRemaining, uint8[6] memory scores) = giraffeRace.getBotStatus();
+        (uint8 action, uint256 raceId, uint64 blocksRemaining, uint8[6] memory scores) = giraffeRace.getBotDashboard();
         assertEq(action, giraffeRace.BOT_ACTION_SET_ODDS());
         assertEq(raceId, 0);
         assertTrue(blocksRemaining > 0);
     }
     
-    function test_BotStatusSettleRace() public {
+    function test_BotDashboardSettleRace() public {
         // Create race and set odds
         vm.prank(owner);
         uint256 raceId = _createRaceAndSetOdds();
@@ -544,11 +544,11 @@ contract GiraffeRaceTest is Test {
         vm.roll(bettingCloseBlock + 1);
         
         // Should indicate SETTLE_RACE
-        (uint8 action,,,) = giraffeRace.getBotStatus();
+        (uint8 action,,,) = giraffeRace.getBotDashboard();
         assertEq(action, giraffeRace.BOT_ACTION_SETTLE_RACE());
     }
     
-    function test_BotStatusCancelRace() public {
+    function test_BotDashboardCancelRace() public {
         // Create race
         vm.prank(owner);
         giraffeRace.createRace();
@@ -557,7 +557,7 @@ contract GiraffeRaceTest is Test {
         vm.roll(block.number + 11);
         
         // Should indicate CANCEL_RACE
-        (uint8 action,,,) = giraffeRace.getBotStatus();
+        (uint8 action,,,) = giraffeRace.getBotDashboard();
         assertEq(action, giraffeRace.BOT_ACTION_CANCEL_RACE());
     }
 
@@ -658,35 +658,4 @@ contract GiraffeRaceTest is Test {
         assertEq(tokenIds[1], tokens[7]);
     }
     
-    function test_GetRaceDataForOdds() public {
-        // Queue a giraffe
-        vm.prank(owner);
-        uint256 token1 = giraffeNft.mintTo(user1, "racer-1");
-        vm.prank(user1);
-        giraffeRace.enterQueue(token1);
-        
-        // Create race
-        vm.prank(owner);
-        uint256 raceId = giraffeRace.createRace();
-        
-        // Get data for odds calculation
-        (
-            uint8[6] memory scores,
-            uint256[6] memory tokenIds,
-            address[6] memory originalOwners,
-            uint64 oddsDeadlineBlock,
-            uint64 blocksRemaining
-        ) = giraffeRace.getRaceDataForOdds(raceId);
-        
-        // Check data is populated
-        assertTrue(oddsDeadlineBlock > 0);
-        assertTrue(blocksRemaining > 0);
-        assertEq(tokenIds[0], token1);
-        assertEq(originalOwners[0], user1);
-        
-        // Scores should be calculated (1-10 range)
-        for (uint8 i = 0; i < 6; i++) {
-            assertTrue(scores[i] >= 1 && scores[i] <= 10);
-        }
-    }
 }
