@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ClaimPayoutCard, EnterNftCard, PlaceBetCard, RaceOverlay, RaceQueueCard, RaceTrack } from "./race/components";
+import { ClaimPayoutCard, EnterNftCard, PlaceBetCard, RaceOverlay, RaceTrack } from "./race/components";
 import { LANE_COUNT, TRACK_HEIGHT_PX, USDC_DECIMALS } from "./race/constants";
 import {
   useMyBet,
@@ -498,29 +498,22 @@ export const RaceDashboard = () => {
               />
 
               {showQueueSection ? (
-                <>
-                  <EnterNftCard
-                    connectedAddress={connectedAddress}
-                    ownedTokenIds={ownedTokenIds}
-                    ownedTokenNameById={ownedTokenNameById}
-                    isOwnedTokensLoading={isOwnedTokensLoading}
-                    isLoadingOwnedTokenNames={isLoadingOwnedTokenNames}
-                    selectedTokenId={selectedTokenId}
-                    setSelectedTokenId={setSelectedTokenId}
-                    userInQueue={userInQueue}
-                    userQueuedToken={userQueuedToken}
-                    userQueuePosition={userQueuePosition}
-                    giraffeRaceContract={giraffeRaceContract}
-                    onEnterQueue={handleEnterQueue}
-                  />
-
-                  <RaceQueueCard
-                    queueEntries={queueEntries}
-                    activeQueueLength={activeQueueLength}
-                    userInQueue={userInQueue}
-                    userQueuedToken={userQueuedToken}
-                  />
-                </>
+                <EnterNftCard
+                  connectedAddress={connectedAddress}
+                  ownedTokenIds={ownedTokenIds}
+                  ownedTokenNameById={ownedTokenNameById}
+                  isOwnedTokensLoading={isOwnedTokensLoading}
+                  isLoadingOwnedTokenNames={isLoadingOwnedTokenNames}
+                  selectedTokenId={selectedTokenId}
+                  setSelectedTokenId={setSelectedTokenId}
+                  userInQueue={userInQueue}
+                  userQueuedToken={userQueuedToken}
+                  userQueuePosition={userQueuePosition}
+                  queueEntries={queueEntries}
+                  activeQueueLength={activeQueueLength}
+                  giraffeRaceContract={giraffeRaceContract}
+                  onEnterQueue={handleEnterQueue}
+                />
               ) : null}
             </div>
           </div>
