@@ -34,7 +34,6 @@ interface RaceOverlayProps {
   bettingCloseBlock: bigint | null;
 
   // Actions
-  onCreateRace: () => Promise<void>;
 }
 
 export const RaceOverlay = ({
@@ -55,7 +54,6 @@ export const RaceOverlay = ({
   estimatedPayoutWei,
   blockNumber,
   bettingCloseBlock,
-  onCreateRace,
 }: RaceOverlayProps) => {
   const revealedWinner = raceIsOver && parsed?.settled ? parsed.winner : null;
   const BETTING_WINDOW_BLOCKS = 30n;
@@ -109,13 +107,6 @@ export const RaceOverlay = ({
                 />
               </div>
             )}
-            <button
-              className="btn btn-primary btn-sm mt-2"
-              disabled={!cooldownStatus?.canCreate}
-              onClick={onCreateRace}
-            >
-              Create Next Race
-            </button>
           </div>
         ) : raceIsOver && revealedWinner !== null ? (
           // User did NOT place a bet - show race over with cooldown
@@ -145,13 +136,6 @@ export const RaceOverlay = ({
                 />
               </div>
             )}
-            <button
-              className="btn btn-primary btn-sm mt-2"
-              disabled={!cooldownStatus?.canCreate}
-              onClick={onCreateRace}
-            >
-              Create Next Race
-            </button>
           </div>
         ) : null}
       </>
@@ -278,9 +262,7 @@ export const RaceOverlay = ({
               />
             </div>
           )}
-          <button className="btn btn-primary btn-sm mt-2" disabled={!cooldownStatus?.canCreate} onClick={onCreateRace}>
-            Create Next Race
-          </button>
+          <div className="text-sm text-base-content/60 mt-1">Waiting for the next race to begin…</div>
         </div>
       ) : status === "no_race" ? (
         // No race exists - prompt to create one
@@ -289,10 +271,7 @@ export const RaceOverlay = ({
           style={{ minWidth: 320 }}
         >
           <div className="text-3xl font-black text-primary drop-shadow">No race active</div>
-          <div className="text-lg font-semibold text-base-content/70">Create a race to get started</div>
-          <button className="btn btn-primary btn-sm mt-2" onClick={onCreateRace}>
-            Create Race
-          </button>
+          <div className="text-lg font-semibold text-base-content/70">Waiting for the next race to be created…</div>
         </div>
       ) : null}
     </>

@@ -25,7 +25,6 @@ export const RaceDashboard = () => {
   // Core data hooks
   const raceData = useRaceData();
   const {
-    publicClient,
     connectedAddress,
     blockNumber,
     giraffeRaceContract,
@@ -274,16 +273,6 @@ export const RaceDashboard = () => {
     : (claimSnapshot?.winningClaimRemaining ?? null);
 
   // Actions
-  const handleCreateRace = useCallback(async () => {
-    const txHash = await writeGiraffeRaceAsync({ functionName: "createRace" } as any);
-    console.log("🏁 createRace TX Hash:", txHash);
-
-    if (publicClient && txHash) {
-      const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
-      console.log("⛽ TOTAL Gas Used:", receipt.gasUsed.toString());
-    }
-  }, [writeGiraffeRaceAsync, publicClient]);
-
   const handleEnterQueue = useCallback(async () => {
     if (selectedTokenId === null) return;
     await writeGiraffeRaceAsync({
@@ -436,7 +425,6 @@ export const RaceDashboard = () => {
                     estimatedPayoutWei={estimatedPayoutWei}
                     blockNumber={activeBlockNumber}
                     bettingCloseBlock={bettingCloseBlock}
-                    onCreateRace={handleCreateRace}
                   />
                 </div>
 
