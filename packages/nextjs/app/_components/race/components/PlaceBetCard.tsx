@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { LANE_COUNT, ODDS_SCALE, USDC_DECIMALS } from "../constants";
 import { BET_TYPE, BetType, LaneStats, MyBets, ParsedGiraffes, ParsedOdds } from "../types";
 import { LaneName } from "./LaneName";
@@ -65,9 +64,6 @@ export const PlaceBetCard = ({
   onApprove,
   onPlaceBet,
 }: PlaceBetCardProps) => {
-  // Track which lane is expanded (showing bet options)
-  const [expandedLane, setExpandedLane] = useState<number | null>(null);
-
   const winOddsLabelForLane = (lane: number) => {
     if (!parsedOdds?.oddsSet) return "—";
     const bps = Number(parsedOdds.winOddsBps[lane] ?? 0n);
@@ -89,23 +85,6 @@ export const PlaceBetCard = ({
     return `${(bps / ODDS_SCALE).toFixed(2)}x`;
   };
 
-  const calculateEstimatedPayout = (betType: BetType, lane: number): bigint | null => {
-    if (!placeBetValue || placeBetValue <= 0n) return null;
-    if (!parsedOdds?.oddsSet) return null;
-
-    let oddsBps: bigint;
-    if (betType === BET_TYPE.WIN) {
-      oddsBps = parsedOdds.winOddsBps[lane] ?? 0n;
-    } else if (betType === BET_TYPE.PLACE) {
-      oddsBps = parsedOdds.placeOddsBps[lane] ?? 0n;
-    } else {
-      oddsBps = parsedOdds.showOddsBps[lane] ?? 0n;
-    }
-
-    if (oddsBps <= 0n) return null;
-    return (placeBetValue * oddsBps) / BigInt(ODDS_SCALE);
-  };
-
   // Check if user already has a specific bet type
   const hasWinBet = myBets?.win.hasBet ?? false;
   const hasPlaceBet = myBets?.place.hasBet ?? false;
@@ -118,10 +97,9 @@ export const PlaceBetCard = ({
 
   const handlePlaceBet = async (lane: number, betType: BetType) => {
     await onPlaceBet(lane, betType);
-    setExpandedLane(null);
   };
 
-  const renderBetButton = (lane: number, betType: BetType, label: string, odds: string, disabled: boolean) => {
+  const renderCompactBetButton = (lane: number, betType: BetType, label: string, odds: string, disabled: boolean) => {
     // Check if THIS bet type on THIS lane is already placed
     let isThisBetPlaced = false;
     if (betType === BET_TYPE.WIN && hasWinBet && winBetLane === lane) isThisBetPlaced = true;
@@ -139,16 +117,18 @@ export const PlaceBetCard = ({
     return (
       <button
         key={betType}
-        className={`btn btn-sm flex-1 ${isThisBetPlaced ? "btn-primary" : "btn-outline"} ${
+        className={`btn btn-xs px-2 min-w-0 ${isThisBetPlaced ? "btn-primary" : "btn-outline"} ${
           isBetTypeDisabled && !isThisBetPlaced ? "opacity-50" : ""
         }`}
         disabled={btnDisabled}
-        onClick={() => handlePlaceBet(lane, betType)}
+        onClick={e => {
+          e.stopPropagation();
+          handlePlaceBet(lane, betType);
+        }}
       >
-        <div className="flex flex-col items-center text-xs">
-          <span className="font-semibold">{label}</span>
-          <span className="opacity-70">{odds}</span>
-          {isThisBetPlaced && <span className="badge badge-xs badge-primary mt-1">PLACED</span>}
+        <div className="flex flex-col items-center leading-tight">
+          <span className="text-[10px] font-semibold">{label}</span>
+          <span className="text-[9px] opacity-70">{odds}</span>
         </div>
       </button>
     );
@@ -220,122 +200,79 @@ export const PlaceBetCard = ({
 
         {!needsApproval && placeBetValue && <div className="text-xs text-success">✓ Approved — ready to place bet</div>}
 
-        {/* Lane selection with bet type buttons */}
+        {/* Lane selection with inline bet type buttons */}
         <div className="flex flex-col gap-2 w-full">
           {Array.from({ length: LANE_COUNT }).map((_, lane) => {
-            const isExpanded = expandedLane === lane;
             const betMarkers = getBetMarkers(lane);
             const hasBetOnLane = betMarkers.length > 0;
 
             return (
               <div
                 key={lane}
-                className={`border rounded-lg overflow-hidden transition-all ${
-                  isExpanded ? "border-primary bg-base-200" : "border-base-300"
-                } ${hasBetOnLane ? "ring-2 ring-primary/30" : ""}`}
+                className={`border rounded-lg p-2 ${hasBetOnLane ? "border-primary bg-base-200" : "border-base-300"}`}
               >
-                {/* Lane header (clickable to expand) */}
-                <button
-                  className={`w-full flex items-center justify-between p-3 hover:bg-base-200 transition-colors ${
-                    isExpanded ? "bg-base-200" : ""
-                  }`}
-                  onClick={() => setExpandedLane(isExpanded ? null : lane)}
-                  disabled={!canBet}
-                  type="button"
-                >
-                  <span className="flex items-center gap-2">
+                <div className="flex items-center gap-2">
+                  {/* Left: Avatar + Name */}
+                  <div className="flex items-center gap-2 min-w-0 flex-shrink-0">
                     <GiraffeAnimated
                       idPrefix={`bet-${(viewingRaceId ?? 0n).toString()}-${lane}-${(laneTokenIds[lane] ?? 0n).toString()}`}
                       tokenId={laneTokenIds[lane] ?? 0n}
                       playbackRate={1}
                       playing={false}
-                      sizePx={48}
+                      sizePx={40}
                     />
-                    <div className="flex flex-col items-start">
-                      {lineupFinalized && parsedGiraffes?.tokenIds?.[lane] && parsedGiraffes.tokenIds[lane] !== 0n ? (
-                        <LaneName tokenId={parsedGiraffes.tokenIds[lane]} fallback={`Lane ${lane}`} />
-                      ) : (
-                        <span>Lane {lane}</span>
-                      )}
+                    <div className="flex flex-col items-start min-w-0">
+                      <span className="text-sm font-medium truncate max-w-[80px]">
+                        {lineupFinalized && parsedGiraffes?.tokenIds?.[lane] && parsedGiraffes.tokenIds[lane] !== 0n ? (
+                          <LaneName tokenId={parsedGiraffes.tokenIds[lane]} fallback={`Lane ${lane}`} />
+                        ) : (
+                          `Lane ${lane}`
+                        )}
+                      </span>
                       {betMarkers.length > 0 && (
-                        <div className="flex gap-1 mt-1">
+                        <div className="flex gap-0.5">
                           {betMarkers.map(m => (
                             <span key={m} className="badge badge-xs badge-primary">
-                              {m === "W" ? "WIN" : m === "P" ? "PLACE" : "SHOW"}
+                              {m}
                             </span>
                           ))}
                         </div>
                       )}
                     </div>
-                  </span>
-                  <span className="flex flex-col items-end text-xs opacity-80">
-                    <span>Zip {laneStats[lane]?.zip ?? 10}/10</span>
-                    <span>Moxie {laneStats[lane]?.moxie ?? 10}/10</span>
-                    <span>Hustle {laneStats[lane]?.hustle ?? 10}/10</span>
-                  </span>
-                </button>
+                  </div>
 
-                {/* Expanded bet options */}
-                {isExpanded && (
-                  <div className="p-3 pt-0 border-t border-base-300">
-                    <div className="text-xs opacity-70 mb-2">Choose bet type:</div>
-                    <div className="flex gap-2">
-                      {renderBetButton(
-                        lane,
-                        BET_TYPE.WIN,
-                        "Win",
-                        winOddsLabelForLane(lane),
-                        !giraffeRaceContract || !connectedAddress || !canBet || !isViewingLatest,
-                      )}
-                      {renderBetButton(
-                        lane,
-                        BET_TYPE.PLACE,
-                        "Place",
-                        placeOddsLabelForLane(lane),
-                        !giraffeRaceContract || !connectedAddress || !canBet || !isViewingLatest,
-                      )}
-                      {renderBetButton(
-                        lane,
-                        BET_TYPE.SHOW,
-                        "Show",
-                        showOddsLabelForLane(lane),
-                        !giraffeRaceContract || !connectedAddress || !canBet || !isViewingLatest,
-                      )}
-                    </div>
-
-                    {/* Payout estimates */}
-                    {placeBetValue && (
-                      <div className="mt-2 text-xs opacity-70">
-                        <div className="grid grid-cols-3 gap-2 text-center">
-                          <div>
-                            <span className="block">Win payout</span>
-                            <span className="font-mono">
-                              {calculateEstimatedPayout(BET_TYPE.WIN, lane)
-                                ? formatUnits(calculateEstimatedPayout(BET_TYPE.WIN, lane)!, USDC_DECIMALS)
-                                : "—"}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="block">Place payout</span>
-                            <span className="font-mono">
-                              {calculateEstimatedPayout(BET_TYPE.PLACE, lane)
-                                ? formatUnits(calculateEstimatedPayout(BET_TYPE.PLACE, lane)!, USDC_DECIMALS)
-                                : "—"}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="block">Show payout</span>
-                            <span className="font-mono">
-                              {calculateEstimatedPayout(BET_TYPE.SHOW, lane)
-                                ? formatUnits(calculateEstimatedPayout(BET_TYPE.SHOW, lane)!, USDC_DECIMALS)
-                                : "—"}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
+                  {/* Middle: Bet buttons */}
+                  <div className="flex gap-1 flex-1 justify-center">
+                    {renderCompactBetButton(
+                      lane,
+                      BET_TYPE.WIN,
+                      "Win",
+                      winOddsLabelForLane(lane),
+                      !giraffeRaceContract || !connectedAddress || !canBet || !isViewingLatest,
+                    )}
+                    {renderCompactBetButton(
+                      lane,
+                      BET_TYPE.PLACE,
+                      "Place",
+                      placeOddsLabelForLane(lane),
+                      !giraffeRaceContract || !connectedAddress || !canBet || !isViewingLatest,
+                    )}
+                    {renderCompactBetButton(
+                      lane,
+                      BET_TYPE.SHOW,
+                      "Show",
+                      showOddsLabelForLane(lane),
+                      !giraffeRaceContract || !connectedAddress || !canBet || !isViewingLatest,
                     )}
                   </div>
-                )}
+
+                  {/* Right: Stats */}
+                  <div className="flex flex-col items-end text-[10px] opacity-70 flex-shrink-0 leading-tight">
+                    <span>Z:{laneStats[lane]?.zip ?? 10}</span>
+                    <span>M:{laneStats[lane]?.moxie ?? 10}</span>
+                    <span>H:{laneStats[lane]?.hustle ?? 10}</span>
+                  </div>
+                </div>
               </div>
             );
           })}
