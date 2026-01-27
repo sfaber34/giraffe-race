@@ -1,6 +1,6 @@
 import fs from "fs/promises";
 import path from "path";
-import { hexToBytes, keccak256, toHex, encodePacked } from "viem";
+import { encodePacked, hexToBytes, keccak256, toHex } from "viem";
 
 // -----------------------
 // Optimized Deterministic Dice (direct modulo)

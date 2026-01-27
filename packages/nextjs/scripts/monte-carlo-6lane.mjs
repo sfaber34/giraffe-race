@@ -35,10 +35,10 @@ const MAX_TICKS = 500;
 class FastRng {
   constructor(seed) {
     // Initialize state from numeric seed
-    this.s0 = (seed >>> 0) || 0x12345678;
-    this.s1 = (Math.imul(seed, 0x85ebca6b) >>> 0) || 0x9abcdef0;
-    this.s2 = (Math.imul(seed, 0xc2b2ae35) >>> 0) || 0xdeadbeef;
-    this.s3 = (Math.imul(seed, 0x27d4eb2f) >>> 0) || 0xcafebabe;
+    this.s0 = seed >>> 0 || 0x12345678;
+    this.s1 = Math.imul(seed, 0x85ebca6b) >>> 0 || 0x9abcdef0;
+    this.s2 = Math.imul(seed, 0xc2b2ae35) >>> 0 || 0xdeadbeef;
+    this.s3 = Math.imul(seed, 0x27d4eb2f) >>> 0 || 0xcafebabe;
     // Warm up
     for (let i = 0; i < 20; i++) this.next();
   }
@@ -177,9 +177,7 @@ function simulateFullRace(seed, scores) {
  */
 function calculateFinishOrder(distances) {
   // Sort lanes by distance (descending - higher distance = better)
-  const sorted = distances
-    .map((d, i) => ({ lane: i, distance: d }))
-    .sort((a, b) => b.distance - a.distance);
+  const sorted = distances.map((d, i) => ({ lane: i, distance: d })).sort((a, b) => b.distance - a.distance);
 
   // Group by distance for dead heat detection
   const groups = [];
@@ -525,7 +523,9 @@ async function main() {
   const showSum = results.reduce((a, r) => a + r.showProb, 0);
 
   console.log("");
-  console.log(`Sum checks: Win=${winSum.toFixed(4)} (≈1.00), Place=${placeSum.toFixed(4)} (≈2.00), Show=${showSum.toFixed(4)} (≈3.00)`);
+  console.log(
+    `Sum checks: Win=${winSum.toFixed(4)} (≈1.00), Place=${placeSum.toFixed(4)} (≈2.00), Show=${showSum.toFixed(4)} (≈3.00)`,
+  );
 }
 
 await main();
