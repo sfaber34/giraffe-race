@@ -2354,7 +2354,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 8,
+      deployedOnBlock: 13,
     },
     GiraffeNFT: {
       address: "0xb19b36b1456e65e3a6d514d3f715f204bd59f431",
@@ -3704,7 +3704,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 10,
+      deployedOnBlock: 15,
     },
     GiraffeRaceSimulator: {
       address: "0x8ce361602b935680e8dec218b820ff5056beb7af",
@@ -3946,7 +3946,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 11,
+      deployedOnBlock: 16,
     },
     HouseTreasury: {
       address: "0xe1aa25618fa0c7a1cfdab5d6b456af611873b629",
@@ -4351,7 +4351,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 12,
+      deployedOnBlock: 17,
     },
     GiraffeRace: {
       address: "0x196dbcbb54b8ec4958c959d8949ebfe87ac2aaaf",
@@ -4366,6 +4366,11 @@ const deployedContracts = {
             },
             {
               name: "_treasuryOwner",
+              type: "address",
+              internalType: "address",
+            },
+            {
+              name: "_raceBot",
               type: "address",
               internalType: "address",
             },
@@ -4429,6 +4434,71 @@ const deployedContracts = {
         {
           type: "function",
           name: "BET_TYPE_WIN",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint8",
+              internalType: "uint8",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "BOT_ACTION_CANCEL_RACE",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint8",
+              internalType: "uint8",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "BOT_ACTION_CREATE_RACE",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint8",
+              internalType: "uint8",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "BOT_ACTION_NONE",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint8",
+              internalType: "uint8",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "BOT_ACTION_SETTLE_RACE",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint8",
+              internalType: "uint8",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "BOT_ACTION_SET_ODDS",
           inputs: [],
           outputs: [
             {
@@ -4584,6 +4654,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "ODDS_WINDOW_BLOCKS",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint64",
+              internalType: "uint64",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "POST_RACE_COOLDOWN_BLOCKS",
           inputs: [],
           outputs: [
@@ -4663,6 +4746,19 @@ const deployedContracts = {
         {
           type: "function",
           name: "adminCancelRace",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "cancelRaceNoOdds",
           inputs: [
             {
               name: "raceId",
@@ -4781,6 +4877,34 @@ const deployedContracts = {
               name: "claimed",
               type: "bool",
               internalType: "bool",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getBotDashboard",
+          inputs: [],
+          outputs: [
+            {
+              name: "action",
+              type: "uint8",
+              internalType: "uint8",
+            },
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "blocksRemaining",
+              type: "uint64",
+              internalType: "uint64",
+            },
+            {
+              name: "scores",
+              type: "uint8[6]",
+              internalType: "uint8[6]",
             },
           ],
           stateMutability: "view",
@@ -4968,6 +5092,54 @@ const deployedContracts = {
                   internalType: "uint64",
                 },
               ],
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getPriorityQueueEntries",
+          inputs: [],
+          outputs: [
+            {
+              name: "entries",
+              type: "tuple[]",
+              internalType: "struct GiraffeRaceBase.QueueEntryView[]",
+              components: [
+                {
+                  name: "index",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "tokenId",
+                  type: "uint256",
+                  internalType: "uint256",
+                },
+                {
+                  name: "owner",
+                  type: "address",
+                  internalType: "address",
+                },
+                {
+                  name: "isValid",
+                  type: "bool",
+                  internalType: "bool",
+                },
+              ],
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getPriorityQueueLength",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
             },
           ],
           stateMutability: "view",
@@ -5270,7 +5442,17 @@ const deployedContracts = {
               internalType: "bool",
             },
             {
-              name: "decimalOddsBps",
+              name: "winOddsBps",
+              type: "uint32[6]",
+              internalType: "uint32[6]",
+            },
+            {
+              name: "placeOddsBps",
+              type: "uint32[6]",
+              internalType: "uint32[6]",
+            },
+            {
+              name: "showOddsBps",
               type: "uint32[6]",
               internalType: "uint32[6]",
             },
@@ -5288,6 +5470,11 @@ const deployedContracts = {
             },
           ],
           outputs: [
+            {
+              name: "oddsDeadlineBlock",
+              type: "uint64",
+              internalType: "uint64",
+            },
             {
               name: "bettingCloseBlock",
               type: "uint64",
@@ -5507,6 +5694,25 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "isUserInPriorityQueue",
+          inputs: [
+            {
+              name: "user",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          outputs: [
+            {
+              name: "",
+              type: "bool",
+              internalType: "bool",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "isUserInQueue",
           inputs: [
             {
@@ -5536,13 +5742,6 @@ const deployedContracts = {
             },
           ],
           stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "leaveQueue",
-          inputs: [],
-          outputs: [],
-          stateMutability: "nonpayable",
         },
         {
           type: "function",
@@ -5608,6 +5807,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "raceBot",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "setHouseEdgeBps",
           inputs: [
             {
@@ -5627,6 +5839,47 @@ const deployedContracts = {
               name: "newMaxBet",
               type: "uint256",
               internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "setOdds",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+            {
+              name: "winOddsBps",
+              type: "uint32[6]",
+              internalType: "uint32[6]",
+            },
+            {
+              name: "placeOddsBps",
+              type: "uint32[6]",
+              internalType: "uint32[6]",
+            },
+            {
+              name: "showOddsBps",
+              type: "uint32[6]",
+              internalType: "uint32[6]",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "setRaceBot",
+          inputs: [
+            {
+              name: "newRaceBot",
+              type: "address",
+              internalType: "address",
             },
           ],
           outputs: [],
@@ -5946,6 +6199,25 @@ const deployedContracts = {
         },
         {
           type: "event",
+          name: "QueueEntryRestored",
+          inputs: [
+            {
+              name: "owner",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "tokenId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
           name: "QueueEntrySelected",
           inputs: [
             {
@@ -5996,6 +6268,38 @@ const deployedContracts = {
         },
         {
           type: "event",
+          name: "RaceAutoCancelled",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "RaceBotUpdated",
+          inputs: [
+            {
+              name: "oldBot",
+              type: "address",
+              indexed: false,
+              internalType: "address",
+            },
+            {
+              name: "newBot",
+              type: "address",
+              indexed: false,
+              internalType: "address",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
           name: "RaceCancelled",
           inputs: [
             {
@@ -6018,7 +6322,7 @@ const deployedContracts = {
               internalType: "uint256",
             },
             {
-              name: "bettingCloseBlock",
+              name: "oddsDeadlineBlock",
               type: "uint64",
               indexed: false,
               internalType: "uint64",
@@ -6037,10 +6341,28 @@ const deployedContracts = {
               internalType: "uint256",
             },
             {
-              name: "decimalOddsBps",
+              name: "winOddsBps",
               type: "uint32[6]",
               indexed: false,
               internalType: "uint32[6]",
+            },
+            {
+              name: "placeOddsBps",
+              type: "uint32[6]",
+              indexed: false,
+              internalType: "uint32[6]",
+            },
+            {
+              name: "showOddsBps",
+              type: "uint32[6]",
+              indexed: false,
+              internalType: "uint32[6]",
+            },
+            {
+              name: "bettingCloseBlock",
+              type: "uint64",
+              indexed: false,
+              internalType: "uint64",
             },
           ],
           anonymous: false,
@@ -6203,6 +6525,11 @@ const deployedContracts = {
         },
         {
           type: "error",
+          name: "NotRaceBot",
+          inputs: [],
+        },
+        {
+          type: "error",
           name: "NotSettled",
           inputs: [],
         },
@@ -6229,6 +6556,16 @@ const deployedContracts = {
         {
           type: "error",
           name: "OddsNotSet",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "OddsWindowActive",
+          inputs: [],
+        },
+        {
+          type: "error",
+          name: "OddsWindowNotExpired",
           inputs: [],
         },
         {
@@ -6263,7 +6600,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 19,
+      deployedOnBlock: 24,
     },
   },
 } as const;

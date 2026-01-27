@@ -229,13 +229,13 @@ abstract contract GiraffeRaceBase {
     error NotTreasuryOwner();
     error OddsNotSet();
     error OddsAlreadySet();
-    error InvalidOdds();
     error InsufficientBankroll();
     error RaceNotCancellable();
     error AlreadyCancelled();
     error InvalidBetType();
     error OddsWindowActive();
-    error OddsWindowNotExpired();
+    error OddsWindowExpired();      // Tried to set probabilities after deadline
+    error OddsWindowNotExpired();   // Tried to cancel before deadline
     error NotRaceBot();
     
     // Queue errors
@@ -248,7 +248,16 @@ abstract contract GiraffeRaceBase {
     // ============ Events ============
     
     event RaceCreated(uint256 indexed raceId, uint64 oddsDeadlineBlock);
-    event RaceOddsSet(uint256 indexed raceId, uint32[6] winOddsBps, uint32[6] placeOddsBps, uint32[6] showOddsBps, uint64 bettingCloseBlock);
+    event RaceProbabilitiesSet(
+        uint256 indexed raceId,
+        uint16[6] winProbBps,
+        uint16[6] placeProbBps,
+        uint16[6] showProbBps,
+        uint32[6] winOddsBps,
+        uint32[6] placeOddsBps,
+        uint32[6] showOddsBps,
+        uint64 bettingCloseBlock
+    );
     event RaceAutoCancelled(uint256 indexed raceId);
     event BetPlaced(uint256 indexed raceId, address indexed bettor, uint8 lane, uint8 betType, uint256 amount);
     event RaceSettled(uint256 indexed raceId, bytes32 seed, uint8 winner);

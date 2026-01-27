@@ -14,7 +14,7 @@ abstract contract GiraffeRaceViews is GiraffeRaceBase {
     /// @notice Actions the bot should take
     uint8 public constant BOT_ACTION_NONE = 0;           // Nothing to do
     uint8 public constant BOT_ACTION_CREATE_RACE = 1;    // Call createRace()
-    uint8 public constant BOT_ACTION_SET_ODDS = 2;       // Call setOdds()
+    uint8 public constant BOT_ACTION_SET_PROBABILITIES = 2;  // Call setProbabilities()
     uint8 public constant BOT_ACTION_SETTLE_RACE = 3;    // Call settleRace()
     uint8 public constant BOT_ACTION_CANCEL_RACE = 4;    // Call cancelRaceNoOdds() (optional, createRace auto-cancels)
 
@@ -160,7 +160,7 @@ abstract contract GiraffeRaceViews is GiraffeRaceBase {
                 // Still in odds window - bot should set odds
                 blocksRemaining = uint64(r.oddsDeadlineBlock - block.number);
                 scores = _raceScore[raceId];
-                return (BOT_ACTION_SET_ODDS, raceId, blocksRemaining, scores);
+                return (BOT_ACTION_SET_PROBABILITIES, raceId, blocksRemaining, scores);
             } else {
                 // Odds window expired - can cancel (or auto-cancel via createRace)
                 return (BOT_ACTION_CANCEL_RACE, raceId, 0, scores);

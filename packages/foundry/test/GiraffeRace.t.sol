@@ -11,7 +11,7 @@ import { MockUSDC } from "../contracts/MockUSDC.sol";
 /**
  * @title GiraffeRaceTest
  * @notice Tests for the GiraffeRace contract with persistent queue system
- * @dev New flow: createRace() -> setOdds() -> betting -> settleRace()
+ * @dev New flow: createRace() -> setProbabilities() -> betting -> settleRace()
  */
 contract GiraffeRaceTest is Test {
     GiraffeRace giraffeRace;
@@ -31,10 +31,11 @@ contract GiraffeRaceTest is Test {
 
     uint256[6] houseGiraffeTokenIds;
     
-    // Default test odds (5.70x Win, 2.40x Place, 1.60x Show)
-    uint32[6] defaultWinOdds = [uint32(57000), 57000, 57000, 57000, 57000, 57000];
-    uint32[6] defaultPlaceOdds = [uint32(24000), 24000, 24000, 24000, 24000, 24000];
-    uint32[6] defaultShowOdds = [uint32(16000), 16000, 16000, 16000, 16000, 16000];
+    // Default test probabilities (equal chances for each lane)
+    // Win: ~16.67% each (sums to 100%), Place: ~33.33% each (sums to 200%), Show: 50% each (sums to 300%)
+    uint16[6] defaultWinProb = [uint16(1667), 1667, 1667, 1667, 1666, 1666];   // ~10000 bps total
+    uint16[6] defaultPlaceProb = [uint16(3333), 3333, 3333, 3333, 3334, 3334]; // ~20000 bps total
+    uint16[6] defaultShowProb = [uint16(5000), 5000, 5000, 5000, 5000, 5000];  // 30000 bps total
 
     function setUp() public {
         vm.startPrank(owner);
@@ -90,12 +91,12 @@ contract GiraffeRaceTest is Test {
 
     // ============ Helper Functions ============
     
-    /// @notice Create a race and set odds (simulates bot behavior)
-    function _createRaceAndSetOdds() internal returns (uint256 raceId) {
+    /// @notice Create a race and set probabilities (simulates bot behavior)
+    function _createRaceAndSetProbabilities() internal returns (uint256 raceId) {
         raceId = giraffeRace.createRace();
-        // setOdds requires raceBot
+        // setProbabilities requires raceBot
         vm.prank(bot);
-        giraffeRace.setOdds(raceId, defaultWinOdds, defaultPlaceOdds, defaultShowOdds);
+        giraffeRace.setProbabilities(raceId, defaultWinProb, defaultPlaceProb, defaultShowProb);
     }
 
     // ============ Basic Tests ============
@@ -139,16 +140,16 @@ contract GiraffeRaceTest is Test {
         // Non-raceBot cannot set odds
         vm.prank(user1);
         vm.expectRevert();
-        giraffeRace.setOdds(raceId, defaultWinOdds, defaultPlaceOdds, defaultShowOdds);
+        giraffeRace.setProbabilities(raceId, defaultWinProb, defaultPlaceProb, defaultShowProb);
         
         // treasuryOwner (not raceBot) also cannot set odds
         vm.prank(owner);
         vm.expectRevert();
-        giraffeRace.setOdds(raceId, defaultWinOdds, defaultPlaceOdds, defaultShowOdds);
+        giraffeRace.setProbabilities(raceId, defaultWinProb, defaultPlaceProb, defaultShowProb);
         
         // raceBot can set odds
         vm.prank(bot);
-        giraffeRace.setOdds(raceId, defaultWinOdds, defaultPlaceOdds, defaultShowOdds);
+        giraffeRace.setProbabilities(raceId, defaultWinProb, defaultPlaceProb, defaultShowProb);
         
         // treasuryOwner can change raceBot
         address newBot = address(0x999);
@@ -241,13 +242,13 @@ contract GiraffeRaceTest is Test {
         assertFalse(cancelled);
     }
     
-    function test_SetOdds() public {
+    function test_SetProbabilities() public {
         vm.prank(owner);
         uint256 raceId = giraffeRace.createRace();
         
-        // Set odds (as raceBot)
+        // Set probabilities (as raceBot) - contract converts to odds with house edge
         vm.prank(bot);
-        giraffeRace.setOdds(raceId, defaultWinOdds, defaultPlaceOdds, defaultShowOdds);
+        giraffeRace.setProbabilities(raceId, defaultWinProb, defaultPlaceProb, defaultShowProb);
         
         // Check odds are set
         (bool settled, bool oddsSet, bool cancelled) = giraffeRace.getRaceFlagsById(raceId);
@@ -260,17 +261,17 @@ contract GiraffeRaceTest is Test {
         assertTrue(bettingCloseBlock > block.number);
     }
     
-    function test_SetOddsFailsAfterDeadline() public {
+    function test_SetProbabilitiesFailsAfterDeadline() public {
         vm.prank(owner);
         uint256 raceId = giraffeRace.createRace();
         
         // Roll past odds deadline (10 blocks)
         vm.roll(block.number + 11);
         
-        // Should fail to set odds (even as raceBot, deadline has passed)
+        // Should fail to set probabilities (even as raceBot, deadline has passed)
         vm.prank(bot);
         vm.expectRevert();
-        giraffeRace.setOdds(raceId, defaultWinOdds, defaultPlaceOdds, defaultShowOdds);
+        giraffeRace.setProbabilities(raceId, defaultWinProb, defaultPlaceProb, defaultShowProb);
     }
     
     function test_CreateRaceWithQueuedGiraffes() public {
@@ -348,7 +349,7 @@ contract GiraffeRaceTest is Test {
         
         // Set odds (as raceBot)
         vm.prank(bot);
-        giraffeRace.setOdds(raceId, defaultWinOdds, defaultPlaceOdds, defaultShowOdds);
+        giraffeRace.setProbabilities(raceId, defaultWinProb, defaultPlaceProb, defaultShowProb);
         
         // Check flags - odds set, betting open
         (settled, oddsSet, cancelled) = giraffeRace.getRaceFlagsById(raceId);
@@ -408,7 +409,7 @@ contract GiraffeRaceTest is Test {
         vm.prank(owner);
         uint256 raceId = giraffeRace.createRace();
         vm.prank(bot);
-        giraffeRace.setOdds(raceId, defaultWinOdds, defaultPlaceOdds, defaultShowOdds);
+        giraffeRace.setProbabilities(raceId, defaultWinProb, defaultPlaceProb, defaultShowProb);
         
         // Roll past original deadline (doesn't matter since odds are set)
         vm.roll(block.number + 11);
@@ -522,14 +523,14 @@ contract GiraffeRaceTest is Test {
         assertEq(action, giraffeRace.BOT_ACTION_CREATE_RACE());
     }
     
-    function test_BotDashboardSetOdds() public {
+    function test_BotDashboardSetProbabilities() public {
         // Create race
         vm.prank(owner);
         giraffeRace.createRace();
         
-        // Should indicate SET_ODDS
+        // Should indicate SET_PROBABILITIES
         (uint8 action, uint256 raceId, uint64 blocksRemaining, uint8[6] memory scores) = giraffeRace.getBotDashboard();
-        assertEq(action, giraffeRace.BOT_ACTION_SET_ODDS());
+        assertEq(action, giraffeRace.BOT_ACTION_SET_PROBABILITIES());
         assertEq(raceId, 0);
         assertTrue(blocksRemaining > 0);
     }
@@ -537,7 +538,7 @@ contract GiraffeRaceTest is Test {
     function test_BotDashboardSettleRace() public {
         // Create race and set odds
         vm.prank(owner);
-        uint256 raceId = _createRaceAndSetOdds();
+        uint256 raceId = _createRaceAndSetProbabilities();
         
         // Roll past betting window
         (, uint64 bettingCloseBlock,) = giraffeRace.getRaceScheduleById(raceId);
@@ -587,7 +588,7 @@ contract GiraffeRaceTest is Test {
     function test_AdminCancelRace() public {
         // Create race and set odds
         vm.prank(owner);
-        uint256 raceId = _createRaceAndSetOdds();
+        uint256 raceId = _createRaceAndSetProbabilities();
 
         // Admin cancels the race
         vm.prank(owner);
@@ -622,7 +623,7 @@ contract GiraffeRaceTest is Test {
         
         // Create first race and set odds - takes first 6
         vm.prank(owner);
-        uint256 raceId1 = _createRaceAndSetOdds();
+        uint256 raceId1 = _createRaceAndSetProbabilities();
         
         // First 6 users should be out of queue
         for (uint8 i = 0; i < 6; i++) {
@@ -644,7 +645,7 @@ contract GiraffeRaceTest is Test {
         
         // Create second race and set odds - takes remaining 2 from queue
         vm.prank(owner);
-        uint256 raceId2 = _createRaceAndSetOdds();
+        uint256 raceId2 = _createRaceAndSetProbabilities();
         
         // All users should be out of queue now
         assertFalse(giraffeRace.isUserInQueue(users[6]));

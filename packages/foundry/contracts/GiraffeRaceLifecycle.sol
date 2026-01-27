@@ -93,17 +93,19 @@ abstract contract GiraffeRaceLifecycle is GiraffeRaceBase {
 
     // ============ Odds Setting ============
 
-    /// @notice Set odds for a race - called by raceBot within odds window
-    /// @dev Opens betting window after odds are set. Only callable by raceBot address.
-    /// @param raceId The race to set odds for
-    /// @param winOddsBps Win odds for each lane in basis points (e.g., 57000 = 5.70x)
-    /// @param placeOddsBps Place odds for each lane in basis points
-    /// @param showOddsBps Show odds for each lane in basis points
-    function setOdds(
+    /// @notice Set probabilities for a race - called by raceBot within odds window
+    /// @dev Converts probabilities to odds on-chain with house edge applied.
+    ///      Opens betting window after odds are calculated and stored.
+    ///      Only callable by raceBot address.
+    /// @param raceId The race to set probabilities for
+    /// @param winProbBps Win probabilities for each lane in basis points (e.g., 1667 = 16.67%)
+    /// @param placeProbBps Place probabilities for each lane in basis points
+    /// @param showProbBps Show probabilities for each lane in basis points
+    function setProbabilities(
         uint256 raceId,
-        uint32[6] calldata winOddsBps,
-        uint32[6] calldata placeOddsBps,
-        uint32[6] calldata showOddsBps
+        uint16[6] calldata winProbBps,
+        uint16[6] calldata placeProbBps,
+        uint16[6] calldata showProbBps
     ) external onlyRaceBot {
         if (raceId >= nextRaceId) revert InvalidRace();
         
@@ -112,26 +114,30 @@ abstract contract GiraffeRaceLifecycle is GiraffeRaceBase {
         if (r.oddsSet) revert OddsAlreadySet();
         if (r.cancelled) revert AlreadyCancelled();
         if (r.settled) revert AlreadySettled();
-        if (block.number > r.oddsDeadlineBlock) revert OddsWindowNotExpired(); // Window expired, must cancel
+        if (block.number > r.oddsDeadlineBlock) revert OddsWindowExpired();
         
-        // Validate all odds meet minimum
+        // Convert probabilities to odds with house edge applied on-chain
+        uint32[6] memory winOdds;
+        uint32[6] memory placeOdds;
+        uint32[6] memory showOdds;
+        
         for (uint8 i = 0; i < LANE_COUNT; ) {
-            if (winOddsBps[i] < MIN_DECIMAL_ODDS_BPS) revert InvalidOdds();
-            if (placeOddsBps[i] < MIN_DECIMAL_ODDS_BPS) revert InvalidOdds();
-            if (showOddsBps[i] < MIN_DECIMAL_ODDS_BPS) revert InvalidOdds();
+            winOdds[i] = OddsLib.probabilityToOdds(winProbBps[i], houseEdgeBps);
+            placeOdds[i] = OddsLib.probabilityToOdds(placeProbBps[i], houseEdgeBps);
+            showOdds[i] = OddsLib.probabilityToOdds(showProbBps[i], houseEdgeBps);
             unchecked { ++i; }
         }
         
-        // Store odds
-        r.decimalOddsBps = winOddsBps;
-        r.placeOddsBps = placeOddsBps;
-        r.showOddsBps = showOddsBps;
+        // Store calculated odds
+        r.decimalOddsBps = winOdds;
+        r.placeOddsBps = placeOdds;
+        r.showOddsBps = showOdds;
         r.oddsSet = true;
         
         // Open betting window
         r.bettingCloseBlock = uint64(block.number) + BETTING_WINDOW_BLOCKS;
         
-        emit RaceOddsSet(raceId, winOddsBps, placeOddsBps, showOddsBps, r.bettingCloseBlock);
+        emit RaceProbabilitiesSet(raceId, winProbBps, placeProbBps, showProbBps, winOdds, placeOdds, showOdds, r.bettingCloseBlock);
     }
 
     // ============ Race Cancellation ============
