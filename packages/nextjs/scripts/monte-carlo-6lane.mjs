@@ -1,7 +1,7 @@
 import os from "node:os";
 
 /**
- * CLI Monte Carlo probability calculator for 6-lane giraffe races.
+ * CLI Monte Carlo probability calculator for 6-lane raffe races.
  * Outputs raw Win, Place, and Show probabilities for each lane in basis points.
  * These probabilities are meant to be committed on-chain; the contract applies house edge.
  *

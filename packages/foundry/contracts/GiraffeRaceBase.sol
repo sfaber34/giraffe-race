@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import { GiraffeRaceSimulator } from "./GiraffeRaceSimulator.sol";
+import { RaffeRaceSimulator } from "./RaffeRaceSimulator.sol";
 import { HouseTreasury } from "./HouseTreasury.sol";
-import { GiraffeRaceConstants as C } from "./libraries/GiraffeRaceConstants.sol";
+import { RaffeRaceConstants as C } from "./libraries/RaffeRaceConstants.sol";
 import { IERC721 } from "../lib/openzeppelin-contracts/contracts/token/ERC721/IERC721.sol";
 
-/// @notice Interface for GiraffeNFT with stat accessors
-interface IGiraffeNFT is IERC721 {
+/// @notice Interface for RaffeNFT with stat accessors
+interface IRaffeNFT is IERC721 {
     function zipOf(uint256 tokenId) external view returns (uint8);
     function moxieOf(uint256 tokenId) external view returns (uint8);
     function hustleOf(uint256 tokenId) external view returns (uint8);
@@ -15,17 +15,17 @@ interface IGiraffeNFT is IERC721 {
 }
 
 /**
- * @title GiraffeRaceBase
+ * @title RaffeRaceBase
  * @notice Base contract with shared state, constants, events, errors, and modifiers
- * @dev All GiraffeRace modules inherit from this contract.
+ * @dev All RaffeRace modules inherit from this contract.
  *      
  *      NOTE: Solidity requires literal values for array sizes in function signatures
  *      and struct definitions. Constants here use literals that MUST match 
- *      GiraffeRaceConstants. The _verifyConstants() function checks this.
+ *      RaffeRaceConstants. The _verifyConstants() function checks this.
  */
-abstract contract GiraffeRaceBase {
+abstract contract RaffeRaceBase {
     // ============ Constants ============
-    // Literals required for array sizes in structs - verified to match GiraffeRaceConstants
+    // Literals required for array sizes in structs - verified to match RaffeRaceConstants
     
     uint8 public constant LANE_COUNT = 6;
     uint16 public constant TRACK_LENGTH = 1000;
@@ -59,7 +59,7 @@ abstract contract GiraffeRaceBase {
     uint8 public constant CLAIM_STATUS_WIN = 3;
     uint8 public constant CLAIM_STATUS_REFUND = 4;
 
-    /// @dev Verify local constants match GiraffeRaceConstants. Called in tests.
+    /// @dev Verify local constants match RaffeRaceConstants. Called in tests.
     function _verifyConstants() internal pure {
         assert(LANE_COUNT == C.LANE_COUNT);
         assert(TRACK_LENGTH == C.TRACK_LENGTH);
@@ -118,7 +118,7 @@ abstract contract GiraffeRaceBase {
         uint16[6] finalDistances;
     }
 
-    struct RaceGiraffes {
+    struct RaceRaffes {
         uint8 assignedCount;
         uint256[6] tokenIds;
         address[6] originalOwners;
@@ -168,8 +168,8 @@ abstract contract GiraffeRaceBase {
     // ============ State Variables ============
     
     // External contract references
-    IGiraffeNFT public giraffeNft;
-    GiraffeRaceSimulator public simulator;
+    IRaffeNFT public raffeNft;
+    RaffeRaceSimulator public simulator;
     HouseTreasury public treasury;
     
     // Admin
@@ -178,8 +178,8 @@ abstract contract GiraffeRaceBase {
     uint16 public houseEdgeBps;
     uint256 public maxBetAmount;
     
-    // House giraffes for auto-fill
-    uint256[6] public houseGiraffeTokenIds;
+    // House raffes for auto-fill
+    uint256[6] public houseRaffeTokenIds;
     
     // Race state
     uint256 public nextRaceId;
@@ -198,7 +198,7 @@ abstract contract GiraffeRaceBase {
     // Mappings
     mapping(uint256 => Race) internal _races;
     mapping(uint256 => mapping(address => UserRaceBets)) internal _userBets;
-    mapping(uint256 => RaceGiraffes) internal _raceGiraffes;
+    mapping(uint256 => RaceRaffes) internal _raceRaffes;
     mapping(uint256 => uint8[6]) internal _raceScore;
     
     // User bet history
@@ -221,8 +221,8 @@ abstract contract GiraffeRaceBase {
     error RaceNotReady();
     error NotWinner();
     error AlreadyClaimed();
-    error InvalidHouseGiraffe();
-    error GiraffeNotAssigned();
+    error InvalidHouseRaffe();
+    error RaffeNotAssigned();
     error NotTokenOwner();
     error PreviousRaceNotSettled();
     error CooldownNotElapsed();
@@ -243,7 +243,7 @@ abstract contract GiraffeRaceBase {
     error NotInQueue();
     error QueueFull();
     error TokenAlreadyQueued();
-    error CannotQueueHouseGiraffe();
+    error CannotQueueHouseRaffe();
 
     // ============ Events ============
     
@@ -263,8 +263,8 @@ abstract contract GiraffeRaceBase {
     event RaceSettled(uint256 indexed raceId, bytes32 seed, uint8 winner);
     event RaceSettledDeadHeat(uint256 indexed raceId, bytes32 seed, uint8 deadHeatCount, uint8[6] winners);
     event Claimed(uint256 indexed raceId, address indexed bettor, uint256 payout);
-    event GiraffeAssigned(uint256 indexed raceId, uint256 indexed tokenId, address indexed originalOwner, uint8 lane);
-    event HouseGiraffeAssigned(uint256 indexed raceId, uint256 indexed tokenId, uint8 lane);
+    event RaffeAssigned(uint256 indexed raceId, uint256 indexed tokenId, address indexed originalOwner, uint8 lane);
+    event HouseRaffeAssigned(uint256 indexed raceId, uint256 indexed tokenId, uint8 lane);
     event HouseEdgeUpdated(uint16 oldEdgeBps, uint16 newEdgeBps);
     event MaxBetUpdated(uint256 oldMaxBet, uint256 newMaxBet);
     event RaceBotUpdated(address oldBot, address newBot);

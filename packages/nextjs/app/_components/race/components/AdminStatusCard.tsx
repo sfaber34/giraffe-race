@@ -7,8 +7,8 @@ import { formatUnits } from "viem";
 
 interface AdminStatusCardProps {
   // Contract state
-  isGiraffeRaceLoading: boolean;
-  giraffeRaceContract: any;
+  isRaffeRaceLoading: boolean;
+  raffeRaceContract: any;
   treasuryContract: any;
   usdcContract: any;
 
@@ -50,8 +50,8 @@ interface AdminStatusCardProps {
 }
 
 export const AdminStatusCard = ({
-  isGiraffeRaceLoading,
-  giraffeRaceContract,
+  isRaffeRaceLoading,
+  raffeRaceContract,
   treasuryContract,
   usdcContract,
   status,
@@ -85,15 +85,11 @@ export const AdminStatusCard = ({
         <div className="flex items-center justify-between">
           <h2 className="card-title">Race status</h2>
           <div className="text-xs opacity-70">
-            {isGiraffeRaceLoading
-              ? "Checking contract…"
-              : giraffeRaceContract
-                ? "GiraffeRace deployed"
-                : "Not deployed"}
+            {isRaffeRaceLoading ? "Checking contract…" : raffeRaceContract ? "RaffeRace deployed" : "Not deployed"}
           </div>
         </div>
 
-        {!giraffeRaceContract ? (
+        {!raffeRaceContract ? (
           <div className="alert alert-info">
             <span className="text-sm">Deploy the contracts first (`yarn chain` + `yarn deploy`).</span>
           </div>
@@ -202,7 +198,7 @@ export const AdminStatusCard = ({
           <div className="flex flex-wrap gap-2">
             <button
               className="btn btn-sm btn-primary"
-              disabled={!giraffeRaceContract || activeRaceExists || isInCooldown || !isViewingLatest}
+              disabled={!raffeRaceContract || activeRaceExists || isInCooldown || !isViewingLatest}
               onClick={onCreateRace}
             >
               {isInCooldown && cooldownStatus
@@ -211,7 +207,7 @@ export const AdminStatusCard = ({
             </button>
             <button
               className="btn btn-sm btn-outline"
-              disabled={!giraffeRaceContract || !canSettle || !isViewingLatest}
+              disabled={!raffeRaceContract || !canSettle || !isViewingLatest}
               onClick={onSettleRace}
             >
               Settle race

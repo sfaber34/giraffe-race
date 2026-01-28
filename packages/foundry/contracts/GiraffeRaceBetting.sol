@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import { GiraffeRaceBase } from "./GiraffeRaceBase.sol";
+import { RaffeRaceBase } from "./RaffeRaceBase.sol";
 import { ClaimLib } from "./libraries/ClaimLib.sol";
 import { SettlementLib } from "./libraries/SettlementLib.sol";
 
 /**
- * @title GiraffeRaceBetting
+ * @title RaffeRaceBetting
  * @notice Handles bet placement and claim processing for Win/Place/Show bets
  * @dev Manages user bets and payouts with dead heat rules
  */
-abstract contract GiraffeRaceBetting is GiraffeRaceBase {
+abstract contract RaffeRaceBetting is RaffeRaceBase {
     // ============ Bet Placement ============
 
     /// @notice Place a bet on a lane for the current active race
@@ -382,7 +382,7 @@ abstract contract GiraffeRaceBetting is GiraffeRaceBase {
                     out.raceId = rid;
                     out.status = CLAIM_STATUS_WIN;
                     out.betLane = ub.winBet.lane;
-                    out.betTokenId = _raceGiraffes[rid].tokenIds[ub.winBet.lane];
+                    out.betTokenId = _raceRaffes[rid].tokenIds[ub.winBet.lane];
                     out.betAmount = ub.winBet.amount;
                     out.winner = r.winner;
                     out.payout = ClaimLib.calculatePayout(uint256(ub.winBet.amount), r.decimalOddsBps[ub.winBet.lane], r.firstPlace.count);
@@ -401,7 +401,7 @@ abstract contract GiraffeRaceBetting is GiraffeRaceBase {
                     out.raceId = rid;
                     out.status = CLAIM_STATUS_WIN;
                     out.betLane = ub.placeBet.lane;
-                    out.betTokenId = _raceGiraffes[rid].tokenIds[ub.placeBet.lane];
+                    out.betTokenId = _raceRaffes[rid].tokenIds[ub.placeBet.lane];
                     out.betAmount = ub.placeBet.amount;
                     out.winner = r.winner;
                     out.payout = ClaimLib.calculatePayout(uint256(ub.placeBet.amount), r.placeOddsBps[ub.placeBet.lane], dh);
@@ -421,7 +421,7 @@ abstract contract GiraffeRaceBetting is GiraffeRaceBase {
                     out.raceId = rid;
                     out.status = CLAIM_STATUS_WIN;
                     out.betLane = ub.showBet.lane;
-                    out.betTokenId = _raceGiraffes[rid].tokenIds[ub.showBet.lane];
+                    out.betTokenId = _raceRaffes[rid].tokenIds[ub.showBet.lane];
                     out.betAmount = ub.showBet.amount;
                     out.winner = r.winner;
                     out.payout = ClaimLib.calculatePayout(uint256(ub.showBet.amount), r.showOddsBps[ub.showBet.lane], dh);
@@ -452,7 +452,7 @@ abstract contract GiraffeRaceBetting is GiraffeRaceBase {
                     out.raceId = rid;
                     out.status = CLAIM_STATUS_REFUND;
                     out.betLane = ub.winBet.lane;
-                    out.betTokenId = _raceGiraffes[rid].tokenIds[ub.winBet.lane];
+                    out.betTokenId = _raceRaffes[rid].tokenIds[ub.winBet.lane];
                     out.betAmount = ub.winBet.amount;
                     out.payout = uint256(ub.winBet.amount);
                     out.bettingCloseBlock = cb;
@@ -483,7 +483,7 @@ abstract contract GiraffeRaceBetting is GiraffeRaceBase {
                     out.raceId = rid;
                     out.status = isWin ? CLAIM_STATUS_WIN : CLAIM_STATUS_LOSS;
                     out.betLane = ub.winBet.lane;
-                    out.betTokenId = _raceGiraffes[rid].tokenIds[ub.winBet.lane];
+                    out.betTokenId = _raceRaffes[rid].tokenIds[ub.winBet.lane];
                     out.betAmount = ub.winBet.amount;
                     out.winner = r.winner;
                     out.payout = isWin ? ClaimLib.calculatePayout(uint256(ub.winBet.amount), r.decimalOddsBps[ub.winBet.lane], r.firstPlace.count) : 0;

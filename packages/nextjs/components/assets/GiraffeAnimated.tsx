@@ -4,16 +4,16 @@ import { memo, useEffect, useMemo, useRef, useState } from "react";
 import type { Hex } from "viem";
 import { isHex } from "viem";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
-import { DEFAULT_GIRAFFE_PALETTE, giraffePaletteFromSeed } from "~~/utils/nft/giraffePalette";
+import { DEFAULT_RAFFE_PALETTE, raffePaletteFromSeed } from "~~/utils/nft/raffePalette";
 
 type Props = {
   /**
-   * Used to namespace SVG ids (clipPath/mask/etc) so multiple giraffes can be rendered safely.
+   * Used to namespace SVG ids (clipPath/mask/etc) so multiple raffes can be rendered safely.
    * Must be stable for the lifetime of the component instance.
    */
   idPrefix: string;
   /**
-   * If provided, we will read `seedOf(tokenId)` from the GiraffeNFT contract and apply seed-based palette rules.
+   * If provided, we will read `seedOf(tokenId)` from the RaffeNFT contract and apply seed-based palette rules.
    */
   tokenId?: bigint;
   /**
@@ -40,16 +40,16 @@ type Props = {
   className?: string;
 };
 
-let giraffeSvgTextPromise: Promise<string> | null = null;
+let raffeSvgTextPromise: Promise<string> | null = null;
 
-async function fetchGiraffeSvgText(): Promise<string> {
-  if (!giraffeSvgTextPromise) {
-    giraffeSvgTextPromise = fetch("/giraffe_animated.svg").then(async r => {
-      if (!r.ok) throw new Error(`Failed to fetch giraffe SVG: ${r.status}`);
+async function fetchRaffeSvgText(): Promise<string> {
+  if (!raffeSvgTextPromise) {
+    raffeSvgTextPromise = fetch("/raffe_animated.svg").then(async r => {
+      if (!r.ok) throw new Error(`Failed to fetch raffe SVG: ${r.status}`);
       return await r.text();
     });
   }
-  return await giraffeSvgTextPromise;
+  return await raffeSvgTextPromise;
 }
 
 function decodeEmbeddedCssImport(svg: string): string {
@@ -137,12 +137,12 @@ function applyHexReplacements(svg: string, replacements: Record<string, string>)
 function addRuntimeOverrides(svg: string): string {
   // Add a class so our override styles can be scoped to this SVG only.
   // Also add play-state overrides that are driven by CSS variables from the wrapper (fallback).
-  const classed = svg.replace(/<svg\b/, `<svg class="giraffe-svg" preserveAspectRatio="xMidYMid meet"`);
+  const classed = svg.replace(/<svg\b/, `<svg class="raffe-svg" preserveAspectRatio="xMidYMid meet"`);
 
   const overrideStyle = `
 <style><![CDATA[
-svg.giraffe-svg * {
-  animation-play-state: var(--giraffe-anim-state, running) !important;
+svg.raffe-svg * {
+  animation-play-state: var(--raffe-anim-state, running) !important;
 }
 ]]></style>`;
 
@@ -152,7 +152,7 @@ svg.giraffe-svg * {
   return classed.slice(0, insertPoint + 1) + overrideStyle + classed.slice(insertPoint + 1);
 }
 
-export const GiraffeAnimated = memo(function GiraffeAnimated({
+export const RaffeAnimated = memo(function RaffeAnimated({
   idPrefix,
   tokenId,
   seed,
@@ -173,7 +173,7 @@ export const GiraffeAnimated = memo(function GiraffeAnimated({
   // Determine if we need to fetch the seed from the contract
   const needsSeedFromContract = tokenId !== undefined && tokenId !== 0n && seed === undefined;
   const { data: seedData } = useScaffoldReadContract({
-    contractName: "GiraffeNFT",
+    contractName: "RaffeNFT",
     functionName: "seedOf",
     args: [needsSeedFromContract ? tokenId : undefined],
     query: { enabled: needsSeedFromContract },
@@ -199,23 +199,23 @@ export const GiraffeAnimated = memo(function GiraffeAnimated({
 
     let cancelled = false;
     (async () => {
-      const raw = await fetchGiraffeSvgText();
+      const raw = await fetchRaffeSvgText();
       const decoded = decodeEmbeddedCssImport(raw);
       const colorized = resolvedSeed
         ? (() => {
-            const palette = giraffePaletteFromSeed(resolvedSeed);
+            const palette = raffePaletteFromSeed(resolvedSeed);
             return applyHexReplacements(decoded, {
-              [DEFAULT_GIRAFFE_PALETTE.body]: palette.body,
-              [DEFAULT_GIRAFFE_PALETTE.faceHighlight]: palette.faceHighlight,
-              [DEFAULT_GIRAFFE_PALETTE.spots]: palette.spots,
-              [DEFAULT_GIRAFFE_PALETTE.accentDark]: palette.accentDark,
-              [DEFAULT_GIRAFFE_PALETTE.legs]: palette.legs,
-              [DEFAULT_GIRAFFE_PALETTE.tailStroke]: palette.tailStroke,
-              [DEFAULT_GIRAFFE_PALETTE.tailBall]: palette.tailBall,
-              [DEFAULT_GIRAFFE_PALETTE.feet]: palette.feet,
-              [DEFAULT_GIRAFFE_PALETTE.hornCircles]: palette.hornCircles,
-              [DEFAULT_GIRAFFE_PALETTE.eyePupil]: palette.eyePupil,
-              [DEFAULT_GIRAFFE_PALETTE.eyeWhite]: palette.eyeWhite,
+              [DEFAULT_RAFFE_PALETTE.body]: palette.body,
+              [DEFAULT_RAFFE_PALETTE.faceHighlight]: palette.faceHighlight,
+              [DEFAULT_RAFFE_PALETTE.spots]: palette.spots,
+              [DEFAULT_RAFFE_PALETTE.accentDark]: palette.accentDark,
+              [DEFAULT_RAFFE_PALETTE.legs]: palette.legs,
+              [DEFAULT_RAFFE_PALETTE.tailStroke]: palette.tailStroke,
+              [DEFAULT_RAFFE_PALETTE.tailBall]: palette.tailBall,
+              [DEFAULT_RAFFE_PALETTE.feet]: palette.feet,
+              [DEFAULT_RAFFE_PALETTE.hornCircles]: palette.hornCircles,
+              [DEFAULT_RAFFE_PALETTE.eyePupil]: palette.eyePupil,
+              [DEFAULT_RAFFE_PALETTE.eyeWhite]: palette.eyeWhite,
             });
           })()
         : decoded;
@@ -254,7 +254,7 @@ export const GiraffeAnimated = memo(function GiraffeAnimated({
     let attemptsLeft = 10;
 
     const tryCapture = () => {
-      const svg = host.querySelector("svg.giraffe-svg");
+      const svg = host.querySelector("svg.raffe-svg");
       if (svg) {
         try {
           // subtree:true captures descendant CSS animations too.
@@ -297,7 +297,7 @@ export const GiraffeAnimated = memo(function GiraffeAnimated({
     let anims = animationsRef.current;
     if (!anims.length) {
       const host = hostRef.current;
-      const svg = host?.querySelector("svg.giraffe-svg");
+      const svg = host?.querySelector("svg.raffe-svg");
       if (svg) {
         try {
           anims = svg.getAnimations({ subtree: true });
@@ -357,7 +357,7 @@ export const GiraffeAnimated = memo(function GiraffeAnimated({
       let anims = animationsRef.current;
       if (!anims.length) {
         const host = hostRef.current;
-        const svg = host?.querySelector("svg.giraffe-svg");
+        const svg = host?.querySelector("svg.raffe-svg");
         if (svg) {
           try {
             anims = svg.getAnimations({ subtree: true });
@@ -403,7 +403,7 @@ export const GiraffeAnimated = memo(function GiraffeAnimated({
     let anims = animationsRef.current;
     if (!anims.length) {
       const host = hostRef.current;
-      const svg = host?.querySelector("svg.giraffe-svg");
+      const svg = host?.querySelector("svg.raffe-svg");
       if (svg) {
         try {
           anims = svg.getAnimations({ subtree: true });
@@ -431,7 +431,7 @@ export const GiraffeAnimated = memo(function GiraffeAnimated({
 
   const wrapperStyle = useMemo(() => {
     return {
-      ["--giraffe-anim-state" as any]: playing ? "running" : "paused",
+      ["--raffe-anim-state" as any]: playing ? "running" : "paused",
       width: `${sizePx}px`,
       height: `${sizePx}px`,
       // Force GPU compositing to fix Chrome bug where CSS animations don't start

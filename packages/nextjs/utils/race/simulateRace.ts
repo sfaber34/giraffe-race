@@ -45,7 +45,7 @@ const scoreBps = (score: number) => {
 };
 
 /**
- * OPTIMIZED: Uses direct modulo (matches new Solidity GiraffeRaceSimulator).
+ * OPTIMIZED: Uses direct modulo (matches new Solidity RaffeRaceSimulator).
  * One keccak256 per tick, direct byte extraction + modulo.
  *
  * Entropy layout per tick (32 bytes):

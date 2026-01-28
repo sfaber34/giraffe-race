@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import { GiraffeRaceConstants as C } from "./GiraffeRaceConstants.sol";
+import { RaffeRaceConstants as C } from "./RaffeRaceConstants.sol";
 
 /**
  * @title OddsLib

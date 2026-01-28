@@ -2,12 +2,12 @@ import type { Hex } from "viem";
 import { DeterministicDice } from "~~/utils/race/deterministicDice";
 
 /**
- * Color slots for the giraffe SVG.
+ * Color slots for the raffe SVG.
  *
  * IMPORTANT: these values are intentionally the current/default SVG colors so rendering is unchanged until
  * you start iterating on palette rules.
  *
- * The initial SVG uses these notable colors (from `public/giraffe_animated.svg`):
+ * The initial SVG uses these notable colors (from `public/raffe_animated.svg`):
  * - #e8b84a: body / head base
  * - #f5d76e: lighter face highlight
  * - #b8862f: legs / tail base
@@ -18,7 +18,7 @@ import { DeterministicDice } from "~~/utils/race/deterministicDice";
  * - #fff: eye white + highlights
  */
 
-export type GiraffePalette = {
+export type RaffePalette = {
   body: string;
   faceHighlight: string;
   legs: string;
@@ -32,7 +32,7 @@ export type GiraffePalette = {
   eyeWhite: string;
 };
 
-export const DEFAULT_GIRAFFE_PALETTE: GiraffePalette = {
+export const DEFAULT_RAFFE_PALETTE: RaffePalette = {
   body: "#e8b84a",
   faceHighlight: "#f5d76e",
   legs: "#b8862f",
@@ -56,7 +56,7 @@ export const DEFAULT_GIRAFFE_PALETTE: GiraffePalette = {
  * - faceHighlight: lighter, slightly less saturated shade of body (same hue)
  * - everything else: defaults for now
  */
-export function giraffePaletteFromSeed(seed: Hex): GiraffePalette {
+export function raffePaletteFromSeed(seed: Hex): RaffePalette {
   const dice = new DeterministicDice(seed);
 
   // Bounded HSL to avoid extreme neon/dark colors.
@@ -151,7 +151,7 @@ export function giraffePaletteFromSeed(seed: Hex): GiraffePalette {
   const eyePupil = pickEyePupilColor(dice);
 
   return {
-    ...DEFAULT_GIRAFFE_PALETTE,
+    ...DEFAULT_RAFFE_PALETTE,
     body,
     faceHighlight,
     spots,

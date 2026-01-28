@@ -3,7 +3,7 @@
 import { CooldownStatus, ParsedFinishOrder, ParsedRace, ParsedSchedule, RaceStatus } from "../types";
 import { BlockCountdownBar } from "./BlockCountdownBar";
 import { LaneName } from "./LaneName";
-import { GiraffeAnimated } from "~~/components/assets/GiraffeAnimated";
+import { RaffeAnimated } from "~~/components/assets/RaffeAnimated";
 
 /* ─────────────────────────────────────────────────────────────────────────────
  * RaceResultsOverlay - Reusable component for showing race finish results
@@ -50,7 +50,7 @@ const RaceResultsOverlay = ({
                 return (
                   <div key={lane} className="flex items-center gap-1.5">
                     {idx > 0 && <span className="opacity-50">,</span>}
-                    <GiraffeAnimated
+                    <RaffeAnimated
                       idPrefix={`${idPrefix}-1st-${raceIdStr}-${lane}`}
                       tokenId={tokenId}
                       playbackRate={1}
@@ -75,7 +75,7 @@ const RaceResultsOverlay = ({
                 return (
                   <div key={lane} className="flex items-center gap-1.5">
                     {idx > 0 && <span className="opacity-50">,</span>}
-                    <GiraffeAnimated
+                    <RaffeAnimated
                       idPrefix={`${idPrefix}-2nd-${raceIdStr}-${lane}`}
                       tokenId={tokenId}
                       playbackRate={1}
@@ -100,7 +100,7 @@ const RaceResultsOverlay = ({
                 return (
                   <div key={lane} className="flex items-center gap-1.5">
                     {idx > 0 && <span className="opacity-50">,</span>}
-                    <GiraffeAnimated
+                    <RaffeAnimated
                       idPrefix={`${idPrefix}-3rd-${raceIdStr}-${lane}`}
                       tokenId={tokenId}
                       playbackRate={1}
@@ -120,7 +120,7 @@ const RaceResultsOverlay = ({
         // Fallback to just winner if no finish order data
         <div className="text-lg font-semibold text-base-content/70 flex items-center gap-2">
           <span>Winner:</span>
-          <GiraffeAnimated
+          <RaffeAnimated
             idPrefix={`${idPrefix}-winner-${raceIdStr}-${parsed.winner}`}
             tokenId={laneTokenIds[parsed.winner] ?? 0n}
             playbackRate={1}

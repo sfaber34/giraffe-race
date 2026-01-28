@@ -5,7 +5,7 @@ const DEFAULTS = {
   trackHeight: 328,
   trackBaseY: 164,
   trackVerticalSpread: 198,
-  giraffeSize: 100,
+  raffeSize: 100,
   worldPaddingLeft: 100,
   worldPaddingRight: 140,
   cameraStartX: 0,
@@ -16,7 +16,7 @@ export interface TrackDimensions {
   trackHeight: number;
   trackBaseY: number;
   trackVerticalSpread: number;
-  giraffeSize: number;
+  raffeSize: number;
   worldPaddingLeft: number;
   worldPaddingRight: number;
   cameraStartX: number;
@@ -45,7 +45,7 @@ export function useTrackDimensions(): TrackDimensions {
       trackHeight: parseVar("--track-height", DEFAULTS.trackHeight),
       trackBaseY: parseVar("--track-base-y", DEFAULTS.trackBaseY),
       trackVerticalSpread: parseVar("--track-vertical-spread", DEFAULTS.trackVerticalSpread),
-      giraffeSize: parseVar("--giraffe-size", DEFAULTS.giraffeSize),
+      raffeSize: parseVar("--raffe-size", DEFAULTS.raffeSize),
       worldPaddingLeft: parseVar("--world-padding-left", DEFAULTS.worldPaddingLeft),
       worldPaddingRight: parseVar("--world-padding-right", DEFAULTS.worldPaddingRight),
       cameraStartX: parseVar("--camera-start-x", DEFAULTS.cameraStartX),

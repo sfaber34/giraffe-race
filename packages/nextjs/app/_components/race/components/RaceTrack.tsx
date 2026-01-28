@@ -3,9 +3,9 @@
 import React, { memo } from "react";
 import { BASE_REPLAY_SPEED_MULTIPLIER, LANE_COUNT, PX_PER_UNIT, SPEED_RANGE, TRACK_LENGTH } from "../constants";
 import { TrackDimensions } from "../hooks/useTrackDimensions";
-import { MyBets, ParsedGiraffes, PlaybackSpeed } from "../types";
+import { MyBets, ParsedRaffes, PlaybackSpeed } from "../types";
 import { LaneName } from "./LaneName";
-import { GiraffeAnimated } from "~~/components/assets/GiraffeAnimated";
+import { RaffeAnimated } from "~~/components/assets/RaffeAnimated";
 
 interface RaceTrackProps {
   // Viewport refs
@@ -17,7 +17,7 @@ interface RaceTrackProps {
   // Race state
   simulation: unknown | null;
   lineupFinalized: boolean;
-  parsedGiraffes: ParsedGiraffes | null;
+  parsedRaffes: ParsedRaffes | null;
   currentDistances: number[];
   prevDistances: number[];
 
@@ -34,7 +34,7 @@ interface RaceTrackProps {
 }
 
 /**
- * Compute Y position for a giraffe based on lane index.
+ * Compute Y position for a raffe based on lane index.
  * Creates depth illusion: lane 0 at top (furthest), lane 5 at bottom (closest).
  */
 const getLaneY = (laneIndex: number, trackBaseY: number, trackVerticalSpread: number): number => {
@@ -51,7 +51,7 @@ const getLaneZIndex = (laneIndex: number): number => {
 };
 
 /**
- * Get scale factor for giraffes. All same size for cartoon style.
+ * Get scale factor for raffes. All same size for cartoon style.
  */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const getLaneScale = (_laneIndex: number): number => 1.0;
@@ -61,7 +61,7 @@ export const RaceTrack = memo(function RaceTrack({
   dimensions,
   simulation,
   lineupFinalized,
-  parsedGiraffes,
+  parsedRaffes,
   currentDistances,
   prevDistances,
   isPlaying,
@@ -72,7 +72,7 @@ export const RaceTrack = memo(function RaceTrack({
   svgResetNonce,
   myBets,
 }: RaceTrackProps) {
-  const { trackBaseY, trackVerticalSpread, giraffeSize, worldPaddingLeft } = dimensions;
+  const { trackBaseY, trackVerticalSpread, raffeSize, worldPaddingLeft } = dimensions;
 
   return (
     <>
@@ -162,7 +162,7 @@ export const RaceTrack = memo(function RaceTrack({
               })}
             </div>
 
-            {/* Giraffes - all on same track with depth staggering */}
+            {/* Raffes - all on same track with depth staggering */}
             {simulation || lineupFinalized
               ? Array.from({ length: LANE_COUNT })
                   // Sort by lane index so back lanes render first (painter's algorithm)
@@ -187,9 +187,9 @@ export const RaceTrack = memo(function RaceTrack({
                       ? MIN_ANIMATION_SPEED_FACTOR + t * (MAX_ANIMATION_SPEED_FACTOR - MIN_ANIMATION_SPEED_FACTOR)
                       : 1;
 
-                    // Allow giraffes to run past the finish line to their actual distances
+                    // Allow raffes to run past the finish line to their actual distances
                     // Distance is in race units, convert to pixels directly (no upper clamp)
-                    const x = worldPaddingLeft + Math.max(0, d) * PX_PER_UNIT - giraffeSize / 2;
+                    const x = worldPaddingLeft + Math.max(0, d) * PX_PER_UNIT - raffeSize / 2;
                     const y = getLaneY(i, trackBaseY, trackVerticalSpread);
                     const scale = getLaneScale(i);
                     const zIndex = getLaneZIndex(i);
@@ -208,21 +208,21 @@ export const RaceTrack = memo(function RaceTrack({
                         }}
                       >
                         <div className="relative">
-                          <GiraffeAnimated
+                          <RaffeAnimated
                             idPrefix={`lane-${i}`}
-                            tokenId={parsedGiraffes?.tokenIds?.[i] ?? 0n}
+                            tokenId={parsedRaffes?.tokenIds?.[i] ?? 0n}
                             playbackRate={speedFactor}
                             resetNonce={svgResetNonce}
                             playing={simulation ? isPlaying && raceStarted && frame < lastFrameIndex : false}
-                            sizePx={giraffeSize}
+                            sizePx={raffeSize}
                           />
-                          {/* Name label - positioned to the right of the giraffe's face */}
-                          {parsedGiraffes?.tokenIds?.[i] ? (
+                          {/* Name label - positioned to the right of the raffe's face */}
+                          {parsedRaffes?.tokenIds?.[i] ? (
                             <div
                               className="absolute pointer-events-none select-none whitespace-nowrap"
                               style={{
-                                left: `${giraffeSize * 1.05}px`,
-                                top: `${giraffeSize * 0.1}px`,
+                                left: `${raffeSize * 1.05}px`,
+                                top: `${raffeSize * 0.1}px`,
                               }}
                             >
                               <span
@@ -231,7 +231,7 @@ export const RaceTrack = memo(function RaceTrack({
                                   textShadow: "0 1px 2px rgba(0,0,0,0.1)",
                                 }}
                               >
-                                <LaneName tokenId={parsedGiraffes.tokenIds[i]} fallback={`#${i + 1}`} />
+                                <LaneName tokenId={parsedRaffes.tokenIds[i]} fallback={`#${i + 1}`} />
                                 {(hasWinBet || hasPlaceBet || hasShowBet) && (
                                   <span className="font-bold">
                                     (

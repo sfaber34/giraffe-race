@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import { GiraffeRaceBase } from "./GiraffeRaceBase.sol";
+import { RaffeRaceBase } from "./RaffeRaceBase.sol";
 
 /**
- * @title GiraffeRaceViews
- * @notice Read-only functions for race state, giraffe assignments, and simulation
+ * @title RaffeRaceViews
+ * @notice Read-only functions for race state, raffe assignments, and simulation
  * @dev Consolidates all view functions for UI/bot consumption
  */
-abstract contract GiraffeRaceViews is GiraffeRaceBase {
+abstract contract RaffeRaceViews is RaffeRaceBase {
     // ============ Bot Action Enum ============
     
     /// @notice Actions the bot should take
@@ -219,9 +219,9 @@ abstract contract GiraffeRaceViews is GiraffeRaceBase {
         canSettleNow = !r.settled && !r.cancelled && r.oddsSet && settleTimeReached && settleBhAvailable;
     }
 
-    // ============ Giraffe Assignments ============
+    // ============ Raffe Assignments ============
 
-    function getRaceGiraffesById(uint256 raceId)
+    function getRaceRaffesById(uint256 raceId)
         external
         view
         returns (
@@ -230,7 +230,7 @@ abstract contract GiraffeRaceViews is GiraffeRaceBase {
             address[6] memory originalOwners
         )
     {
-        RaceGiraffes storage ra = _raceGiraffes[raceId];
+        RaceRaffes storage ra = _raceRaffes[raceId];
         return (ra.assignedCount, ra.tokenIds, ra.originalOwners);
     }
 

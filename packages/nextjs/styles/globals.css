@@ -109,7 +109,7 @@
   --track-height: 328px;
   --track-base-y: 164px;
   --track-vertical-spread: 198px;
-  --giraffe-size: 100px;
+  --raffe-size: 100px;
   --world-padding-left: 100px;
   --world-padding-right: 140px;
   /* Track length is constant: TRACK_LENGTH (1000) * PX_PER_UNIT (3) = 3000px */
@@ -126,7 +126,7 @@
     --track-height: 650px;
     --track-base-y: 325px;
     --track-vertical-spread: 418px;
-    --giraffe-size: 180px;
+    --raffe-size: 180px;
     --world-padding-left: 180px;
     --world-padding-right: 260px;
     --world-width: calc(var(--world-padding-left) + var(--track-length-px) + var(--world-padding-right));

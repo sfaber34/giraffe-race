@@ -5,7 +5,7 @@ import { IERC20 } from "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC
 
 /**
  * @title HouseTreasury
- * @notice Centralized treasury for the giraffe race betting platform.
+ * @notice Centralized treasury for the raffe race betting platform.
  * @dev Holds USDC bankroll and allows authorized contracts (race contracts) to:
  *      - Collect bets from users
  *      - Pay winners
@@ -62,7 +62,7 @@ contract HouseTreasury {
 
     // ============ Owner Functions ============
 
-    /// @notice Authorize a contract (e.g., GiraffeRace) to collect bets and pay winners.
+    /// @notice Authorize a contract (e.g., RaffeRace) to collect bets and pay winners.
     function authorize(address contractAddr) external onlyOwner {
         if (contractAddr == address(0)) revert ZeroAddress();
         authorizedContracts[contractAddr] = true;

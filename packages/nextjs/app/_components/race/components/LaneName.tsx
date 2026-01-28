@@ -10,7 +10,7 @@ interface LaneNameProps {
 export const LaneName = ({ tokenId, fallback }: LaneNameProps) => {
   const enabled = tokenId !== 0n;
   const { data: nameData } = useScaffoldReadContract({
-    contractName: "GiraffeNFT",
+    contractName: "RaffeNFT",
     functionName: "nameOf",
     args: [enabled ? tokenId : undefined],
     query: { enabled },

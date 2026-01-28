@@ -1,4 +1,4 @@
-// Race-related constants - keep in sync with GiraffeRaceConstants.sol
+// Race-related constants - keep in sync with RaffeRaceConstants.sol
 
 export const USDC_DECIMALS = 6;
 export const LANE_COUNT = 6 as const;
@@ -33,16 +33,16 @@ export const PX_PER_UNIT = 3;
 // ============================================================================
 // RESPONSIVE TRACK DIMENSIONS
 // ============================================================================
-// Track height, giraffe size, and vertical spread are now RESPONSIVE.
+// Track height, raffe size, and vertical spread are now RESPONSIVE.
 // - CSS variables defined in globals.css (single source of truth for breakpoints)
 // - useTrackDimensions() hook reads current values for JS calculations
 //
-// Mobile (< 768px): 328px height, 100px giraffe
-// Desktop (>= 768px): 650px height, 140px giraffe
+// Mobile (< 768px): 328px height, 100px raffe
+// Desktop (>= 768px): 650px height, 140px raffe
 //
 // The following constants are FALLBACKS only - use useTrackDimensions() hook instead.
 // ============================================================================
-export const GIRAFFE_SIZE_PX = 100; // Fallback - use dimensions.giraffeSize
+export const RAFFE_SIZE_PX = 100; // Fallback - use dimensions.raffeSize
 export const TRACK_HEIGHT_PX = 328; // Fallback - use dimensions.trackHeight
 export const TRACK_BASE_Y_PX = 164; // Fallback - use dimensions.trackBaseY
 export const TRACK_VERTICAL_SPREAD_PX = 198; // Fallback - use dimensions.trackVerticalSpread

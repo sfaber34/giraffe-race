@@ -25,7 +25,7 @@ export interface ParsedSchedule {
   settledAtBlock: bigint; // Block when race was settled (0 if not settled)
 }
 
-export interface ParsedGiraffes {
+export interface ParsedRaffes {
   assignedCount: number;
   tokenIds: bigint[];
   originalOwners: readonly `0x${string}`[];

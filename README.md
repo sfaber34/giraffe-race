@@ -1,7 +1,7 @@
-# 🦒 Giraffe Race
+# 🦒 Raffe Race
 
 ## What it is
-A deterministic giraffe racing game built on Ethereum using the Diamond pattern (EIP-2535). The game features on-chain race simulation, NFT giraffes with stats, and a USDC-based betting system with fixed odds.
+A deterministic raffe racing game built on Ethereum using the Diamond pattern (EIP-2535). The game features on-chain race simulation, NFT raffes with stats, and a USDC-based betting system with fixed odds.
 
 ## Architecture
 
@@ -10,12 +10,12 @@ The smart contracts use the **Diamond Pattern** for modularity and upgradeabilit
 - `AdminFacet.sol` - House edge, max bet configuration
 - `RaceLifecycleFacet.sol` - Race creation, finalization, settlement
 - `BettingFacet.sol` - Bet placement and claims
-- `GiraffeSubmissionFacet.sol` - NFT submission for races
+- `RaffeSubmissionFacet.sol` - NFT submission for races
 - `RaceViewsFacet.sol` - Read-only view functions
 
 Supporting contracts:
-- `GiraffeNFT.sol` - ERC721 giraffes with zip/moxie/hustle stats
-- `GiraffeRaceSimulator.sol` - Deterministic race simulation
+- `RaffeNFT.sol` - ERC721 raffes with zip/moxie/hustle stats
+- `RaffeRaceSimulator.sol` - Deterministic race simulation
 - `HouseTreasury.sol` - USDC bankroll management
 - `WinProbTable6.sol` - On-chain probability lookup table
 
@@ -23,12 +23,12 @@ Supporting contracts:
 1. Start local chain: `yarn chain`
 2. Deploy contracts: `yarn deploy`
 3. Start frontend: `yarn start`
-4. Use the Debug Contracts page to interact with the GiraffeRace contract
+4. Use the Debug Contracts page to interact with the RaffeRace contract
 
 ### Race Flow
 1. **Create Race**: `createRace()` - Opens submission window
-2. **Submit Giraffes** (optional): `submitGiraffe(tokenId)` - Enter your giraffe
-3. **Finalize**: `finalizeRaceGiraffes()` - Closes submissions, opens betting
+2. **Submit Raffes** (optional): `submitRaffe(tokenId)` - Enter your raffe
+3. **Finalize**: `finalizeRaceRaffes()` - Closes submissions, opens betting
 4. **Place Bets**: `placeBet(lane, amount)` - Bet USDC on a lane
 5. **Settle**: `settleRace()` - Determines winner using blockhash entropy
 6. **Claim**: `claim()` or `claimNextWinningPayout()` - Collect winnings

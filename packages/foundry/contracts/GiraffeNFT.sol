@@ -6,13 +6,13 @@ import { Ownable } from "../lib/openzeppelin-contracts/contracts/access/Ownable.
 import { IERC20 } from "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 /**
- * @title GiraffeNFT
- * @notice Minimal ERC-721 for race giraffes with commit-reveal minting.
+ * @title RaffeNFT
+ * @notice Minimal ERC-721 for race raffes with commit-reveal minting.
  * @dev Token IDs are sequential starting at 1.
  *      Uses commit-reveal pattern to prevent seed gaming.
  *      Minting costs 1 USDC which goes to the treasury.
  */
-contract GiraffeNFT is ERC721, Ownable {
+contract RaffeNFT is ERC721, Ownable {
     uint256 public nextTokenId = 1;
     /// @notice Base token URI used by OZ's ERC721 `tokenURI`.
     /// @dev Set this to your Next.js route, e.g. "https://yourdomain.com/api/nft/".
@@ -25,7 +25,7 @@ contract GiraffeNFT is ERC721, Ownable {
     /// @notice Mint fee in USDC (1 USDC = 1e6 with 6 decimals).
     uint256 public constant MINT_FEE = 1e6;
 
-    mapping(uint256 => string) private _giraffeNames;
+    mapping(uint256 => string) private _raffeNames;
     mapping(uint256 => bytes32) private _seeds;
     // Name collision protection: track which name hashes are used
     mapping(bytes32 => bool) private _usedNames; // nameHash => isUsed
@@ -75,7 +75,7 @@ contract GiraffeNFT is ERC721, Ownable {
     uint256 public constant MAX_REVEAL_BLOCKS = 250; // A bit less than 256 to be safe
 
     event BaseTokenURISet(string baseTokenURI);
-    event GiraffeMinted(uint256 indexed tokenId, address indexed to, bytes32 seed, string name);
+    event RaffeMinted(uint256 indexed tokenId, address indexed to, bytes32 seed, string name);
     event MintCommitted(bytes32 indexed commitId, address indexed minter, string name, uint256 blockNumber);
     event MintRevealed(bytes32 indexed commitId, uint256 indexed tokenId, address indexed minter);
     event MintCommitCancelled(bytes32 indexed commitId, address indexed minter);
@@ -95,16 +95,16 @@ contract GiraffeNFT is ERC721, Ownable {
     error TreasuryNotSet();
     error MintFeeTransferFailed();
 
-    constructor() ERC721("Giraffe", "GRF") Ownable(msg.sender) {}
+    constructor() ERC721("Raffe", "GRF") Ownable(msg.sender) {}
 
     modifier onlyRace() {
-        require(msg.sender == raceContract, "GiraffeNFT: not race");
+        require(msg.sender == raceContract, "RaffeNFT: not race");
         _;
     }
 
     modifier onlyLocalTesting() {
         // Allow anyone to use testing helpers on anvil/hardhat local chain.
-        require(block.chainid == 31337, "GiraffeNFT: local testing only");
+        require(block.chainid == 31337, "RaffeNFT: local testing only");
         _;
     }
 
@@ -127,7 +127,7 @@ contract GiraffeNFT is ERC721, Ownable {
 
     /// @notice Random seed for a given tokenId (used by off-chain SVG/metadata rendering).
     function seedOf(uint256 tokenId) external view returns (bytes32) {
-        require(_ownerOf(tokenId) != address(0), "GiraffeNFT: nonexistent token");
+        require(_ownerOf(tokenId) != address(0), "RaffeNFT: nonexistent token");
         return _seeds[tokenId];
     }
 
@@ -201,92 +201,92 @@ contract GiraffeNFT is ERC721, Ownable {
     }
 
     function zipOf(uint256 tokenId) external view returns (uint8) {
-        require(_ownerOf(tokenId) != address(0), "GiraffeNFT: nonexistent token");
+        require(_ownerOf(tokenId) != address(0), "RaffeNFT: nonexistent token");
         return _clampStat(_zip[tokenId]);
     }
 
     function moxieOf(uint256 tokenId) external view returns (uint8) {
-        require(_ownerOf(tokenId) != address(0), "GiraffeNFT: nonexistent token");
+        require(_ownerOf(tokenId) != address(0), "RaffeNFT: nonexistent token");
         return _clampStat(_moxie[tokenId]);
     }
 
     function hustleOf(uint256 tokenId) external view returns (uint8) {
-        require(_ownerOf(tokenId) != address(0), "GiraffeNFT: nonexistent token");
+        require(_ownerOf(tokenId) != address(0), "RaffeNFT: nonexistent token");
         return _clampStat(_hustle[tokenId]);
     }
 
     function statsOf(uint256 tokenId) external view returns (uint8 zip, uint8 moxie, uint8 hustle) {
-        require(_ownerOf(tokenId) != address(0), "GiraffeNFT: nonexistent token");
+        require(_ownerOf(tokenId) != address(0), "RaffeNFT: nonexistent token");
         zip = _clampStat(_zip[tokenId]);
         moxie = _clampStat(_moxie[tokenId]);
         hustle = _clampStat(_hustle[tokenId]);
     }
 
-    function _mintGiraffe(address to, string memory giraffeName) internal returns (uint256 tokenId) {
+    function _mintRaffe(address to, string memory raffeName) internal returns (uint256 tokenId) {
         tokenId = nextTokenId++;
         
         // Name is required - validate and check for collisions
-        bytes32 nameHash = _hashName(giraffeName); // Will revert if empty or all whitespace
+        bytes32 nameHash = _hashName(raffeName); // Will revert if empty or all whitespace
         
         // Revert if name is already taken (case-insensitive check)
         if (_usedNames[nameHash]) {
-            revert NameAlreadyTaken(giraffeName);
+            revert NameAlreadyTaken(raffeName);
         }
         
-        _giraffeNames[tokenId] = giraffeName;
+        _raffeNames[tokenId] = raffeName;
         _usedNames[nameHash] = true;
         
         // On-chain entropy seed (gameable for direct mint, but OK for local testing / owner mints).
         // Uses previous blockhash so it's always available.
         bytes32 bh = block.number > 0 ? blockhash(block.number - 1) : bytes32(0);
-        bytes32 seed = keccak256(abi.encodePacked(bh, address(this), tokenId, to, "GIRAFFE_SEED_V1"));
+        bytes32 seed = keccak256(abi.encodePacked(bh, address(this), tokenId, to, "RAFFE_SEED_V1"));
         _seeds[tokenId] = seed;
         // Derive random stats (1-10) from seed
         _zip[tokenId] = _randomStat(seed, "ZIP");
         _moxie[tokenId] = _randomStat(seed, "MOXIE");
         _hustle[tokenId] = _randomStat(seed, "HUSTLE");
         _safeMint(to, tokenId);
-        emit GiraffeMinted(tokenId, to, seed, giraffeName);
+        emit RaffeMinted(tokenId, to, seed, raffeName);
     }
 
     /// @notice Direct mint for local testing only (bypasses commit-reveal).
     /// @dev On production networks, use commitMint + revealMint instead.
     ///      Stats are randomly assigned based on blockhash seed.
-    function mint(string calldata giraffeName) external onlyLocalTesting returns (uint256 tokenId) {
-        return _mintGiraffe(msg.sender, giraffeName);
+    function mint(string calldata raffeName) external onlyLocalTesting returns (uint256 tokenId) {
+        return _mintRaffe(msg.sender, raffeName);
     }
 
-    /// @notice Owner-only mint to a specific address (for deployment/house giraffes).
+    /// @notice Owner-only mint to a specific address (for deployment/house raffes).
     /// @dev Only the contract owner can mint to arbitrary addresses.
     ///      This bypasses commit-reveal since owner is trusted.
     ///      Stats are randomly assigned based on blockhash seed.
-    function mintTo(address to, string calldata giraffeName) external onlyOwner returns (uint256 tokenId) {
-        return _mintGiraffe(to, giraffeName);
+    function mintTo(address to, string calldata raffeName) external onlyOwner returns (uint256 tokenId) {
+        return _mintRaffe(to, raffeName);
     }
 
     /// @notice Permissionless local testing helper to set zip directly on an existing token.
     function setZipForTesting(uint256 tokenId, uint8 zip) external onlyLocalTesting {
-        require(_ownerOf(tokenId) != address(0), "GiraffeNFT: nonexistent token");
+        require(_ownerOf(tokenId) != address(0), "RaffeNFT: nonexistent token");
         _zip[tokenId] = _clampStat(zip);
     }
 
     /// @notice Permissionless local testing helper to set all stats directly on an existing token.
     function setForTesting(uint256 tokenId, uint8 zip, uint8 moxie, uint8 hustle) external onlyLocalTesting {
-        require(_ownerOf(tokenId) != address(0), "GiraffeNFT: nonexistent token");
+        require(_ownerOf(tokenId) != address(0), "RaffeNFT: nonexistent token");
         _zip[tokenId] = _clampStat(zip);
         _moxie[tokenId] = _clampStat(moxie);
         _hustle[tokenId] = _clampStat(hustle);
     }
 
     function nameOf(uint256 tokenId) external view returns (string memory) {
-        return _giraffeNames[tokenId];
+        return _raffeNames[tokenId];
     }
 
     // ============ Commit-Reveal Minting Functions ============
 
-    /// @notice Commit to mint a giraffe with a specific name.
+    /// @notice Commit to mint a raffe with a specific name.
     /// @dev Reserves the name immediately. User must call revealMint within MAX_REVEAL_BLOCKS.
-    /// @param name The name for the giraffe (1-32 characters, case-insensitive uniqueness).
+    /// @param name The name for the raffe (1-32 characters, case-insensitive uniqueness).
     /// @param commitment keccak256(abi.encodePacked(secret)) where secret is a random bytes32.
     /// @return commitId The unique identifier for this commit.
     function commitMint(string calldata name, bytes32 commitment) external returns (bytes32 commitId) {
@@ -313,7 +313,7 @@ contract GiraffeNFT is ERC721, Ownable {
         emit MintCommitted(commitId, msg.sender, name, block.number);
     }
     
-    /// @notice Reveal the secret and mint the giraffe.
+    /// @notice Reveal the secret and mint the raffe.
     /// @dev Requires 1 USDC mint fee (user must approve this contract first).
     /// @param commitId The commit ID from commitMint.
     /// @param secret The secret that was hashed to create the commitment.
@@ -352,10 +352,10 @@ contract GiraffeNFT is ERC721, Ownable {
         commit.status = CommitStatus.Revealed;
         
         tokenId = nextTokenId++;
-        bytes32 seed = keccak256(abi.encodePacked(bh, address(this), tokenId, msg.sender, secret, "GIRAFFE_SEED_V2"));
+        bytes32 seed = keccak256(abi.encodePacked(bh, address(this), tokenId, msg.sender, secret, "RAFFE_SEED_V2"));
         _seeds[tokenId] = seed;
         
-        _giraffeNames[tokenId] = commit.name;
+        _raffeNames[tokenId] = commit.name;
         // Derive random stats (1-10) from the commit-reveal seed
         _zip[tokenId] = _randomStat(seed, "ZIP");
         _moxie[tokenId] = _randomStat(seed, "MOXIE");
@@ -363,7 +363,7 @@ contract GiraffeNFT is ERC721, Ownable {
         
         _safeMint(msg.sender, tokenId);
         
-        emit GiraffeMinted(tokenId, msg.sender, seed, commit.name);
+        emit RaffeMinted(tokenId, msg.sender, seed, commit.name);
         emit MintRevealed(commitId, tokenId, msg.sender);
     }
     

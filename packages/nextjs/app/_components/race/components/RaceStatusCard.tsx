@@ -5,12 +5,12 @@ import { CooldownStatus, NextWinningClaim, ParsedRace, ParsedSchedule, RaceStatu
 import { BlockCountdownBar } from "./BlockCountdownBar";
 import { LaneName } from "./LaneName";
 import { formatUnits } from "viem";
-import { GiraffeAnimated } from "~~/components/assets/GiraffeAnimated";
+import { RaffeAnimated } from "~~/components/assets/RaffeAnimated";
 
 interface RaceStatusCardProps {
   // Contract state
-  isGiraffeRaceLoading: boolean;
-  giraffeRaceContract: any;
+  isRaffeRaceLoading: boolean;
+  raffeRaceContract: any;
   treasuryContract: any;
   usdcContract: any;
 
@@ -59,8 +59,8 @@ interface RaceStatusCardProps {
 }
 
 export const RaceStatusCard = ({
-  isGiraffeRaceLoading,
-  giraffeRaceContract,
+  isRaffeRaceLoading,
+  raffeRaceContract,
   treasuryContract,
   usdcContract,
   status,
@@ -99,15 +99,11 @@ export const RaceStatusCard = ({
         <div className="flex items-center justify-between">
           <h2 className="card-title">Race status</h2>
           <div className="text-xs opacity-70">
-            {isGiraffeRaceLoading
-              ? "Checking contract…"
-              : giraffeRaceContract
-                ? "GiraffeRace deployed"
-                : "Not deployed"}
+            {isRaffeRaceLoading ? "Checking contract…" : raffeRaceContract ? "RaffeRace deployed" : "Not deployed"}
           </div>
         </div>
 
-        {!giraffeRaceContract ? (
+        {!raffeRaceContract ? (
           <div className="alert alert-info">
             <span className="text-sm">Deploy the contracts first (`yarn chain` + `yarn deploy`).</span>
           </div>
@@ -216,7 +212,7 @@ export const RaceStatusCard = ({
           <div className="flex flex-wrap gap-2">
             <button
               className="btn btn-sm btn-primary"
-              disabled={!giraffeRaceContract || activeRaceExists || isInCooldown || !isViewingLatest}
+              disabled={!raffeRaceContract || activeRaceExists || isInCooldown || !isViewingLatest}
               onClick={onCreateRace}
             >
               {isInCooldown && cooldownStatus
@@ -225,7 +221,7 @@ export const RaceStatusCard = ({
             </button>
             <button
               className="btn btn-sm btn-outline"
-              disabled={!giraffeRaceContract || !canSettle || !isViewingLatest}
+              disabled={!raffeRaceContract || !canSettle || !isViewingLatest}
               onClick={onSettleRace}
             >
               Settle race
@@ -340,7 +336,7 @@ export const RaceStatusCard = ({
               <div className="flex justify-between">
                 <span className="opacity-70">Your bet</span>
                 <span className="font-semibold text-right">
-                  <GiraffeAnimated
+                  <RaffeAnimated
                     idPrefix={`claim-${displayedNextWinningClaim.raceId.toString()}-${displayedNextWinningClaim.betLane}-${displayedNextWinningClaim.betTokenId.toString()}`}
                     tokenId={displayedNextWinningClaim.betTokenId}
                     playbackRate={1}
@@ -371,7 +367,7 @@ export const RaceStatusCard = ({
           )}
           <button
             className="btn btn-sm btn-primary"
-            disabled={!giraffeRaceContract || !connectedAddress || !displayedNextWinningClaim?.hasClaim}
+            disabled={!raffeRaceContract || !connectedAddress || !displayedNextWinningClaim?.hasClaim}
             onClick={onClaimPayout}
           >
             Claim payout

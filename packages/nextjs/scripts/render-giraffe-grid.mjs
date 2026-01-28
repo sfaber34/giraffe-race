@@ -49,18 +49,18 @@ class DeterministicDice {
 }
 
 /**
- * Generates a simple HTML grid of 1k giraffe SVGs for palette iteration.
+ * Generates a simple HTML grid of 1k raffe SVGs for palette iteration.
  *
  * Today: all SVGs are identical because the renderer hasn't applied palette rules yet.
  * We still generate distinct seeds to make it easy to switch to seed-based coloring later.
  *
  * Usage:
- *   node packages/nextjs/scripts/render-giraffe-grid.mjs
- *   node packages/nextjs/scripts/render-giraffe-grid.mjs --count 1000 --cols 20
+ *   node packages/nextjs/scripts/render-raffe-grid.mjs
+ *   node packages/nextjs/scripts/render-raffe-grid.mjs --count 1000 --cols 20
  */
 
 function parseArgs(argv) {
-  const out = { count: 1000, cols: 20, out: "packages/nextjs/generated/giraffe-grid.html" };
+  const out = { count: 1000, cols: 20, out: "packages/nextjs/generated/raffe-grid.html" };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--count") out.count = Number(argv[++i]);
@@ -78,7 +78,7 @@ function base64(s) {
 
 const { count, cols, out } = parseArgs(process.argv.slice(2));
 
-const templatePath = path.join(process.cwd(), "packages/nextjs/public/giraffe_animated.svg");
+const templatePath = path.join(process.cwd(), "packages/nextjs/public/raffe_animated.svg");
 const svgTemplate = await fs.readFile(templatePath, "utf8");
 
 const SIZE = 192;
@@ -92,7 +92,7 @@ for (let i = 1; i <= count; i++) {
   const src = `data:image/svg+xml;base64,${base64(svg)}`;
   items.push(`
     <div class="cell" title="tokenId=${tokenId} seed=${seed}">
-      <img src="${src}" width="${SIZE}" height="${SIZE}" alt="giraffe ${tokenId}" />
+      <img src="${src}" width="${SIZE}" height="${SIZE}" alt="raffe ${tokenId}" />
       <div class="meta">#${tokenId}</div>
     </div>
   `);
@@ -103,7 +103,7 @@ const html = `<!doctype html>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Giraffe Grid (${count})</title>
+    <title>Raffe Grid (${count})</title>
     <style>
       :root { color-scheme: dark; }
       body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; background: #0b1020; color: #e6e6e6; }
@@ -137,7 +137,7 @@ console.log(`Wrote ${outPath}`);
 // -----------------------
 
 function applyPaletteFromSeed(svg, seed) {
-  // Keep ranges aligned with `utils/nft/giraffePalette.ts`:
+  // Keep ranges aligned with `utils/nft/raffePalette.ts`:
   // hue: roll(360), sat: 55+roll(26), light: 42+roll(19)
   const dice = new DeterministicDice(seed);
   const hue = Number(dice.roll(360n)); // 0..359

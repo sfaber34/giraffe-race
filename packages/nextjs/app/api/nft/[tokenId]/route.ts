@@ -3,11 +3,11 @@ import { createPublicClient, http } from "viem";
 import type { Abi } from "viem";
 import { foundry } from "viem/chains";
 import deployedContracts from "~~/contracts/deployedContracts";
-import { renderGiraffeSvg } from "~~/utils/nft/renderGiraffeSvg";
+import { renderRaffeSvg } from "~~/utils/nft/renderRaffeSvg";
 
 export const runtime = "nodejs";
 
-const giraffeNftAbi = [
+const raffeNftAbi = [
   {
     type: "function",
     name: "seedOf",
@@ -59,10 +59,10 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ tokenId: s
   }
 
   const chainId = foundry.id;
-  const addr = (deployedContracts as any)?.[chainId]?.GiraffeNFT?.address as `0x${string}` | undefined;
+  const addr = (deployedContracts as any)?.[chainId]?.RaffeNFT?.address as `0x${string}` | undefined;
   if (!addr) {
     return Response.json(
-      { error: `GiraffeNFT not configured for chainId=${chainId}. Redeploy + regenerate deployedContracts.` },
+      { error: `RaffeNFT not configured for chainId=${chainId}. Redeploy + regenerate deployedContracts.` },
       { status: 500 },
     );
   }
@@ -71,19 +71,19 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ tokenId: s
     const [seed, mintedName, stats] = await Promise.all([
       publicClient.readContract({
         address: addr,
-        abi: giraffeNftAbi,
+        abi: raffeNftAbi,
         functionName: "seedOf",
         args: [tokenId],
       }),
       publicClient.readContract({
         address: addr,
-        abi: giraffeNftAbi,
+        abi: raffeNftAbi,
         functionName: "nameOf",
         args: [tokenId],
       }),
       publicClient.readContract({
         address: addr,
-        abi: giraffeNftAbi,
+        abi: raffeNftAbi,
         functionName: "statsOf",
         args: [tokenId],
       }),
@@ -91,17 +91,16 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ tokenId: s
 
     const [readiness, conditioning, speed] = stats as readonly [number, number, number];
 
-    const svg = await renderGiraffeSvg({ tokenId, seed });
+    const svg = await renderRaffeSvg({ tokenId, seed });
     const image = `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
 
     const nameTrimmed = (mintedName ?? "").trim();
-    const displayName = nameTrimmed.length ? nameTrimmed : `Giraffe #${tokenId.toString()}`;
+    const displayName = nameTrimmed.length ? nameTrimmed : `Raffe #${tokenId.toString()}`;
 
     return Response.json(
       {
         name: displayName,
-        description:
-          "A giraffe racer from Giraffe Race. Appearance is derived deterministically from an on-chain seed.",
+        description: "A raffe racer from Raffe Race. Appearance is derived deterministically from an on-chain seed.",
         image,
         attributes: [
           { trait_type: "tokenId", value: tokenId.toString() },

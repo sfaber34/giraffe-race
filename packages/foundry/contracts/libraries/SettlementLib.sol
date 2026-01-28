@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import { GiraffeRaceBase } from "../GiraffeRaceBase.sol";
-import { GiraffeRaceSimulator } from "../GiraffeRaceSimulator.sol";
+import { RaffeRaceBase } from "../RaffeRaceBase.sol";
+import { RaffeRaceSimulator } from "../RaffeRaceSimulator.sol";
 import { ClaimLib } from "./ClaimLib.sol";
-import { GiraffeRaceConstants as C } from "./GiraffeRaceConstants.sol";
+import { RaffeRaceConstants as C } from "./RaffeRaceConstants.sol";
 
 /**
  * @title SettlementLib
@@ -21,26 +21,26 @@ library SettlementLib {
     /// @param settledLiability Current settled liability (will be updated)
     /// @return newSettledLiability The updated settled liability
     function settleRace(
-        GiraffeRaceBase.Race storage race,
+        RaffeRaceBase.Race storage race,
         uint256 raceId,
         uint8[6] storage raceScore,
-        GiraffeRaceSimulator simulator,
+        RaffeRaceSimulator simulator,
         uint256 settledLiability
     ) internal returns (uint256 newSettledLiability) {
         // Validation
-        if (race.bettingCloseBlock == 0) revert GiraffeRaceBase.InvalidRace();
-        if (race.settled) revert GiraffeRaceBase.AlreadySettled();
-        if (block.number <= race.bettingCloseBlock) revert GiraffeRaceBase.RaceNotReady();
+        if (race.bettingCloseBlock == 0) revert RaffeRaceBase.InvalidRace();
+        if (race.settled) revert RaffeRaceBase.AlreadySettled();
+        if (block.number <= race.bettingCloseBlock) revert RaffeRaceBase.RaceNotReady();
         
         // Fixed odds required only if there were bets
-        if (race.totalPot != 0 && !race.oddsSet) revert GiraffeRaceBase.OddsNotSet();
+        if (race.totalPot != 0 && !race.oddsSet) revert RaffeRaceBase.OddsNotSet();
 
         // Get blockhash for randomness
         bytes32 bh = blockhash(race.bettingCloseBlock);
         if (bh == bytes32(0)) {
             // Blockhash not available (>256 blocks ago) - race cannot be settled
             // Admin should cancel this race for refunds
-            revert GiraffeRaceBase.RaceNotReady();
+            revert RaffeRaceBase.RaceNotReady();
         }
 
         // Generate deterministic seed
@@ -48,7 +48,7 @@ library SettlementLib {
         bytes32 simSeed = keccak256(abi.encodePacked(baseSeed, "RACE_SIM"));
         
         // Run full race simulation (until all racers finish)
-        GiraffeRaceSimulator.FinishOrder memory finishOrder = 
+        RaffeRaceSimulator.FinishOrder memory finishOrder = 
             simulator.simulateFullRace(simSeed, raceScore);
 
         // Update race state - legacy fields for backwards compatibility
@@ -88,9 +88,9 @@ library SettlementLib {
 
         // Emit appropriate event
         if (finishOrder.first.count > 1) {
-            emit GiraffeRaceBase.RaceSettledDeadHeat(raceId, simSeed, finishOrder.first.count, race.winners);
+            emit RaffeRaceBase.RaceSettledDeadHeat(raceId, simSeed, finishOrder.first.count, race.winners);
         } else {
-            emit GiraffeRaceBase.RaceSettled(raceId, simSeed, race.winner);
+            emit RaffeRaceBase.RaceSettled(raceId, simSeed, race.winner);
         }
     }
 }

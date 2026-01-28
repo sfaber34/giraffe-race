@@ -29,8 +29,8 @@ export const RaceDashboard = () => {
   const {
     connectedAddress,
     blockNumber,
-    giraffeRaceContract,
-    giraffeNftContract,
+    raffeRaceContract,
+    raffeNftContract,
     usdcContractName,
     treasuryContract,
     ownedTokenIds,
@@ -49,11 +49,11 @@ export const RaceDashboard = () => {
   const { viewingRaceId, isViewingLatest, setViewRaceId } = useViewingRace(latestRaceId, hasAnyRace);
 
   // Race details
-  const raceDetails = useRaceDetails(viewingRaceId, hasAnyRace, giraffeRaceContract, giraffeNftContract);
+  const raceDetails = useRaceDetails(viewingRaceId, hasAnyRace, raffeRaceContract, raffeNftContract);
   const {
     parsed,
     parsedSchedule,
-    parsedGiraffes,
+    parsedRaffes,
     parsedOdds,
     parsedFinishOrder,
     laneScore,
@@ -64,14 +64,14 @@ export const RaceDashboard = () => {
   } = raceDetails;
 
   // Race queue
-  const queue = useRaceQueue(giraffeRaceContract, connectedAddress);
+  const queue = useRaceQueue(raffeRaceContract, connectedAddress);
   const { activeQueueLength, userInQueue, userQueuedToken, userQueuePosition, queueEntries } = queue;
 
   // My bets (Win/Place/Show)
-  const myBets = useMyBets(viewingRaceId, connectedAddress, giraffeRaceContract, hasAnyRace);
+  const myBets = useMyBets(viewingRaceId, connectedAddress, raffeRaceContract, hasAnyRace);
 
   // Winning claims
-  const { nextWinningClaim, winningClaimRemaining } = useWinningClaims(connectedAddress, giraffeRaceContract);
+  const { nextWinningClaim, winningClaimRemaining } = useWinningClaims(connectedAddress, raffeRaceContract);
 
   // Replay hook
   const replay = useRaceReplay({
@@ -90,7 +90,7 @@ export const RaceDashboard = () => {
 
   // Race status
   const status = useRaceStatus(
-    giraffeRaceContract,
+    raffeRaceContract,
     hasAnyRace,
     parsed,
     parsedSchedule,
@@ -120,7 +120,7 @@ export const RaceDashboard = () => {
   const [jumpToNextWinningClaimAfterClaim, setJumpToNextWinningClaimAfterClaim] = useState(false);
 
   // Write hooks
-  const { writeContractAsync: writeGiraffeRaceAsync } = useScaffoldWriteContract({ contractName: "GiraffeRace" });
+  const { writeContractAsync: writeRaffeRaceAsync } = useScaffoldWriteContract({ contractName: "RaffeRace" });
   // Use dynamic USDC contract name (USDC for Base, MockUSDC for local)
   const { writeContractAsync: writeUsdcAsync } = useScaffoldWriteContract({
     contractName: usdcContractName as any,
@@ -199,12 +199,12 @@ export const RaceDashboard = () => {
   // Actions
   const handleEnterQueue = useCallback(async () => {
     if (selectedTokenId === null) return;
-    await writeGiraffeRaceAsync({
+    await writeRaffeRaceAsync({
       functionName: "enterQueue" as any,
       args: [selectedTokenId],
     } as any);
     setSelectedTokenId(null);
-  }, [selectedTokenId, writeGiraffeRaceAsync]);
+  }, [selectedTokenId, writeRaffeRaceAsync]);
 
   const handleApprove = useCallback(async () => {
     if (!placeBetValue || !treasuryContract?.address) return;
@@ -223,28 +223,28 @@ export const RaceDashboard = () => {
     async (lane: number, betType: BetType) => {
       if (!placeBetValue) return;
       const validLane = BigInt(Math.max(0, Math.min(Number(LANE_COUNT - 1), Math.floor(lane))));
-      await writeGiraffeRaceAsync({
+      await writeRaffeRaceAsync({
         functionName: "placeBet",
         args: [validLane, placeBetValue, BigInt(betType)],
       } as any);
       // Don't clear bet amount - user might want to place multiple bets with same amount
     },
-    [placeBetValue, writeGiraffeRaceAsync],
+    [placeBetValue, writeRaffeRaceAsync],
   );
 
   const handleClaimPayout = useCallback(async () => {
-    await writeGiraffeRaceAsync({ functionName: "claimNextWinningPayout" } as any);
+    await writeRaffeRaceAsync({ functionName: "claimNextWinningPayout" } as any);
     setSyncClaimSnapshotAfterUserAction(true);
     setJumpToNextWinningClaimAfterClaim(true);
-  }, [writeGiraffeRaceAsync]);
+  }, [writeRaffeRaceAsync]);
 
   return (
     <div className="flex flex-col w-full">
       <div className="flex flex-col gap-8 w-full max-w-none px-[30px] py-8">
         <div className="flex flex-col gap-2">
-          <h1 className="text-4xl font-bold">Giraffe Race</h1>
+          <h1 className="text-4xl font-bold">Raffe Race</h1>
           <p className="text-base-content/70">
-            Enter the queue, wait for a race, place your bets, and watch your giraffe compete!
+            Enter the queue, wait for a race, place your bets, and watch your raffe compete!
           </p>
         </div>
 
@@ -326,7 +326,7 @@ export const RaceDashboard = () => {
                   dimensions={trackDimensions}
                   simulation={replay.simulation}
                   lineupFinalized={lineupFinalized}
-                  parsedGiraffes={parsedGiraffes}
+                  parsedRaffes={parsedRaffes}
                   currentDistances={replay.currentDistances}
                   prevDistances={replay.prevDistances}
                   isPlaying={replay.isPlaying}
@@ -444,7 +444,7 @@ export const RaceDashboard = () => {
                 lineupFinalized={lineupFinalized}
                 laneTokenIds={laneTokenIds}
                 laneStats={laneStats}
-                parsedGiraffes={parsedGiraffes}
+                parsedRaffes={parsedRaffes}
                 parsedOdds={parsedOdds}
                 betAmountUsdc={betAmountUsdc}
                 setBetAmountUsdc={setBetAmountUsdc}
@@ -455,7 +455,7 @@ export const RaceDashboard = () => {
                 myBets={myBets}
                 canBet={canBet}
                 isViewingLatest={isViewingLatest}
-                giraffeRaceContract={giraffeRaceContract}
+                raffeRaceContract={raffeRaceContract}
                 needsApproval={needsApproval}
                 hasEnoughUsdc={hasEnoughUsdc}
                 exceedsMaxBet={exceedsMaxBet}
@@ -468,7 +468,7 @@ export const RaceDashboard = () => {
             {/* Claim payout card - between Place a bet and Enter Queue */}
             <ClaimPayoutCard
               connectedAddress={connectedAddress}
-              giraffeRaceContract={giraffeRaceContract}
+              raffeRaceContract={raffeRaceContract}
               claimUiUnlocked={claimUiUnlocked}
               hasRevealedClaimSnapshot={hasRevealedClaimSnapshot}
               displayedNextWinningClaim={displayedNextWinningClaim}
@@ -490,7 +490,7 @@ export const RaceDashboard = () => {
                 userQueuePosition={userQueuePosition}
                 queueEntries={queueEntries}
                 activeQueueLength={activeQueueLength}
-                giraffeRaceContract={giraffeRaceContract}
+                raffeRaceContract={raffeRaceContract}
                 onEnterQueue={handleEnterQueue}
               />
             ) : null}

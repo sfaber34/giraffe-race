@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Address } from "@scaffold-ui/components";
 import { encodePacked, formatUnits, keccak256, toHex } from "viem";
 import { useAccount, useBlockNumber, usePublicClient } from "wagmi";
-import { GiraffeAnimated } from "~~/components/assets/GiraffeAnimated";
+import { RaffeAnimated } from "~~/components/assets/RaffeAnimated";
 import {
   useDeployedContractInfo,
   useScaffoldReadContract,
@@ -40,7 +40,7 @@ function computeCommitment(secret: `0x${string}`): `0x${string}` {
 function loadSecrets(address: string): Record<string, `0x${string}`> {
   if (typeof window === "undefined") return {};
   try {
-    const data = localStorage.getItem(`giraffe-secrets-${address}`);
+    const data = localStorage.getItem(`raffe-secrets-${address}`);
     if (!data) return {};
     return JSON.parse(data);
   } catch {
@@ -52,14 +52,14 @@ function saveSecret(address: string, name: string, secret: `0x${string}`) {
   if (typeof window === "undefined") return;
   const secrets = loadSecrets(address);
   secrets[name.toLowerCase()] = secret;
-  localStorage.setItem(`giraffe-secrets-${address}`, JSON.stringify(secrets));
+  localStorage.setItem(`raffe-secrets-${address}`, JSON.stringify(secrets));
 }
 
 function removeSecret(address: string, name: string) {
   if (typeof window === "undefined") return;
   const secrets = loadSecrets(address);
   delete secrets[name.toLowerCase()];
-  localStorage.setItem(`giraffe-secrets-${address}`, JSON.stringify(secrets));
+  localStorage.setItem(`raffe-secrets-${address}`, JSON.stringify(secrets));
 }
 
 function getSecret(address: string, name: string): `0x${string}` | undefined {
@@ -67,7 +67,7 @@ function getSecret(address: string, name: string): `0x${string}` | undefined {
   return secrets[name.toLowerCase()];
 }
 
-export const GiraffeNfts = () => {
+export const RaffeNfts = () => {
   const { address: connectedAddress } = useAccount();
   const { targetNetwork } = useTargetNetwork();
   const publicClient = usePublicClient({ chainId: targetNetwork.id });
@@ -77,7 +77,7 @@ export const GiraffeNfts = () => {
     { tokenId: bigint; name: string; zip: number; moxie: number; hustle: number }[]
   >([]);
   const [isLoadingOwnedNfts, setIsLoadingOwnedNfts] = useState(false);
-  const [isGiraffeNftDeployedOnChain, setIsGiraffeNftDeployedOnChain] = useState<boolean | null>(null);
+  const [isRaffeNftDeployedOnChain, setIsRaffeNftDeployedOnChain] = useState<boolean | null>(null);
 
   // Commit-reveal state
   const [pendingCommits, setPendingCommits] = useState<PendingCommit[]>([]);
@@ -89,42 +89,42 @@ export const GiraffeNfts = () => {
 
   const { data: blockNumber } = useBlockNumber({ watch: true });
 
-  const { data: giraffeNftContract } = useDeployedContractInfo({
-    contractName: "GiraffeNFT",
+  const { data: raffeNftContract } = useDeployedContractInfo({
+    contractName: "RaffeNFT",
   });
 
   useEffect(() => {
     const run = async () => {
       if (!publicClient) {
-        setIsGiraffeNftDeployedOnChain(null);
+        setIsRaffeNftDeployedOnChain(null);
         return;
       }
-      const addr = giraffeNftContract?.address as `0x${string}` | undefined;
+      const addr = raffeNftContract?.address as `0x${string}` | undefined;
       if (!addr) {
-        setIsGiraffeNftDeployedOnChain(false);
+        setIsRaffeNftDeployedOnChain(false);
         return;
       }
       try {
         const bytecode = await publicClient.getBytecode({ address: addr });
-        setIsGiraffeNftDeployedOnChain(!!bytecode && bytecode !== "0x");
+        setIsRaffeNftDeployedOnChain(!!bytecode && bytecode !== "0x");
       } catch {
-        setIsGiraffeNftDeployedOnChain(false);
+        setIsRaffeNftDeployedOnChain(false);
       }
     };
     void run();
-  }, [publicClient, giraffeNftContract?.address]);
+  }, [publicClient, raffeNftContract?.address]);
 
   const { data: nextTokenId } = useScaffoldReadContract({
-    contractName: "GiraffeNFT",
+    contractName: "RaffeNFT",
     functionName: "nextTokenId",
-    query: { enabled: !!giraffeNftContract },
+    query: { enabled: !!raffeNftContract },
   });
 
   const { data: ownedTokenIdsData } = useScaffoldReadContract({
-    contractName: "GiraffeNFT",
+    contractName: "RaffeNFT",
     functionName: "tokensOfOwner",
     args: [connectedAddress],
-    query: { enabled: !!connectedAddress && !!giraffeNftContract },
+    query: { enabled: !!connectedAddress && !!raffeNftContract },
   });
 
   const ownedTokenIds = useMemo(() => {
@@ -133,20 +133,20 @@ export const GiraffeNfts = () => {
   }, [ownedTokenIdsData]);
 
   const { data: minRevealBlocks } = useScaffoldReadContract({
-    contractName: "GiraffeNFT",
+    contractName: "RaffeNFT",
     functionName: "MIN_REVEAL_BLOCKS",
-    query: { enabled: !!giraffeNftContract },
+    query: { enabled: !!raffeNftContract },
   });
 
-  const { writeContractAsync: writeGiraffeNftAsync } = useScaffoldWriteContract({
-    contractName: "GiraffeNFT",
+  const { writeContractAsync: writeRaffeNftAsync } = useScaffoldWriteContract({
+    contractName: "RaffeNFT",
   });
 
-  // Read treasury address from GiraffeNFT to check if mint fee is required
+  // Read treasury address from RaffeNFT to check if mint fee is required
   const { data: treasuryAddress } = useScaffoldReadContract({
-    contractName: "GiraffeNFT",
+    contractName: "RaffeNFT",
     functionName: "treasury",
-    query: { enabled: !!giraffeNftContract },
+    query: { enabled: !!raffeNftContract },
   });
 
   // Check if mint fee is required (treasury is configured)
@@ -157,13 +157,13 @@ export const GiraffeNfts = () => {
   // Get USDC contract info for allowance check (USDC for Base, MockUSDC for local)
   const { data: usdcContract, contractName: usdcContractName } = useUsdcContract();
 
-  // Read user's USDC allowance for GiraffeNFT contract
+  // Read user's USDC allowance for RaffeNFT contract
   const { data: usdcAllowance, refetch: refetchAllowance } = useScaffoldReadContract({
     contractName: usdcContractName as any,
     functionName: "allowance",
-    args: [connectedAddress, giraffeNftContract?.address],
+    args: [connectedAddress, raffeNftContract?.address],
     query: {
-      enabled: !!connectedAddress && !!giraffeNftContract && !!usdcContract && !!usdcContractName && mintFeeRequired,
+      enabled: !!connectedAddress && !!raffeNftContract && !!usdcContract && !!usdcContractName && mintFeeRequired,
     },
   } as any);
 
@@ -196,16 +196,16 @@ export const GiraffeNfts = () => {
 
   // Fetch pending commits from chain
   const { data: chainPendingCommitIds, refetch: refetchPendingCommits } = useScaffoldReadContract({
-    contractName: "GiraffeNFT",
+    contractName: "RaffeNFT",
     functionName: "getPendingCommits",
     args: [connectedAddress],
-    query: { enabled: !!connectedAddress && !!giraffeNftContract },
+    query: { enabled: !!connectedAddress && !!raffeNftContract },
   });
 
   // Build pending commits from chain data + local secrets
   useEffect(() => {
     const fetchCommitDetails = async () => {
-      if (!chainPendingCommitIds || !publicClient || !giraffeNftContract?.address || !connectedAddress) {
+      if (!chainPendingCommitIds || !publicClient || !raffeNftContract?.address || !connectedAddress) {
         setPendingCommits([]);
         return;
       }
@@ -221,8 +221,8 @@ export const GiraffeNfts = () => {
       for (const commitId of chainIds) {
         try {
           const result = await publicClient.readContract({
-            address: giraffeNftContract.address as `0x${string}`,
-            abi: giraffeNftContract.abi,
+            address: raffeNftContract.address as `0x${string}`,
+            abi: raffeNftContract.abi,
             functionName: "getCommit",
             args: [commitId],
           });
@@ -255,12 +255,12 @@ export const GiraffeNfts = () => {
     };
 
     void fetchCommitDetails();
-  }, [chainPendingCommitIds, publicClient, giraffeNftContract?.address, giraffeNftContract?.abi, connectedAddress]);
+  }, [chainPendingCommitIds, publicClient, raffeNftContract?.address, raffeNftContract?.abi, connectedAddress]);
 
   // Fetch owned NFT details
   useEffect(() => {
     const run = async () => {
-      if (!connectedAddress || !publicClient || !giraffeNftContract?.address) {
+      if (!connectedAddress || !publicClient || !raffeNftContract?.address) {
         setOwnedNfts([]);
         return;
       }
@@ -274,14 +274,14 @@ export const GiraffeNfts = () => {
 
         const calls = ownedTokenIds.flatMap(id => [
           {
-            address: giraffeNftContract.address as `0x${string}`,
-            abi: giraffeNftContract.abi as any,
+            address: raffeNftContract.address as `0x${string}`,
+            abi: raffeNftContract.abi as any,
             functionName: "nameOf",
             args: [id],
           },
           {
-            address: giraffeNftContract.address as `0x${string}`,
-            abi: giraffeNftContract.abi as any,
+            address: raffeNftContract.address as `0x${string}`,
+            abi: raffeNftContract.abi as any,
             functionName: "statsOf",
             args: [id],
           },
@@ -295,14 +295,14 @@ export const GiraffeNfts = () => {
           const settled = await Promise.allSettled(
             ownedTokenIds.flatMap(id => [
               (publicClient as any).readContract({
-                address: giraffeNftContract.address,
-                abi: giraffeNftContract.abi,
+                address: raffeNftContract.address,
+                abi: raffeNftContract.abi,
                 functionName: "nameOf",
                 args: [id],
               }),
               (publicClient as any).readContract({
-                address: giraffeNftContract.address,
-                abi: giraffeNftContract.abi,
+                address: raffeNftContract.address,
+                abi: raffeNftContract.abi,
                 functionName: "statsOf",
                 args: [id],
               }),
@@ -333,14 +333,7 @@ export const GiraffeNfts = () => {
     };
 
     void run();
-  }, [
-    connectedAddress,
-    publicClient,
-    giraffeNftContract?.address,
-    giraffeNftContract?.abi,
-    ownedTokenIds,
-    nextTokenId,
-  ]);
+  }, [connectedAddress, publicClient, raffeNftContract?.address, raffeNftContract?.abi, ownedTokenIds, nextTokenId]);
 
   // Validate name for profanity
   const validateName = useCallback((name: string): boolean => {
@@ -382,7 +375,7 @@ export const GiraffeNfts = () => {
       // Save secret BEFORE transaction (in case user closes tab during confirmation)
       saveSecret(connectedAddress, name, secret);
 
-      await writeGiraffeNftAsync({
+      await writeRaffeNftAsync({
         functionName: "commitMint",
         args: [name, commitment],
       });
@@ -395,16 +388,16 @@ export const GiraffeNfts = () => {
     } finally {
       setIsCommitting(false);
     }
-  }, [connectedAddress, mintName, validateName, writeGiraffeNftAsync, refetchPendingCommits]);
+  }, [connectedAddress, mintName, validateName, writeRaffeNftAsync, refetchPendingCommits]);
 
   const handleApproveUsdc = useCallback(async () => {
-    if (!connectedAddress || !giraffeNftContract?.address) return;
+    if (!connectedAddress || !raffeNftContract?.address) return;
 
     setIsApproving(true);
     try {
       await (writeUsdcAsync as any)({
         functionName: "approve",
-        args: [giraffeNftContract.address, MINT_FEE], // Approve exactly 1 mint
+        args: [raffeNftContract.address, MINT_FEE], // Approve exactly 1 mint
       });
       setTimeout(() => void refetchAllowance(), 1000);
     } catch (error) {
@@ -412,7 +405,7 @@ export const GiraffeNfts = () => {
     } finally {
       setIsApproving(false);
     }
-  }, [connectedAddress, giraffeNftContract?.address, writeUsdcAsync, refetchAllowance]);
+  }, [connectedAddress, raffeNftContract?.address, writeUsdcAsync, refetchAllowance]);
 
   const handleRevealMint = useCallback(
     async (commit: PendingCommit) => {
@@ -420,7 +413,7 @@ export const GiraffeNfts = () => {
 
       setIsRevealing(commit.commitId);
       try {
-        await writeGiraffeNftAsync({
+        await writeRaffeNftAsync({
           functionName: "revealMint",
           args: [commit.commitId, commit.secret],
         });
@@ -437,7 +430,7 @@ export const GiraffeNfts = () => {
         setIsRevealing(null);
       }
     },
-    [writeGiraffeNftAsync, connectedAddress, refetchPendingCommits, mintFeeRequired, refetchAllowance],
+    [writeRaffeNftAsync, connectedAddress, refetchPendingCommits, mintFeeRequired, refetchAllowance],
   );
 
   const handleCancelCommit = useCallback(
@@ -446,7 +439,7 @@ export const GiraffeNfts = () => {
 
       setIsCancelling(commit.commitId);
       try {
-        await writeGiraffeNftAsync({
+        await writeRaffeNftAsync({
           functionName: "cancelCommit",
           args: [commit.commitId],
         });
@@ -459,7 +452,7 @@ export const GiraffeNfts = () => {
         setIsCancelling(null);
       }
     },
-    [writeGiraffeNftAsync, connectedAddress, refetchPendingCommits],
+    [writeRaffeNftAsync, connectedAddress, refetchPendingCommits],
   );
 
   const getCommitStatus = (commit: PendingCommit): "waiting" | "ready" | "expired" => {
@@ -472,8 +465,8 @@ export const GiraffeNfts = () => {
   return (
     <div className="flex flex-col gap-8 w-full max-w-4xl px-6 py-10">
       <div className="flex flex-col gap-2">
-        <h1 className="text-4xl font-bold">Giraffe NFTs</h1>
-        <p className="text-base-content/70">Mint and view your Giraffe NFTs.</p>
+        <h1 className="text-4xl font-bold">Raffe NFTs</h1>
+        <p className="text-base-content/70">Mint and view your Raffe NFTs.</p>
       </div>
 
       <div className="grid grid-cols-1 gap-4">
@@ -481,20 +474,20 @@ export const GiraffeNfts = () => {
         <div className="card bg-base-200 shadow">
           <div className="card-body gap-3">
             <div className="flex items-center justify-between">
-              <h2 className="card-title">Mint a Giraffe NFT</h2>
+              <h2 className="card-title">Mint a Raffe NFT</h2>
               <div className="text-xs opacity-70">
-                {isGiraffeNftDeployedOnChain === null
+                {isRaffeNftDeployedOnChain === null
                   ? "Checking deployment…"
-                  : isGiraffeNftDeployedOnChain
-                    ? "GiraffeNFT deployed"
+                  : isRaffeNftDeployedOnChain
+                    ? "RaffeNFT deployed"
                     : "Not deployed"}
               </div>
             </div>
 
-            {isGiraffeNftDeployedOnChain === false && (
+            {isRaffeNftDeployedOnChain === false && (
               <div className="alert alert-warning">
                 <span className="text-sm">
-                  GiraffeNFT isn&apos;t deployed on the connected network. Run `yarn deploy` and refresh.
+                  RaffeNFT isn&apos;t deployed on the connected network. Run `yarn deploy` and refresh.
                 </span>
               </div>
             )}
@@ -503,7 +496,7 @@ export const GiraffeNfts = () => {
               <h3 className="font-semibold mb-2">🔒 Secure Minting</h3>
               <p className="opacity-70">
                 Minting uses commit-reveal to prevent gaming. After committing, wait{" "}
-                {minRevealBlocks?.toString() ?? "2"} blocks, then reveal to mint your unique giraffe.
+                {minRevealBlocks?.toString() ?? "2"} blocks, then reveal to mint your unique raffe.
               </p>
               {mintFeeRequired && (
                 <p className="mt-2 text-primary font-medium">💰 Mint fee: {formatUnits(MINT_FEE, 6)} USDC</p>
@@ -512,7 +505,7 @@ export const GiraffeNfts = () => {
 
             <label className="form-control w-full">
               <div className="label">
-                <span className="label-text">Name your Giraffe</span>
+                <span className="label-text">Name your Raffe</span>
               </div>
               <input
                 className={`input input-bordered w-full ${nameError ? "input-error" : ""}`}
@@ -534,8 +527,8 @@ export const GiraffeNfts = () => {
               className="btn btn-primary"
               disabled={
                 !connectedAddress ||
-                !giraffeNftContract ||
-                isGiraffeNftDeployedOnChain !== true ||
+                !raffeNftContract ||
+                isRaffeNftDeployedOnChain !== true ||
                 mintName.trim().length === 0 ||
                 !!nameError ||
                 isCommitting
@@ -690,7 +683,7 @@ export const GiraffeNfts = () => {
         <div className="card bg-base-200 shadow">
           <div className="card-body gap-3">
             <div className="flex items-center justify-between">
-              <h2 className="card-title">Your Giraffe NFTs</h2>
+              <h2 className="card-title">Your Raffe NFTs</h2>
               <div className="text-xs opacity-70">{isLoadingOwnedNfts ? "Loading…" : `${ownedNfts.length} found`}</div>
             </div>
 
@@ -712,7 +705,7 @@ export const GiraffeNfts = () => {
                       <div className="flex items-center justify-between gap-3">
                         <div className="font-medium">
                           <span className="inline-flex items-center gap-2">
-                            <GiraffeAnimated
+                            <RaffeAnimated
                               idPrefix={`nft-${nft.tokenId.toString()}`}
                               tokenId={nft.tokenId}
                               playbackRate={1}

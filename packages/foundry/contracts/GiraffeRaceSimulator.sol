@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import { GiraffeRaceConstants as C } from "./libraries/GiraffeRaceConstants.sol";
+import { RaffeRaceConstants as C } from "./libraries/RaffeRaceConstants.sol";
 
-/// @notice Stateless simulator contract for GiraffeRace
+/// @notice Stateless simulator contract for RaffeRace
 /// @dev OPTIMIZED: Uses direct modulo instead of rejection sampling for ~97% gas savings.
 ///      
 ///      NOTE: Solidity requires literal values for array sizes in function signatures.
-///      Constants here use literals that MUST match GiraffeRaceConstants. The constructor
+///      Constants here use literals that MUST match RaffeRaceConstants. The constructor
 ///      verifies this at deployment time.
-contract GiraffeRaceSimulator {
+contract RaffeRaceSimulator {
     // Race constants - literals required for array sizes in function signatures
-    // These MUST match GiraffeRaceConstants (verified in constructor)
+    // These MUST match RaffeRaceConstants (verified in constructor)
     uint8 internal constant LANE_COUNT = 6;
     uint16 internal constant TRACK_LENGTH = 1000;
     uint16 internal constant MAX_TICKS = 500;
@@ -194,7 +194,7 @@ contract GiraffeRaceSimulator {
             if (finished) break;
         }
 
-        require(finished, "GiraffeRace: race did not finish");
+        require(finished, "RaffeRace: race did not finish");
 
         gasCheckpoint = gasleft();
         uint256 mainLoopGas = gasStart - gasCheckpoint;
@@ -266,7 +266,7 @@ contract GiraffeRaceSimulator {
             if (finished) break;
         }
 
-        require(finished, "GiraffeRace: race did not finish");
+        require(finished, "RaffeRace: race did not finish");
 
         // Determine winner(s)
         (winners, winnerCount) = _findWinners(distances);
@@ -351,7 +351,7 @@ contract GiraffeRaceSimulator {
             if (allFinished) break;
         }
 
-        require(allFinished, "GiraffeRace: race did not finish");
+        require(allFinished, "RaffeRace: race did not finish");
         
         finishOrder.distances = distances;
         

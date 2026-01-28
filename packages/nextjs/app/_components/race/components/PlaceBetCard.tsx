@@ -1,10 +1,10 @@
 "use client";
 
 import { LANE_COUNT, ODDS_SCALE, USDC_DECIMALS } from "../constants";
-import { BET_TYPE, BetType, LaneStats, MyBets, ParsedGiraffes, ParsedOdds } from "../types";
+import { BET_TYPE, BetType, LaneStats, MyBets, ParsedOdds, ParsedRaffes } from "../types";
 import { LaneName } from "./LaneName";
 import { formatUnits } from "viem";
-import { GiraffeAnimated } from "~~/components/assets/GiraffeAnimated";
+import { RaffeAnimated } from "~~/components/assets/RaffeAnimated";
 
 interface PlaceBetCardProps {
   // State
@@ -12,7 +12,7 @@ interface PlaceBetCardProps {
   lineupFinalized: boolean;
   laneTokenIds: bigint[];
   laneStats: LaneStats[];
-  parsedGiraffes: ParsedGiraffes | null;
+  parsedRaffes: ParsedRaffes | null;
   parsedOdds: ParsedOdds | null;
 
   // User state
@@ -24,7 +24,7 @@ interface PlaceBetCardProps {
   // Flags
   canBet: boolean;
   isViewingLatest: boolean;
-  giraffeRaceContract: any;
+  raffeRaceContract: any;
   needsApproval: boolean;
   hasEnoughUsdc: boolean;
   exceedsMaxBet: boolean;
@@ -45,7 +45,7 @@ export const PlaceBetCard = ({
   lineupFinalized,
   laneTokenIds,
   laneStats,
-  parsedGiraffes,
+  parsedRaffes,
   parsedOdds,
   connectedAddress,
   userUsdcBalance,
@@ -53,7 +53,7 @@ export const PlaceBetCard = ({
   myBets,
   canBet,
   isViewingLatest,
-  giraffeRaceContract,
+  raffeRaceContract,
   needsApproval,
   hasEnoughUsdc,
   exceedsMaxBet,
@@ -215,7 +215,7 @@ export const PlaceBetCard = ({
                 <div className="flex items-center gap-2">
                   {/* Left: Avatar + Name */}
                   <div className="flex items-center gap-2 min-w-0 flex-shrink-0">
-                    <GiraffeAnimated
+                    <RaffeAnimated
                       idPrefix={`bet-${(viewingRaceId ?? 0n).toString()}-${lane}-${(laneTokenIds[lane] ?? 0n).toString()}`}
                       tokenId={laneTokenIds[lane] ?? 0n}
                       playbackRate={1}
@@ -224,8 +224,8 @@ export const PlaceBetCard = ({
                     />
                     <div className="flex flex-col items-start min-w-0">
                       <span className="text-sm font-medium truncate max-w-[80px]">
-                        {lineupFinalized && parsedGiraffes?.tokenIds?.[lane] && parsedGiraffes.tokenIds[lane] !== 0n ? (
-                          <LaneName tokenId={parsedGiraffes.tokenIds[lane]} fallback={`Lane ${lane}`} />
+                        {lineupFinalized && parsedRaffes?.tokenIds?.[lane] && parsedRaffes.tokenIds[lane] !== 0n ? (
+                          <LaneName tokenId={parsedRaffes.tokenIds[lane]} fallback={`Lane ${lane}`} />
                         ) : (
                           `Lane ${lane}`
                         )}
@@ -249,21 +249,21 @@ export const PlaceBetCard = ({
                       BET_TYPE.WIN,
                       "Win",
                       winOddsLabelForLane(lane),
-                      !giraffeRaceContract || !connectedAddress || !canBet || !isViewingLatest,
+                      !raffeRaceContract || !connectedAddress || !canBet || !isViewingLatest,
                     )}
                     {renderCompactBetButton(
                       lane,
                       BET_TYPE.PLACE,
                       "Place",
                       placeOddsLabelForLane(lane),
-                      !giraffeRaceContract || !connectedAddress || !canBet || !isViewingLatest,
+                      !raffeRaceContract || !connectedAddress || !canBet || !isViewingLatest,
                     )}
                     {renderCompactBetButton(
                       lane,
                       BET_TYPE.SHOW,
                       "Show",
                       showOddsLabelForLane(lane),
-                      !giraffeRaceContract || !connectedAddress || !canBet || !isViewingLatest,
+                      !raffeRaceContract || !connectedAddress || !canBet || !isViewingLatest,
                     )}
                   </div>
 
@@ -282,13 +282,13 @@ export const PlaceBetCard = ({
         {/* Bet type explanations */}
         <div className="text-xs opacity-60 space-y-1 pt-2 border-t border-base-300">
           <div>
-            <strong>Win:</strong> Giraffe must finish 1st
+            <strong>Win:</strong> Raffe must finish 1st
           </div>
           <div>
-            <strong>Place:</strong> Giraffe must finish 1st or 2nd
+            <strong>Place:</strong> Raffe must finish 1st or 2nd
           </div>
           <div>
-            <strong>Show:</strong> Giraffe must finish 1st, 2nd, or 3rd
+            <strong>Show:</strong> Raffe must finish 1st, 2nd, or 3rd
           </div>
           <div className="italic pt-1">Dead heat rules apply for ties at qualifying positions.</div>
         </div>

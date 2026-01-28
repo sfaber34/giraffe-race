@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import { GiraffeRaceBase } from "./GiraffeRaceBase.sol";
+import { RaffeRaceBase } from "./RaffeRaceBase.sol";
 import { SettlementLib } from "./libraries/SettlementLib.sol";
 import { OddsLib } from "./libraries/OddsLib.sol";
 
 /**
- * @title GiraffeRaceLifecycle
+ * @title RaffeRaceLifecycle
  * @notice Handles race creation, odds setting, cancellation, and settlement
  * @dev New flow:
  *      1. createRace() - selects lineup, starts odds window (10 blocks)
@@ -14,8 +14,8 @@ import { OddsLib } from "./libraries/OddsLib.sol";
  *      3. If no odds within window, race can be cancelled (auto or explicit)
  *      4. settleRace() - settles after betting closes
  */
-abstract contract GiraffeRaceLifecycle is GiraffeRaceBase {
-    // ============ Optimized Simple RNG (for house giraffe selection) ============
+abstract contract RaffeRaceLifecycle is RaffeRaceBase {
+    // ============ Optimized Simple RNG (for house raffe selection) ============
     
     struct SimpleRng {
         bytes32 seed;
@@ -37,7 +37,7 @@ abstract contract GiraffeRaceLifecycle is GiraffeRaceBase {
 
     /// @notice Create a new race - selects lineup from queue, starts odds window
     /// @dev Lineup is selected FIFO from priority queue then main queue.
-    ///      Empty lanes filled with random house giraffes.
+    ///      Empty lanes filled with random house raffes.
     ///      Bot has ODDS_WINDOW_BLOCKS to call setOdds(), otherwise race is cancelled.
     function createRace() external returns (uint256 raceId) {
         // Handle previous race state
@@ -75,9 +75,9 @@ abstract contract GiraffeRaceLifecycle is GiraffeRaceBase {
         _selectLineupFromQueue(raceId);
         
         // Snapshot effective score for each lane
-        RaceGiraffes storage ra = _raceGiraffes[raceId];
+        RaceRaffes storage ra = _raceRaffes[raceId];
         for (uint8 lane = 0; lane < LANE_COUNT; ) {
-            (uint8 zip, uint8 moxie, uint8 hustle) = giraffeNft.statsOf(ra.tokenIds[lane]);
+            (uint8 zip, uint8 moxie, uint8 hustle) = raffeNft.statsOf(ra.tokenIds[lane]);
             _raceScore[raceId][lane] = OddsLib.calculateEffectiveScore(zip, moxie, hustle);
             unchecked { ++lane; }
         }
@@ -173,20 +173,20 @@ abstract contract GiraffeRaceLifecycle is GiraffeRaceBase {
     /// @notice Restore queue entries from a cancelled race to priority queue
     /// @dev Entries go to priority queue which is processed before main queue
     function _restoreQueueEntries(uint256 raceId) internal {
-        RaceGiraffes storage ra = _raceGiraffes[raceId];
+        RaceRaffes storage ra = _raceRaffes[raceId];
         
         for (uint8 i = 0; i < ra.assignedCount; ) {
             address owner = ra.originalOwners[i];
             uint256 tokenId = ra.tokenIds[i];
             
-            // Skip house giraffes - they don't go back to queue
+            // Skip house raffes - they don't go back to queue
             if (owner == treasuryOwner) {
                 unchecked { ++i; }
                 continue;
             }
             
             // Validate ownership still valid
-            if (giraffeNft.ownerOf(tokenId) != owner) {
+            if (raffeNft.ownerOf(tokenId) != owner) {
                 unchecked { ++i; }
                 continue;
             }
@@ -224,11 +224,11 @@ abstract contract GiraffeRaceLifecycle is GiraffeRaceBase {
 
     // ============ Internal Helpers ============
 
-    /// @notice Select lineup from queue (FIFO) and fill remaining with house giraffes
+    /// @notice Select lineup from queue (FIFO) and fill remaining with house raffes
     /// @dev Priority queue is processed first (restored entries from cancelled races)
     function _selectLineupFromQueue(uint256 raceId) internal {
-        delete _raceGiraffes[raceId];
-        RaceGiraffes storage ra = _raceGiraffes[raceId];
+        delete _raceRaffes[raceId];
+        RaceRaffes storage ra = _raceRaffes[raceId];
         
         uint8 assignedCount = 0;
         
@@ -250,7 +250,7 @@ abstract contract GiraffeRaceLifecycle is GiraffeRaceBase {
             }
             
             // Validate ownership
-            if (giraffeNft.ownerOf(tokenId) != owner) {
+            if (raffeNft.ownerOf(tokenId) != owner) {
                 // Invalid - clear state and skip
                 _tokenQueueIndex[tokenId] = 0;
                 userInQueue[owner] = false;
@@ -262,7 +262,7 @@ abstract contract GiraffeRaceLifecycle is GiraffeRaceBase {
             ra.originalOwners[assignedCount] = owner;
             
             emit QueueEntrySelected(raceId, owner, tokenId, assignedCount);
-            emit GiraffeAssigned(raceId, tokenId, owner, assignedCount);
+            emit RaffeAssigned(raceId, tokenId, owner, assignedCount);
             
             // Clear queue state (consumed)
             _tokenQueueIndex[tokenId] = 0;
@@ -282,7 +282,7 @@ abstract contract GiraffeRaceLifecycle is GiraffeRaceBase {
             }
             
             // Validate ownership (user might have transferred NFT after queuing)
-            if (giraffeNft.ownerOf(entry.tokenId) != entry.owner) {
+            if (raffeNft.ownerOf(entry.tokenId) != entry.owner) {
                 // Invalid entry - mark as removed and skip
                 entry.removed = true;
                 _tokenQueueIndex[entry.tokenId] = 0;
@@ -296,7 +296,7 @@ abstract contract GiraffeRaceLifecycle is GiraffeRaceBase {
             ra.originalOwners[assignedCount] = entry.owner;
             
             emit QueueEntrySelected(raceId, entry.owner, entry.tokenId, assignedCount);
-            emit GiraffeAssigned(raceId, entry.tokenId, entry.owner, assignedCount);
+            emit RaffeAssigned(raceId, entry.tokenId, entry.owner, assignedCount);
             
             // Remove from queue (consumed)
             entry.removed = true;
@@ -309,17 +309,17 @@ abstract contract GiraffeRaceLifecycle is GiraffeRaceBase {
         
         ra.assignedCount = assignedCount;
         
-        // Fill remaining lanes with house giraffes (randomly selected)
+        // Fill remaining lanes with house raffes (randomly selected)
         if (assignedCount < LANE_COUNT) {
-            _fillWithHouseGiraffes(raceId, assignedCount);
+            _fillWithHouseRaffes(raceId, assignedCount);
         }
     }
 
-    /// @notice Fill remaining race lanes with randomly selected house giraffes
-    function _fillWithHouseGiraffes(uint256 raceId, uint8 startLane) internal {
-        RaceGiraffes storage ra = _raceGiraffes[raceId];
+    /// @notice Fill remaining race lanes with randomly selected house raffes
+    function _fillWithHouseRaffes(uint256 raceId, uint8 startLane) internal {
+        RaceRaffes storage ra = _raceRaffes[raceId];
         
-        // Create seed for random house giraffe selection
+        // Create seed for random house raffe selection
         bytes32 seed = keccak256(abi.encodePacked(
             block.prevrandao,
             block.timestamp,
@@ -328,12 +328,12 @@ abstract contract GiraffeRaceLifecycle is GiraffeRaceBase {
         ));
         SimpleRng memory rng = _createRng(seed);
         
-        // Track which house giraffes are still available
+        // Track which house raffes are still available
         uint8[6] memory availableIdx = [0, 1, 2, 3, 4, 5];
         uint8 availableCount = LANE_COUNT;
         
         for (uint8 lane = startLane; lane < LANE_COUNT; ) {
-            if (availableCount == 0) revert InvalidHouseGiraffe();
+            if (availableCount == 0) revert InvalidHouseRaffe();
             
             uint256 pick;
             (pick, rng) = _roll(rng, availableCount);
@@ -342,16 +342,16 @@ abstract contract GiraffeRaceLifecycle is GiraffeRaceBase {
             availableCount--;
             availableIdx[uint8(pick)] = availableIdx[availableCount];
             
-            uint256 houseTokenId = houseGiraffeTokenIds[idx];
-            if (giraffeNft.ownerOf(houseTokenId) != treasuryOwner) {
-                revert InvalidHouseGiraffe();
+            uint256 houseTokenId = houseRaffeTokenIds[idx];
+            if (raffeNft.ownerOf(houseTokenId) != treasuryOwner) {
+                revert InvalidHouseRaffe();
             }
             
             ra.tokenIds[lane] = houseTokenId;
             ra.originalOwners[lane] = treasuryOwner;
             
-            emit HouseGiraffeAssigned(raceId, houseTokenId, lane);
-            emit GiraffeAssigned(raceId, houseTokenId, treasuryOwner, lane);
+            emit HouseRaffeAssigned(raceId, houseTokenId, lane);
+            emit RaffeAssigned(raceId, houseTokenId, treasuryOwner, lane);
             
             unchecked { ++lane; }
         }

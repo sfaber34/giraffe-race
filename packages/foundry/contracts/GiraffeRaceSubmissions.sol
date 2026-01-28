@@ -1,31 +1,31 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import { GiraffeRaceBase } from "./GiraffeRaceBase.sol";
+import { RaffeRaceBase } from "./RaffeRaceBase.sol";
 
 /**
- * @title GiraffeRaceSubmissions
- * @notice Handles the persistent race queue for giraffe entries
+ * @title RaffeRaceSubmissions
+ * @notice Handles the persistent race queue for raffe entries
  * @dev Users enter the queue once and are automatically selected for races FIFO.
  *      One entry per user. Entries persist until selected for a race.
  *      Users CANNOT withdraw from queue once entered (commitment model).
  *      Priority queue holds restored entries from cancelled races (processed first).
  */
-abstract contract GiraffeRaceSubmissions is GiraffeRaceBase {
-    /// @notice Enter your giraffe into the persistent race queue
+abstract contract RaffeRaceSubmissions is RaffeRaceBase {
+    /// @notice Enter your raffe into the persistent race queue
     /// @dev FIFO order - first to enter will be first to race
     ///      Once entered, you CANNOT withdraw - you're committed until race runs
-    /// @param tokenId The token ID of the giraffe to queue
+    /// @param tokenId The token ID of the raffe to queue
     function enterQueue(uint256 tokenId) external {
         // One entry per user
         if (userInQueue[msg.sender]) revert AlreadyInQueue();
         
-        // Must own the giraffe
-        if (giraffeNft.ownerOf(tokenId) != msg.sender) revert NotTokenOwner();
+        // Must own the raffe
+        if (raffeNft.ownerOf(tokenId) != msg.sender) revert NotTokenOwner();
         
-        // Prevent queuing house giraffes
+        // Prevent queuing house raffes
         for (uint256 i = 0; i < LANE_COUNT; ) {
-            if (houseGiraffeTokenIds[i] == tokenId) revert CannotQueueHouseGiraffe();
+            if (houseRaffeTokenIds[i] == tokenId) revert CannotQueueHouseRaffe();
             unchecked { ++i; }
         }
         
@@ -81,7 +81,7 @@ abstract contract GiraffeRaceSubmissions is GiraffeRaceBase {
         // Count priority queue (all entries are active since they're freshly restored)
         for (uint256 i = 0; i < _priorityQueue.length; ) {
             QueueEntry storage entry = _priorityQueue[i];
-            if (!entry.removed && giraffeNft.ownerOf(entry.tokenId) == entry.owner) {
+            if (!entry.removed && raffeNft.ownerOf(entry.tokenId) == entry.owner) {
                 unchecked { ++count; }
             }
             unchecked { ++i; }
@@ -90,7 +90,7 @@ abstract contract GiraffeRaceSubmissions is GiraffeRaceBase {
         // Count main queue
         for (uint256 i = queueHead; i < _raceQueue.length; ) {
             QueueEntry storage entry = _raceQueue[i];
-            if (!entry.removed && giraffeNft.ownerOf(entry.tokenId) == entry.owner) {
+            if (!entry.removed && raffeNft.ownerOf(entry.tokenId) == entry.owner) {
                 unchecked { ++count; }
             }
             unchecked { ++i; }
@@ -120,7 +120,7 @@ abstract contract GiraffeRaceSubmissions is GiraffeRaceBase {
             QueueEntry storage entry = _priorityQueue[i];
             
             bool isValid = !entry.removed && 
-                           giraffeNft.ownerOf(entry.tokenId) == entry.owner;
+                           raffeNft.ownerOf(entry.tokenId) == entry.owner;
             
             entries[i] = QueueEntryView({
                 index: i,
@@ -155,7 +155,7 @@ abstract contract GiraffeRaceSubmissions is GiraffeRaceBase {
             QueueEntry storage entry = _raceQueue[idx];
             
             bool isValid = !entry.removed && 
-                           giraffeNft.ownerOf(entry.tokenId) == entry.owner;
+                           raffeNft.ownerOf(entry.tokenId) == entry.owner;
             
             entries[i] = QueueEntryView({
                 index: idx,
@@ -202,7 +202,7 @@ abstract contract GiraffeRaceSubmissions is GiraffeRaceBase {
         // Check priority queue first
         for (uint256 i = 0; i < _priorityQueue.length; ) {
             QueueEntry storage entry = _priorityQueue[i];
-            if (!entry.removed && giraffeNft.ownerOf(entry.tokenId) == entry.owner) {
+            if (!entry.removed && raffeNft.ownerOf(entry.tokenId) == entry.owner) {
                 unchecked { ++validPosition; }
                 if (entry.owner == user) {
                     return validPosition;
@@ -214,7 +214,7 @@ abstract contract GiraffeRaceSubmissions is GiraffeRaceBase {
         // Then main queue
         for (uint256 i = queueHead; i < _raceQueue.length; ) {
             QueueEntry storage entry = _raceQueue[i];
-            if (!entry.removed && giraffeNft.ownerOf(entry.tokenId) == entry.owner) {
+            if (!entry.removed && raffeNft.ownerOf(entry.tokenId) == entry.owner) {
                 unchecked { ++validPosition; }
                 if (entry.owner == user) {
                     return validPosition;

@@ -1,10 +1,10 @@
 import leoProfanity from "leo-profanity";
 
-// Add any custom words specific to the giraffe racing context if needed
+// Add any custom words specific to the raffe racing context if needed
 // leoProfanity.add("customWord1");
 // leoProfanity.add("customWord2");
 
-// Remove false positives if needed (e.g., words that might be valid giraffe names)
+// Remove false positives if needed (e.g., words that might be valid raffe names)
 // leoProfanity.remove("hell");
 
 /**

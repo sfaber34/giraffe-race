@@ -102,7 +102,7 @@ function getArtifactOfContract(contractName) {
   }
 
   // If not found, search all .sol folders for the contract
-  // This handles cases where contract name differs from file name (e.g., Diamond.sol contains GiraffeRaceDiamond)
+  // This handles cases where contract name differs from file name (e.g., Diamond.sol contains RaffeRaceDiamond)
   const outDir = join(__dirname, "..", "out");
   if (!existsSync(outDir)) return null;
 

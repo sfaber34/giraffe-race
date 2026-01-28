@@ -18,11 +18,11 @@ export const AdminDashboard = () => {
     publicClient,
     connectedAddress,
     blockNumber,
-    giraffeRaceContract,
+    raffeRaceContract,
     usdcContract,
     usdcContractName,
     treasuryContract,
-    isGiraffeRaceLoading,
+    isRaffeRaceLoading,
     hasAnyRace,
     latestRaceId,
     cooldownStatus,
@@ -35,11 +35,11 @@ export const AdminDashboard = () => {
   const { viewingRaceId, isViewingLatest, setViewRaceId } = useViewingRace(latestRaceId, hasAnyRace);
 
   // Race details
-  const raceDetails = useRaceDetails(viewingRaceId, hasAnyRace, giraffeRaceContract, null);
+  const raceDetails = useRaceDetails(viewingRaceId, hasAnyRace, raffeRaceContract, null);
   const { parsed, parsedSchedule, bettingCloseBlock } = raceDetails;
 
   // Race status
-  const status = useRaceStatus(giraffeRaceContract, hasAnyRace, parsed, parsedSchedule, cooldownStatus, blockNumber);
+  const status = useRaceStatus(raffeRaceContract, hasAnyRace, parsed, parsedSchedule, cooldownStatus, blockNumber);
 
   // Live block number
   const { data: liveBlockNumber } = useBlockNumber({ watch: true });
@@ -62,17 +62,17 @@ export const AdminDashboard = () => {
 
   // Read current admin settings
   const { data: currentHouseEdgeBps } = useScaffoldReadContract({
-    contractName: "GiraffeRace",
+    contractName: "RaffeRace",
     functionName: "houseEdgeBps",
   });
 
   const { data: currentMaxBetAmount } = useScaffoldReadContract({
-    contractName: "GiraffeRace",
+    contractName: "RaffeRace",
     functionName: "maxBetAmount",
   });
 
   const { data: currentRaceBot } = useScaffoldReadContract({
-    contractName: "GiraffeRace",
+    contractName: "RaffeRace",
     functionName: "raceBot",
   });
 
@@ -86,7 +86,7 @@ export const AdminDashboard = () => {
     connectedAddress && treasuryOwner && connectedAddress.toLowerCase() === treasuryOwner.toLowerCase();
 
   // Write hooks
-  const { writeContractAsync: writeGiraffeRaceAsync } = useScaffoldWriteContract({ contractName: "GiraffeRace" });
+  const { writeContractAsync: writeRaffeRaceAsync } = useScaffoldWriteContract({ contractName: "RaffeRace" });
   const { writeContractAsync: writeUsdcAsync } = useScaffoldWriteContract({
     contractName: usdcContractName as any,
   });
@@ -130,24 +130,24 @@ export const AdminDashboard = () => {
   );
 
   const handleCreateRace = useCallback(async () => {
-    const txHash = await writeGiraffeRaceAsync({ functionName: "createRace" } as any);
+    const txHash = await writeRaffeRaceAsync({ functionName: "createRace" } as any);
     console.log("🏁 createRace TX Hash:", txHash);
 
     if (publicClient && txHash) {
       const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
       console.log("⛽ TOTAL Gas Used:", receipt.gasUsed.toString());
     }
-  }, [writeGiraffeRaceAsync, publicClient]);
+  }, [writeRaffeRaceAsync, publicClient]);
 
   const handleSettleRace = useCallback(async () => {
-    const txHash = await writeGiraffeRaceAsync({ functionName: "settleRace" } as any);
+    const txHash = await writeRaffeRaceAsync({ functionName: "settleRace" } as any);
     console.log("🏁 settleRace TX Hash:", txHash);
 
     if (publicClient && txHash) {
       const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
       console.log("⛽ TOTAL Gas Used:", receipt.gasUsed.toString());
     }
-  }, [writeGiraffeRaceAsync, publicClient]);
+  }, [writeRaffeRaceAsync, publicClient]);
 
   const handleFundTreasury = useCallback(async () => {
     if (!treasuryContract?.address) return;
@@ -180,7 +180,7 @@ export const AdminDashboard = () => {
     if (isNaN(bps) || bps < 0 || bps > MAX_HOUSE_EDGE_BPS) return;
     try {
       setIsUpdatingHouseEdge(true);
-      await writeGiraffeRaceAsync({
+      await writeRaffeRaceAsync({
         functionName: "setHouseEdgeBps",
         args: [bps],
       } as any);
@@ -188,7 +188,7 @@ export const AdminDashboard = () => {
     } finally {
       setIsUpdatingHouseEdge(false);
     }
-  }, [newHouseEdgeBps, writeGiraffeRaceAsync]);
+  }, [newHouseEdgeBps, writeRaffeRaceAsync]);
 
   const handleSetMaxBet = useCallback(async () => {
     const v = newMaxBetUsdc.trim();
@@ -202,7 +202,7 @@ export const AdminDashboard = () => {
     if (amount <= 0n) return;
     try {
       setIsUpdatingMaxBet(true);
-      await writeGiraffeRaceAsync({
+      await writeRaffeRaceAsync({
         functionName: "setMaxBetAmount",
         args: [amount],
       } as any);
@@ -210,14 +210,14 @@ export const AdminDashboard = () => {
     } finally {
       setIsUpdatingMaxBet(false);
     }
-  }, [newMaxBetUsdc, writeGiraffeRaceAsync]);
+  }, [newMaxBetUsdc, writeRaffeRaceAsync]);
 
   const handleSetRaceBot = useCallback(async () => {
     const addr = newRaceBot.trim();
     if (!addr || !isAddress(addr)) return;
     try {
       setIsUpdatingRaceBot(true);
-      await writeGiraffeRaceAsync({
+      await writeRaffeRaceAsync({
         functionName: "setRaceBot",
         args: [addr],
       } as any);
@@ -225,7 +225,7 @@ export const AdminDashboard = () => {
     } finally {
       setIsUpdatingRaceBot(false);
     }
-  }, [newRaceBot, writeGiraffeRaceAsync]);
+  }, [newRaceBot, writeRaffeRaceAsync]);
 
   const handleAdminCancelRace = useCallback(async () => {
     const v = cancelRaceId.trim();
@@ -234,7 +234,7 @@ export const AdminDashboard = () => {
     if (isNaN(raceId) || raceId < 1) return;
     try {
       setIsCancellingRace(true);
-      await writeGiraffeRaceAsync({
+      await writeRaffeRaceAsync({
         functionName: "adminCancelRace",
         args: [BigInt(raceId)],
       } as any);
@@ -242,7 +242,7 @@ export const AdminDashboard = () => {
     } finally {
       setIsCancellingRace(false);
     }
-  }, [cancelRaceId, writeGiraffeRaceAsync]);
+  }, [cancelRaceId, writeRaffeRaceAsync]);
 
   return (
     <div className="flex flex-col w-full">
@@ -287,8 +287,8 @@ export const AdminDashboard = () => {
 
         {/* Admin Status Card */}
         <AdminStatusCard
-          isGiraffeRaceLoading={isGiraffeRaceLoading}
-          giraffeRaceContract={giraffeRaceContract}
+          isRaffeRaceLoading={isRaffeRaceLoading}
+          raffeRaceContract={raffeRaceContract}
           treasuryContract={treasuryContract}
           usdcContract={usdcContract}
           status={status}

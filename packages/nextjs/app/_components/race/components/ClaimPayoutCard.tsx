@@ -4,11 +4,11 @@ import { USDC_DECIMALS } from "../constants";
 import { NextWinningClaim } from "../types";
 import { LaneName } from "./LaneName";
 import { formatUnits } from "viem";
-import { GiraffeAnimated } from "~~/components/assets/GiraffeAnimated";
+import { RaffeAnimated } from "~~/components/assets/RaffeAnimated";
 
 interface ClaimPayoutCardProps {
   connectedAddress: `0x${string}` | undefined;
-  giraffeRaceContract: any;
+  raffeRaceContract: any;
   claimUiUnlocked: boolean;
   hasRevealedClaimSnapshot: boolean;
   displayedNextWinningClaim: NextWinningClaim | null;
@@ -18,7 +18,7 @@ interface ClaimPayoutCardProps {
 
 export const ClaimPayoutCard = ({
   connectedAddress,
-  giraffeRaceContract,
+  raffeRaceContract,
   claimUiUnlocked,
   hasRevealedClaimSnapshot,
   displayedNextWinningClaim,
@@ -54,7 +54,7 @@ export const ClaimPayoutCard = ({
             <div className="flex justify-between items-center">
               <span className="opacity-70">Your bet</span>
               <span className="font-semibold text-right">
-                <GiraffeAnimated
+                <RaffeAnimated
                   idPrefix={`claim-${displayedNextWinningClaim.raceId.toString()}-${displayedNextWinningClaim.betLane}-${displayedNextWinningClaim.betTokenId.toString()}`}
                   tokenId={displayedNextWinningClaim.betTokenId}
                   playbackRate={1}
@@ -87,7 +87,7 @@ export const ClaimPayoutCard = ({
         )}
         <button
           className="btn btn-sm btn-primary"
-          disabled={!giraffeRaceContract || !connectedAddress || !displayedNextWinningClaim?.hasClaim}
+          disabled={!raffeRaceContract || !connectedAddress || !displayedNextWinningClaim?.hasClaim}
           onClick={onClaimPayout}
         >
           Claim payout

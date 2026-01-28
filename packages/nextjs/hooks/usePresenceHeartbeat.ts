@@ -6,10 +6,10 @@ import { useEffect, useRef } from "react";
 function getVisitorId(): string {
   if (typeof window === "undefined") return "";
 
-  let id = sessionStorage.getItem("giraffe-visitor-id");
+  let id = sessionStorage.getItem("raffe-visitor-id");
   if (!id) {
     id = `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
-    sessionStorage.setItem("giraffe-visitor-id", id);
+    sessionStorage.setItem("raffe-visitor-id", id);
   }
   return id;
 }

@@ -2,8 +2,8 @@
 pragma solidity ^0.8.19;
 
 /**
- * @title GiraffeRaceConstants
- * @notice Single source of truth for all GiraffeRace constants
+ * @title RaffeRaceConstants
+ * @notice Single source of truth for all RaffeRace constants
  * @dev Import this and use `C.CONSTANT_NAME` throughout the codebase.
  *      
  *      IMPORTANT: Solidity requires literal values for array sizes in function 
@@ -11,9 +11,9 @@ pragma solidity ^0.8.19;
  *      you must use the literal `6`. However, you should add an assertion to 
  *      ensure it matches this file:
  *      
- *          assert(6 == GiraffeRaceConstants.LANE_COUNT);
+ *          assert(6 == RaffeRaceConstants.LANE_COUNT);
  */
-library GiraffeRaceConstants {
+library RaffeRaceConstants {
     // ============ Race Configuration ============
     
     /// @notice Number of lanes in each race (also used for array sizes)

@@ -2,13 +2,13 @@ import fs from "fs/promises";
 import path from "path";
 
 /**
- * Quick helper to inventory hex colors in `public/giraffe_animated.svg`.
+ * Quick helper to inventory hex colors in `public/raffe_animated.svg`.
  *
  * Usage:
- *   node packages/nextjs/scripts/extract-giraffe-colors.mjs
+ *   node packages/nextjs/scripts/extract-raffe-colors.mjs
  */
 
-const svgPath = path.join(process.cwd(), "packages/nextjs/public/giraffe_animated.svg");
+const svgPath = path.join(process.cwd(), "packages/nextjs/public/raffe_animated.svg");
 const svg = await fs.readFile(svgPath, "utf8");
 
 const re = /#[0-9a-fA-F]{3,8}\b/g;

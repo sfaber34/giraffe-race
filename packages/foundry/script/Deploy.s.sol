@@ -2,15 +2,15 @@
 pragma solidity ^0.8.19;
 
 import "./DeployHelpers.s.sol";
-import { GiraffeRace } from "../contracts/GiraffeRaceV2.sol";
-import { GiraffeNFT } from "../contracts/GiraffeNFT.sol";
-import { GiraffeRaceSimulator } from "../contracts/GiraffeRaceSimulator.sol";
+import { RaffeRace } from "../contracts/RaffeRaceV2.sol";
+import { RaffeNFT } from "../contracts/RaffeNFT.sol";
+import { RaffeRaceSimulator } from "../contracts/RaffeRaceSimulator.sol";
 import { HouseTreasury } from "../contracts/HouseTreasury.sol";
 import { MockUSDC } from "../contracts/MockUSDC.sol";
 
 /**
  * @title DeployScript
- * @notice Deployment script for GiraffeRace (simplified non-Diamond version)
+ * @notice Deployment script for RaffeRace (simplified non-Diamond version)
  * @dev Integrated with Scaffold-ETH 2 deployment system
  *
  * Environment variables:
@@ -67,13 +67,13 @@ contract DeployScript is ScaffoldETHDeploy {
             deployments.push(Deployment("MockUSDC", usdcAddress));
         }
 
-        GiraffeNFT giraffeNft = new GiraffeNFT();
-        console.log("GiraffeNFT deployed at:", address(giraffeNft));
-        deployments.push(Deployment("GiraffeNFT", address(giraffeNft)));
+        RaffeNFT raffeNft = new RaffeNFT();
+        console.log("RaffeNFT deployed at:", address(raffeNft));
+        deployments.push(Deployment("RaffeNFT", address(raffeNft)));
 
-        GiraffeRaceSimulator simulator = new GiraffeRaceSimulator();
-        console.log("GiraffeRaceSimulator deployed at:", address(simulator));
-        deployments.push(Deployment("GiraffeRaceSimulator", address(simulator)));
+        RaffeRaceSimulator simulator = new RaffeRaceSimulator();
+        console.log("RaffeRaceSimulator deployed at:", address(simulator));
+        deployments.push(Deployment("RaffeRaceSimulator", address(simulator)));
 
         // Deploy Treasury with deployer as initial owner (so we can authorize the race contract)
         // Ownership will be transferred to treasuryOwner at the end.
@@ -81,31 +81,31 @@ contract DeployScript is ScaffoldETHDeploy {
         console.log("HouseTreasury deployed at:", address(treasury));
         deployments.push(Deployment("HouseTreasury", address(treasury)));
 
-        // 2. Mint house giraffes to treasuryOwner
-        uint256[6] memory houseGiraffeTokenIds;
-        houseGiraffeTokenIds[0] = giraffeNft.mintTo(treasuryOwner, "house-1");
-        houseGiraffeTokenIds[1] = giraffeNft.mintTo(treasuryOwner, "house-2");
-        houseGiraffeTokenIds[2] = giraffeNft.mintTo(treasuryOwner, "house-3");
-        houseGiraffeTokenIds[3] = giraffeNft.mintTo(treasuryOwner, "house-4");
-        houseGiraffeTokenIds[4] = giraffeNft.mintTo(treasuryOwner, "house-5");
-        houseGiraffeTokenIds[5] = giraffeNft.mintTo(treasuryOwner, "house-6");
-        console.log("Minted 6 house giraffes to treasuryOwner");
+        // 2. Mint house raffes to treasuryOwner
+        uint256[6] memory houseRaffeTokenIds;
+        houseRaffeTokenIds[0] = raffeNft.mintTo(treasuryOwner, "house-1");
+        houseRaffeTokenIds[1] = raffeNft.mintTo(treasuryOwner, "house-2");
+        houseRaffeTokenIds[2] = raffeNft.mintTo(treasuryOwner, "house-3");
+        houseRaffeTokenIds[3] = raffeNft.mintTo(treasuryOwner, "house-4");
+        houseRaffeTokenIds[4] = raffeNft.mintTo(treasuryOwner, "house-5");
+        houseRaffeTokenIds[5] = raffeNft.mintTo(treasuryOwner, "house-6");
+        console.log("Minted 6 house raffes to treasuryOwner");
 
-        // 3. Deploy GiraffeRace (single contract - no Diamond)
-        GiraffeRace giraffeRace = new GiraffeRace(
-            address(giraffeNft),
+        // 3. Deploy RaffeRace (single contract - no Diamond)
+        RaffeRace raffeRace = new RaffeRace(
+            address(raffeNft),
             treasuryOwner,
             raceBotAddress,
-            houseGiraffeTokenIds,
+            houseRaffeTokenIds,
             address(simulator),
             address(treasury)
         );
-        console.log("GiraffeRace deployed at:", address(giraffeRace));
-        deployments.push(Deployment("GiraffeRace", address(giraffeRace)));
+        console.log("RaffeRace deployed at:", address(raffeRace));
+        deployments.push(Deployment("RaffeRace", address(raffeRace)));
 
-        // 4. Authorize GiraffeRace in treasury
-        treasury.authorize(address(giraffeRace));
-        console.log("GiraffeRace authorized in treasury");
+        // 4. Authorize RaffeRace in treasury
+        treasury.authorize(address(raffeRace));
+        console.log("RaffeRace authorized in treasury");
 
         // 5. Transfer treasury ownership to the actual treasuryOwner (multisig)
         if (treasuryOwner != deployer) {
@@ -113,19 +113,19 @@ contract DeployScript is ScaffoldETHDeploy {
             console.log("Treasury ownership transferred to:", treasuryOwner);
         }
 
-        // 6. Configure GiraffeNFT
-        giraffeNft.setRaceContract(address(giraffeRace));
-        giraffeNft.setTreasury(usdcAddress, address(treasury));
-        console.log("GiraffeNFT configured with race contract and treasury");
+        // 6. Configure RaffeNFT
+        raffeNft.setRaceContract(address(raffeRace));
+        raffeNft.setTreasury(usdcAddress, address(treasury));
+        console.log("RaffeNFT configured with race contract and treasury");
 
-        // 7. Transfer GiraffeNFT ownership to treasuryOwner
-        giraffeNft.transferOwnership(treasuryOwner);
-        console.log("GiraffeNFT ownership transferred to:", treasuryOwner);
+        // 7. Transfer RaffeNFT ownership to treasuryOwner
+        raffeNft.transferOwnership(treasuryOwner);
+        console.log("RaffeNFT ownership transferred to:", treasuryOwner);
 
         console.log("\n=== Deployment Summary ===");
-        console.log("GiraffeRace:          ", address(giraffeRace));
+        console.log("RaffeRace:          ", address(raffeRace));
         console.log("USDC:                 ", usdcAddress);
-        console.log("GiraffeNFT:           ", address(giraffeNft));
+        console.log("RaffeNFT:           ", address(raffeNft));
         console.log("Treasury:             ", address(treasury));
         console.log("Simulator:            ", address(simulator));
         console.log("Treasury Owner:       ", treasuryOwner);

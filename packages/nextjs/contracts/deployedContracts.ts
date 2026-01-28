@@ -6,7 +6,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 
 const deployedContracts = {
   8453: {
-    GiraffeNFT: {
+    RaffeNFT: {
       address: "0xa67e746383dcc73f1bfe9144102274443d8bac4e",
       abi: [
         {
@@ -188,7 +188,7 @@ const deployedContracts = {
             {
               name: "status",
               type: "uint8",
-              internalType: "enum GiraffeNFT.CommitStatus",
+              internalType: "enum RaffeNFT.CommitStatus",
             },
             {
               name: "minRevealBlock",
@@ -308,7 +308,7 @@ const deployedContracts = {
           name: "mint",
           inputs: [
             {
-              name: "giraffeName",
+              name: "raffeName",
               type: "string",
               internalType: "string",
             },
@@ -356,7 +356,7 @@ const deployedContracts = {
             {
               name: "status",
               type: "uint8",
-              internalType: "enum GiraffeNFT.CommitStatus",
+              internalType: "enum RaffeNFT.CommitStatus",
             },
           ],
           stateMutability: "view",
@@ -371,7 +371,7 @@ const deployedContracts = {
               internalType: "address",
             },
             {
-              name: "giraffeName",
+              name: "raffeName",
               type: "string",
               internalType: "string",
             },
@@ -961,7 +961,7 @@ const deployedContracts = {
         },
         {
           type: "event",
-          name: "GiraffeMinted",
+          name: "RaffeMinted",
           inputs: [
             {
               name: "tokenId",
@@ -1356,7 +1356,7 @@ const deployedContracts = {
       inheritedFunctions: {},
       deployedOnBlock: 41205120,
     },
-    GiraffeRaceSimulator: {
+    RaffeRaceSimulator: {
       address: "0xaddac7d10509e307662e053a0d4ebbac15ddfa2f",
       abi: [
         {
@@ -1407,12 +1407,12 @@ const deployedContracts = {
             {
               name: "finishOrder",
               type: "tuple",
-              internalType: "struct GiraffeRaceSimulator.FinishOrder",
+              internalType: "struct RaffeRaceSimulator.FinishOrder",
               components: [
                 {
                   name: "first",
                   type: "tuple",
-                  internalType: "struct GiraffeRaceSimulator.PositionInfo",
+                  internalType: "struct RaffeRaceSimulator.PositionInfo",
                   components: [
                     {
                       name: "lanes",
@@ -1429,7 +1429,7 @@ const deployedContracts = {
                 {
                   name: "second",
                   type: "tuple",
-                  internalType: "struct GiraffeRaceSimulator.PositionInfo",
+                  internalType: "struct RaffeRaceSimulator.PositionInfo",
                   components: [
                     {
                       name: "lanes",
@@ -1446,7 +1446,7 @@ const deployedContracts = {
                 {
                   name: "third",
                   type: "tuple",
-                  internalType: "struct GiraffeRaceSimulator.PositionInfo",
+                  internalType: "struct RaffeRaceSimulator.PositionInfo",
                   components: [
                     {
                       name: "lanes",
@@ -2356,7 +2356,7 @@ const deployedContracts = {
       inheritedFunctions: {},
       deployedOnBlock: 3,
     },
-    GiraffeNFT: {
+    RaffeNFT: {
       address: "0xb19b36b1456e65e3a6d514d3f715f204bd59f431",
       abi: [
         {
@@ -2538,7 +2538,7 @@ const deployedContracts = {
             {
               name: "status",
               type: "uint8",
-              internalType: "enum GiraffeNFT.CommitStatus",
+              internalType: "enum RaffeNFT.CommitStatus",
             },
             {
               name: "minRevealBlock",
@@ -2658,7 +2658,7 @@ const deployedContracts = {
           name: "mint",
           inputs: [
             {
-              name: "giraffeName",
+              name: "raffeName",
               type: "string",
               internalType: "string",
             },
@@ -2706,7 +2706,7 @@ const deployedContracts = {
             {
               name: "status",
               type: "uint8",
-              internalType: "enum GiraffeNFT.CommitStatus",
+              internalType: "enum RaffeNFT.CommitStatus",
             },
           ],
           stateMutability: "view",
@@ -2721,7 +2721,7 @@ const deployedContracts = {
               internalType: "address",
             },
             {
-              name: "giraffeName",
+              name: "raffeName",
               type: "string",
               internalType: "string",
             },
@@ -3311,7 +3311,7 @@ const deployedContracts = {
         },
         {
           type: "event",
-          name: "GiraffeMinted",
+          name: "RaffeMinted",
           inputs: [
             {
               name: "tokenId",
@@ -3706,7 +3706,7 @@ const deployedContracts = {
       inheritedFunctions: {},
       deployedOnBlock: 5,
     },
-    GiraffeRaceSimulator: {
+    RaffeRaceSimulator: {
       address: "0x8ce361602b935680e8dec218b820ff5056beb7af",
       abi: [
         {
@@ -3757,12 +3757,12 @@ const deployedContracts = {
             {
               name: "finishOrder",
               type: "tuple",
-              internalType: "struct GiraffeRaceSimulator.FinishOrder",
+              internalType: "struct RaffeRaceSimulator.FinishOrder",
               components: [
                 {
                   name: "first",
                   type: "tuple",
-                  internalType: "struct GiraffeRaceSimulator.PositionInfo",
+                  internalType: "struct RaffeRaceSimulator.PositionInfo",
                   components: [
                     {
                       name: "lanes",
@@ -3779,7 +3779,7 @@ const deployedContracts = {
                 {
                   name: "second",
                   type: "tuple",
-                  internalType: "struct GiraffeRaceSimulator.PositionInfo",
+                  internalType: "struct RaffeRaceSimulator.PositionInfo",
                   components: [
                     {
                       name: "lanes",
@@ -3796,7 +3796,7 @@ const deployedContracts = {
                 {
                   name: "third",
                   type: "tuple",
-                  internalType: "struct GiraffeRaceSimulator.PositionInfo",
+                  internalType: "struct RaffeRaceSimulator.PositionInfo",
                   components: [
                     {
                       name: "lanes",
@@ -4353,14 +4353,14 @@ const deployedContracts = {
       inheritedFunctions: {},
       deployedOnBlock: 7,
     },
-    GiraffeRace: {
+    RaffeRace: {
       address: "0x196dbcbb54b8ec4958c959d8949ebfe87ac2aaaf",
       abi: [
         {
           type: "constructor",
           inputs: [
             {
-              name: "_giraffeNft",
+              name: "_raffeNft",
               type: "address",
               internalType: "address",
             },
@@ -4375,7 +4375,7 @@ const deployedContracts = {
               internalType: "address",
             },
             {
-              name: "_houseGiraffeTokenIds",
+              name: "_houseRaffeTokenIds",
               type: "uint256[6]",
               internalType: "uint256[6]",
             },
@@ -4953,7 +4953,7 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "getHouseGiraffeTokenIds",
+          name: "getHouseRaffeTokenIds",
           inputs: [],
           outputs: [
             {
@@ -4978,7 +4978,7 @@ const deployedContracts = {
             {
               name: "out",
               type: "tuple",
-              internalType: "struct GiraffeRaceBase.NextClaimView",
+              internalType: "struct RaffeRaceBase.NextClaimView",
               components: [
                 {
                   name: "hasClaim",
@@ -5044,7 +5044,7 @@ const deployedContracts = {
             {
               name: "out",
               type: "tuple",
-              internalType: "struct GiraffeRaceBase.NextClaimView",
+              internalType: "struct RaffeRaceBase.NextClaimView",
               components: [
                 {
                   name: "hasClaim",
@@ -5104,7 +5104,7 @@ const deployedContracts = {
             {
               name: "entries",
               type: "tuple[]",
-              internalType: "struct GiraffeRaceBase.QueueEntryView[]",
+              internalType: "struct RaffeRaceBase.QueueEntryView[]",
               components: [
                 {
                   name: "index",
@@ -5163,7 +5163,7 @@ const deployedContracts = {
             {
               name: "entries",
               type: "tuple[]",
-              internalType: "struct GiraffeRaceBase.QueueEntryView[]",
+              internalType: "struct RaffeRaceBase.QueueEntryView[]",
               components: [
                 {
                   name: "index",
@@ -5398,7 +5398,7 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "getRaceGiraffesById",
+          name: "getRaceRaffesById",
           inputs: [
             {
               name: "raceId",
@@ -5630,13 +5630,13 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "giraffeNft",
+          name: "raffeNft",
           inputs: [],
           outputs: [
             {
               name: "",
               type: "address",
-              internalType: "contract IGiraffeNFT",
+              internalType: "contract IRaffeNFT",
             },
           ],
           stateMutability: "view",
@@ -5656,7 +5656,7 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "houseGiraffeTokenIds",
+          name: "houseRaffeTokenIds",
           inputs: [
             {
               name: "",
@@ -5966,7 +5966,7 @@ const deployedContracts = {
             {
               name: "",
               type: "address",
-              internalType: "contract GiraffeRaceSimulator",
+              internalType: "contract RaffeRaceSimulator",
             },
           ],
           stateMutability: "view",
@@ -6080,7 +6080,7 @@ const deployedContracts = {
         },
         {
           type: "event",
-          name: "GiraffeAssigned",
+          name: "RaffeAssigned",
           inputs: [
             {
               name: "raceId",
@@ -6130,7 +6130,7 @@ const deployedContracts = {
         },
         {
           type: "event",
-          name: "HouseGiraffeAssigned",
+          name: "HouseRaffeAssigned",
           inputs: [
             {
               name: "raceId",
@@ -6483,7 +6483,7 @@ const deployedContracts = {
         },
         {
           type: "error",
-          name: "CannotQueueHouseGiraffe",
+          name: "CannotQueueHouseRaffe",
           inputs: [],
         },
         {
@@ -6493,7 +6493,7 @@ const deployedContracts = {
         },
         {
           type: "error",
-          name: "GiraffeNotAssigned",
+          name: "RaffeNotAssigned",
           inputs: [],
         },
         {
@@ -6513,7 +6513,7 @@ const deployedContracts = {
         },
         {
           type: "error",
-          name: "InvalidHouseGiraffe",
+          name: "InvalidHouseRaffe",
           inputs: [],
         },
         {

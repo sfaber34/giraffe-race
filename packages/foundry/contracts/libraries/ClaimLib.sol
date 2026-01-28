@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import { GiraffeRaceBase } from "../GiraffeRaceBase.sol";
-import { GiraffeRaceConstants as C } from "./GiraffeRaceConstants.sol";
+import { RaffeRaceBase } from "../RaffeRaceBase.sol";
+import { RaffeRaceConstants as C } from "./RaffeRaceConstants.sol";
 
 /**
  * @title ClaimLib
@@ -60,7 +60,7 @@ library ClaimLib {
     /// @param lane The lane to check
     /// @return True if the lane is a winner
     function isWinnerFromRace(
-        GiraffeRaceBase.Race storage race,
+        RaffeRaceBase.Race storage race,
         uint8 lane
     ) internal view returns (bool) {
         for (uint8 i = 0; i < race.deadHeatCount; ) {
@@ -75,7 +75,7 @@ library ClaimLib {
     /// @param lane The lane to check
     /// @return True if the lane is in this position
     function isLaneInPosition(
-        GiraffeRaceBase.PositionInfo storage position,
+        RaffeRaceBase.PositionInfo storage position,
         uint8 lane
     ) internal view returns (bool) {
         for (uint8 i = 0; i < position.count; ) {
@@ -90,7 +90,7 @@ library ClaimLib {
     /// @param lane The lane to check
     /// @return True if the lane is in this position
     function isLaneInPositionMemory(
-        GiraffeRaceBase.PositionInfo memory position,
+        RaffeRaceBase.PositionInfo memory position,
         uint8 lane
     ) internal pure returns (bool) {
         for (uint8 i = 0; i < position.count; ) {
@@ -146,7 +146,7 @@ library ClaimLib {
     /// @param race The race struct
     /// @return liability Total liability for the race
     function calculateRaceLiability(
-        GiraffeRaceBase.Race storage race
+        RaffeRaceBase.Race storage race
     ) internal view returns (uint256 liability) {
         uint8 winnerCount = race.deadHeatCount;
         for (uint8 i = 0; i < winnerCount; ) {
@@ -162,7 +162,7 @@ library ClaimLib {
     /// @param placeOddsBps Fixed odds for Place bets
     /// @return liability Total Place bet liability
     function calculatePlaceLiability(
-        GiraffeRaceBase.Race storage race,
+        RaffeRaceBase.Race storage race,
         uint32 placeOddsBps
     ) internal view returns (uint256 liability) {
         // 1st place lanes get full payout
@@ -189,7 +189,7 @@ library ClaimLib {
     /// @param showOddsBps Fixed odds for Show bets
     /// @return liability Total Show bet liability
     function calculateShowLiability(
-        GiraffeRaceBase.Race storage race,
+        RaffeRaceBase.Race storage race,
         uint32 showOddsBps
     ) internal view returns (uint256 liability) {
         // 1st place lanes get full payout

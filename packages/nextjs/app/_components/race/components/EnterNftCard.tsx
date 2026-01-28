@@ -7,7 +7,7 @@ import { parseStats } from "../utils";
 import { LaneName } from "./LaneName";
 import { Address } from "@scaffold-ui/components";
 import { usePublicClient } from "wagmi";
-import { GiraffeAnimated } from "~~/components/assets/GiraffeAnimated";
+import { RaffeAnimated } from "~~/components/assets/RaffeAnimated";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
 
 interface EnterNftCardProps {
@@ -30,7 +30,7 @@ interface EnterNftCardProps {
   activeQueueLength: number;
 
   // Contract
-  giraffeRaceContract: any;
+  raffeRaceContract: any;
 
   // Actions
   onEnterQueue: () => Promise<void>;
@@ -49,26 +49,26 @@ export const EnterNftCard = ({
   userQueuePosition,
   queueEntries,
   activeQueueLength,
-  giraffeRaceContract,
+  raffeRaceContract,
   onEnterQueue,
 }: EnterNftCardProps) => {
   const publicClient = usePublicClient();
-  const { data: giraffeNftContract } = useDeployedContractInfo({ contractName: "GiraffeNFT" });
+  const { data: raffeNftContract } = useDeployedContractInfo({ contractName: "RaffeNFT" });
 
   // Fetch stats for all queue entries
   const [queueStats, setQueueStats] = useState<Record<string, LaneStats>>({});
 
   useEffect(() => {
     const fetchStats = async () => {
-      if (!publicClient || !giraffeNftContract?.address || !giraffeNftContract?.abi || queueEntries.length === 0) {
+      if (!publicClient || !raffeNftContract?.address || !raffeNftContract?.abi || queueEntries.length === 0) {
         setQueueStats({});
         return;
       }
 
       try {
         const calls = queueEntries.map(entry => ({
-          address: giraffeNftContract.address as `0x${string}`,
-          abi: giraffeNftContract.abi as any,
+          address: raffeNftContract.address as `0x${string}`,
+          abi: raffeNftContract.abi as any,
           functionName: "statsOf",
           args: [entry.tokenId],
         }));
@@ -96,7 +96,7 @@ export const EnterNftCard = ({
     };
 
     void fetchStats();
-  }, [publicClient, giraffeNftContract, queueEntries]);
+  }, [publicClient, raffeNftContract, queueEntries]);
 
   // Determine which entries are "Up Next" (first LANE_COUNT entries)
   const upNextTokenIds = useMemo(() => {
@@ -108,15 +108,15 @@ export const EnterNftCard = ({
       <div className="card-body gap-3">
         <h3 className="font-semibold">Enter the Race Queue</h3>
         <p className="text-sm opacity-70">
-          Join the queue to have your giraffe compete in future races. First come, first served — races start
-          automatically when 6 giraffes are ready.
+          Join the queue to have your raffe compete in future races. First come, first served — races start
+          automatically when 6 raffes are ready.
         </p>
 
         {userInQueue && userQueuedToken ? (
-          // User is already in queue - show their queued giraffe
+          // User is already in queue - show their queued raffe
           <div className="bg-base-200 rounded-xl p-4 flex flex-col gap-3">
             <div className="flex items-center gap-3">
-              <GiraffeAnimated
+              <RaffeAnimated
                 idPrefix={`queued-${userQueuedToken.toString()}`}
                 tokenId={userQueuedToken}
                 playbackRate={1}
@@ -132,21 +132,21 @@ export const EnterNftCard = ({
                 </span>
               </div>
             </div>
-            <div className="text-xs text-success">✓ Your giraffe is committed to race!</div>
+            <div className="text-xs text-success">✓ Your raffe is committed to race!</div>
           </div>
         ) : (
           // User is not in queue - show entry form
           <>
             <label className="form-control w-full">
               <div className="label">
-                <span className="label-text">Select a Giraffe</span>
+                <span className="label-text">Select a Raffe</span>
               </div>
               {!connectedAddress ? (
                 <div className="text-sm opacity-70">Connect your wallet to see your NFTs.</div>
               ) : isOwnedTokensLoading ? (
                 <div className="text-sm opacity-70">Loading your NFTs…</div>
               ) : ownedTokenIds.length === 0 ? (
-                <div className="text-sm opacity-70">You don&apos;t own any GiraffeNFTs yet.</div>
+                <div className="text-sm opacity-70">You don&apos;t own any RaffeNFTs yet.</div>
               ) : (
                 <select
                   className="select select-bordered w-full"
@@ -173,7 +173,7 @@ export const EnterNftCard = ({
 
             <button
               className="btn btn-primary"
-              disabled={!giraffeRaceContract || !connectedAddress || selectedTokenId === null}
+              disabled={!raffeRaceContract || !connectedAddress || selectedTokenId === null}
               onClick={onEnterQueue}
             >
               Join Queue
@@ -182,7 +182,7 @@ export const EnterNftCard = ({
         )}
 
         <div className="text-xs opacity-70">
-          You can have one giraffe in the queue at a time. Once entered, your giraffe is committed until it races.
+          You can have one raffe in the queue at a time. Once entered, your raffe is committed until it races.
         </div>
 
         {/* Queue Display - List View */}
@@ -190,16 +190,16 @@ export const EnterNftCard = ({
         <div className="flex items-center justify-between">
           <h4 className="font-semibold text-sm">Race Queue</h4>
           <div className="text-xs opacity-70">
-            {activeQueueLength} giraffe{activeQueueLength !== 1 ? "s" : ""} waiting
+            {activeQueueLength} raffe{activeQueueLength !== 1 ? "s" : ""} waiting
           </div>
         </div>
 
         {queueEntries.length === 0 ? (
-          <div className="text-sm opacity-70">No giraffes in the queue yet. Be the first to join!</div>
+          <div className="text-sm opacity-70">No raffes in the queue yet. Be the first to join!</div>
         ) : (
           <div className="flex flex-col gap-2">
             {queueEntries.map((entry, idx) => {
-              const isUserGiraffe = userInQueue && userQueuedToken !== null && entry.tokenId === userQueuedToken;
+              const isUserRaffe = userInQueue && userQueuedToken !== null && entry.tokenId === userQueuedToken;
               const isUpNext = upNextTokenIds.has(entry.tokenId.toString());
               const stats = queueStats[entry.tokenId.toString()] ?? { zip: 10, moxie: 10, hustle: 10 };
 
@@ -207,7 +207,7 @@ export const EnterNftCard = ({
                 <div
                   key={entry.tokenId.toString()}
                   className={`flex items-center gap-3 p-3 rounded-xl border bg-base-200/40 ${
-                    isUserGiraffe
+                    isUserRaffe
                       ? "border-primary ring-1 ring-primary"
                       : isUpNext
                         ? "border-warning/50"
@@ -221,7 +221,7 @@ export const EnterNftCard = ({
 
                   {/* NFT Avatar */}
                   <div className="flex-shrink-0">
-                    <GiraffeAnimated
+                    <RaffeAnimated
                       idPrefix={`queue-${entry.tokenId.toString()}`}
                       tokenId={entry.tokenId}
                       playbackRate={1}
@@ -236,7 +236,7 @@ export const EnterNftCard = ({
                       <span className="font-semibold truncate">
                         <LaneName tokenId={entry.tokenId} fallback={`#${entry.tokenId.toString()}`} />
                       </span>
-                      {isUserGiraffe && <span className="badge badge-primary badge-sm">You</span>}
+                      {isUserRaffe && <span className="badge badge-primary badge-sm">You</span>}
                       {isUpNext && <span className="badge badge-warning badge-sm">Up Next</span>}
                     </div>
                     {/* Owner Address */}

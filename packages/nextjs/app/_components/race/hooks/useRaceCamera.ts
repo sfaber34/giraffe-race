@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BASE_REPLAY_SPEED_MULTIPLIER, GIRAFFE_SIZE_PX, TRACK_LENGTH, TRACK_LENGTH_PX } from "../constants";
+import { BASE_REPLAY_SPEED_MULTIPLIER, RAFFE_SIZE_PX, TRACK_LENGTH, TRACK_LENGTH_PX } from "../constants";
 import { PlaybackSpeed } from "../types";
 
 interface UseRaceCameraProps {
@@ -74,7 +74,7 @@ export const useRaceCamera = ({
 
     const distances = currentDistances.map(x => Number(x ?? 0));
     const maxDist = Math.max(...distances);
-    const spriteHalf = GIRAFFE_SIZE_PX / 2;
+    const spriteHalf = RAFFE_SIZE_PX / 2;
     const maxRunnerX = worldPaddingLeft + (maxDist / TRACK_LENGTH) * TRACK_LENGTH_PX - spriteHalf;
 
     const avgDist = distances.length ? distances.reduce((sum, d) => sum + d, 0) / distances.length : 0;

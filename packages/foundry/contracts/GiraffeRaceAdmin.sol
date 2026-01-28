@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import { GiraffeRaceBase } from "./GiraffeRaceBase.sol";
+import { RaffeRaceBase } from "./RaffeRaceBase.sol";
 
 /**
- * @title GiraffeRaceAdmin
- * @notice Admin functions for GiraffeRace configuration
+ * @title RaffeRaceAdmin
+ * @notice Admin functions for RaffeRace configuration
  * @dev Only callable by treasuryOwner
  */
-abstract contract GiraffeRaceAdmin is GiraffeRaceBase {
+abstract contract RaffeRaceAdmin is RaffeRaceBase {
     /// @notice Update the house edge (in basis points). Max 30%.
     /// @param newEdgeBps The new house edge in basis points (e.g., 500 = 5%).
     function setHouseEdgeBps(uint16 newEdgeBps) external onlyTreasuryOwner {
@@ -66,7 +66,7 @@ abstract contract GiraffeRaceAdmin is GiraffeRaceBase {
 
     // ============ View Functions ============
 
-    function getHouseGiraffeTokenIds() external view returns (uint256[6] memory) {
-        return houseGiraffeTokenIds;
+    function getHouseRaffeTokenIds() external view returns (uint256[6] memory) {
+        return houseRaffeTokenIds;
     }
 }
