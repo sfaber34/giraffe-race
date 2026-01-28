@@ -136,10 +136,10 @@ export const PlaceBetCard = ({
 
   // Get any existing bet markers for a lane
   const getBetMarkers = (lane: number) => {
-    const markers: string[] = [];
-    if (winBetLane === lane) markers.push("W");
-    if (placeBetLane === lane) markers.push("P");
-    if (showBetLane === lane) markers.push("S");
+    const markers: { label: string; color: string }[] = [];
+    if (winBetLane === lane) markers.push({ label: "Win", color: "bg-yellow-500 text-yellow-950" });
+    if (placeBetLane === lane) markers.push({ label: "Place", color: "bg-blue-400 text-blue-950" });
+    if (showBetLane === lane) markers.push({ label: "Show", color: "bg-green-400 text-green-950" });
     return markers;
   };
 
@@ -233,8 +233,8 @@ export const PlaceBetCard = ({
                       {betMarkers.length > 0 && (
                         <div className="flex gap-0.5">
                           {betMarkers.map(m => (
-                            <span key={m} className="badge badge-xs badge-primary">
-                              {m}
+                            <span key={m.label} className={`badge badge-xs ${m.color}`}>
+                              {m.label}
                             </span>
                           ))}
                         </div>

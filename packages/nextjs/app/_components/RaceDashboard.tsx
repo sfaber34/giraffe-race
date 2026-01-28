@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ClaimPayoutCard, EnterNftCard, PlaceBetCard, RaceOverlay, RaceTrack } from "./race/components";
 import { LANE_COUNT, TRACK_HEIGHT_PX, USDC_DECIMALS } from "./race/constants";
 import {
-  useMyBet,
   useMyBets,
   useRaceCamera,
   useRaceData,
@@ -64,9 +63,6 @@ export const RaceDashboard = () => {
   const queue = useRaceQueue(giraffeRaceContract, connectedAddress);
   const { activeQueueLength, userInQueue, userQueuedToken, userQueuePosition, queueEntries } = queue;
 
-  // My bet (legacy single bet - for backwards compatibility)
-  const myBet = useMyBet(viewingRaceId, connectedAddress, giraffeRaceContract, hasAnyRace);
-
   // My bets (Win/Place/Show)
   const myBets = useMyBets(viewingRaceId, connectedAddress, giraffeRaceContract, hasAnyRace);
 
@@ -107,7 +103,6 @@ export const RaceDashboard = () => {
 
   // Local UI state
   const [selectedTokenId, setSelectedTokenId] = useState<bigint | null>(null);
-  const [betLane, setBetLane] = useState<number | null>(null);
   const [betAmountUsdc, setBetAmountUsdc] = useState("");
   const [isApproving, setIsApproving] = useState(false);
 
@@ -122,17 +117,6 @@ export const RaceDashboard = () => {
   const { writeContractAsync: writeUsdcAsync } = useScaffoldWriteContract({
     contractName: usdcContractName as any,
   });
-
-  // Reset state on race/wallet change
-  useEffect(() => {
-    setBetLane(null);
-  }, [connectedAddress, viewingRaceId]);
-
-  // Lock bet lane to user's bet
-  useEffect(() => {
-    if (!myBet?.hasBet) return;
-    setBetLane(myBet.lane);
-  }, [myBet?.hasBet, myBet?.lane]);
 
   // Jump to next winning claim after claim
   useEffect(() => {
@@ -196,17 +180,6 @@ export const RaceDashboard = () => {
     if (maxBetAmount === null) return false;
     return placeBetValue > maxBetAmount;
   }, [placeBetValue, maxBetAmount]);
-
-  const estimatedPayoutWei = useMemo(() => {
-    if (!parsedOdds?.oddsSet) return null;
-    const lane = myBet?.hasBet ? myBet.lane : betLane;
-    if (lane === null || lane === undefined) return null;
-    const amountWei = myBet?.hasBet ? myBet.amount : placeBetValue;
-    if (!amountWei) return null;
-    const oddsBps = parsedOdds.oddsBps?.[lane] ?? 0n;
-    if (oddsBps <= 0n) return null;
-    return (amountWei * oddsBps) / 10_000n;
-  }, [parsedOdds?.oddsSet, parsedOdds?.oddsBps, placeBetValue, betLane, myBet?.hasBet, myBet?.lane, myBet?.amount]);
 
   // Revealed state
   const hasRevealedClaimSnapshot = claimSnapshot !== null;
@@ -335,8 +308,6 @@ export const RaceDashboard = () => {
                     cooldownStatus={cooldownStatus}
                     laneTokenIds={laneTokenIds}
                     parsedFinishOrder={parsedFinishOrder}
-                    myBet={myBet}
-                    estimatedPayoutWei={estimatedPayoutWei}
                     blockNumber={activeBlockNumber}
                     bettingCloseBlock={bettingCloseBlock}
                   />
@@ -355,7 +326,7 @@ export const RaceDashboard = () => {
                   lastFrameIndex={replay.lastFrameIndex}
                   playbackSpeed={replay.playbackSpeed}
                   svgResetNonce={replay.svgResetNonce}
-                  myBet={myBet}
+                  myBets={myBets}
                 />
               </div>
 

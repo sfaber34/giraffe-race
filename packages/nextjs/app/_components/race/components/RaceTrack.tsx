@@ -1,6 +1,6 @@
 "use client";
 
-import { memo } from "react";
+import React, { memo } from "react";
 import {
   BASE_REPLAY_SPEED_MULTIPLIER,
   GIRAFFE_SIZE_PX,
@@ -15,7 +15,7 @@ import {
   WORLD_PADDING_LEFT_PX,
   WORLD_WIDTH_PX,
 } from "../constants";
-import { MyBet, ParsedGiraffes, PlaybackSpeed } from "../types";
+import { MyBets, ParsedGiraffes, PlaybackSpeed } from "../types";
 import { LaneName } from "./LaneName";
 import { GiraffeAnimated } from "~~/components/assets/GiraffeAnimated";
 
@@ -39,7 +39,7 @@ interface RaceTrackProps {
   svgResetNonce: number;
 
   // Bet state
-  myBet: MyBet | null;
+  myBets: MyBets | null;
 }
 
 /**
@@ -78,7 +78,7 @@ export const RaceTrack = memo(function RaceTrack({
   lastFrameIndex,
   playbackSpeed,
   svgResetNonce,
-  myBet,
+  myBets,
 }: RaceTrackProps) {
   return (
     <>
@@ -178,7 +178,11 @@ export const RaceTrack = memo(function RaceTrack({
                     const d = simulation ? Number(currentDistances[i] ?? 0) : 0;
                     const prev = simulation ? Number(prevDistances[i] ?? 0) : 0;
                     const delta = Math.max(0, d - prev);
-                    const isUserBetLane = !!myBet?.hasBet && myBet.lane === i;
+
+                    // Determine which bets the user has on this lane
+                    const hasWinBet = myBets?.win?.hasBet && myBets.win.lane === i;
+                    const hasPlaceBet = myBets?.place?.hasBet && myBets.place.lane === i;
+                    const hasShowBet = myBets?.show?.hasBet && myBets.show.lane === i;
 
                     const MIN_ANIMATION_SPEED_FACTOR = 2.0;
                     const MAX_ANIMATION_SPEED_FACTOR = 5.0;
@@ -210,17 +214,6 @@ export const RaceTrack = memo(function RaceTrack({
                         }}
                       >
                         <div className="relative">
-                          {isUserBetLane ? (
-                            <div
-                              className="absolute left-1/3 -translate-x-1/2 -top-2 z-30 pointer-events-none select-none"
-                              role="img"
-                              aria-label="Your bet"
-                            >
-                              <span className="inline-flex items-center justify-center rounded-full bg-base-100/90 px-1.5 py-0.5 text-green-500 font-extrabold drop-shadow text-sm">
-                                $
-                              </span>
-                            </div>
-                          ) : null}
                           <GiraffeAnimated
                             idPrefix={`lane-${i}`}
                             tokenId={parsedGiraffes?.tokenIds?.[i] ?? 0n}
@@ -239,12 +232,46 @@ export const RaceTrack = memo(function RaceTrack({
                               }}
                             >
                               <span
-                                className="inline-flex items-center px-1.5 py-0.5 text-xs font-semibold"
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-semibold"
                                 style={{
                                   textShadow: "0 1px 2px rgba(0,0,0,0.1)",
                                 }}
                               >
                                 <LaneName tokenId={parsedGiraffes.tokenIds[i]} fallback={`#${i + 1}`} />
+                                {(hasWinBet || hasPlaceBet || hasShowBet) && (
+                                  <span className="font-bold">
+                                    (
+                                    {[
+                                      hasWinBet && (
+                                        <span key="w" className="text-yellow-500">
+                                          W
+                                        </span>
+                                      ),
+                                      hasPlaceBet && (
+                                        <span key="p" className="text-blue-400">
+                                          P
+                                        </span>
+                                      ),
+                                      hasShowBet && (
+                                        <span key="s" className="text-green-400">
+                                          S
+                                        </span>
+                                      ),
+                                    ]
+                                      .filter(Boolean)
+                                      .reduce((acc: React.ReactNode[], el, idx) => {
+                                        if (idx > 0)
+                                          acc.push(
+                                            <span key={`slash-${idx}`} className="opacity-70">
+                                              /
+                                            </span>,
+                                          );
+                                        acc.push(el);
+                                        return acc;
+                                      }, [])}
+                                    )
+                                  </span>
+                                )}
                               </span>
                             </div>
                           ) : null}

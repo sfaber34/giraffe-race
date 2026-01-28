@@ -1,10 +1,8 @@
 "use client";
 
-import { USDC_DECIMALS } from "../constants";
-import { CooldownStatus, MyBet, ParsedFinishOrder, ParsedRace, ParsedSchedule, RaceStatus } from "../types";
+import { CooldownStatus, ParsedFinishOrder, ParsedRace, ParsedSchedule, RaceStatus } from "../types";
 import { BlockCountdownBar } from "./BlockCountdownBar";
 import { LaneName } from "./LaneName";
-import { formatUnits } from "viem";
 import { GiraffeAnimated } from "~~/components/assets/GiraffeAnimated";
 
 interface RaceOverlayProps {
@@ -25,10 +23,6 @@ interface RaceOverlayProps {
   cooldownStatus: CooldownStatus | null;
   laneTokenIds: bigint[];
   parsedFinishOrder: ParsedFinishOrder | null;
-
-  // Bet data
-  myBet: MyBet | null;
-  estimatedPayoutWei: bigint | null;
 
   // Block data
   blockNumber: bigint | undefined;
@@ -52,8 +46,6 @@ export const RaceOverlay = ({
   cooldownStatus,
   laneTokenIds,
   parsedFinishOrder,
-  myBet,
-  estimatedPayoutWei,
   blockNumber,
   bettingCloseBlock,
 }: RaceOverlayProps) => {
@@ -194,30 +186,8 @@ export const RaceOverlay = ({
           className="flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-base-100/90 backdrop-blur-sm shadow-lg"
           style={{ minWidth: 320 }}
         >
-          {myBet?.hasBet ? (
-            <>
-              <div className="text-3xl font-black text-primary drop-shadow">Bet placed</div>
-              <div className="text-lg font-semibold text-base-content/80 flex items-center gap-2">
-                <span>You bet {formatUnits(myBet.amount, USDC_DECIMALS)} USDC on</span>
-                <GiraffeAnimated
-                  idPrefix={`overlay-bet-${(viewingRaceId ?? 0n).toString()}-${myBet.lane}`}
-                  tokenId={laneTokenIds[myBet.lane] ?? 0n}
-                  playbackRate={1}
-                  playing={true}
-                  sizePx={48}
-                />
-                <LaneName tokenId={laneTokenIds[myBet.lane] ?? 0n} fallback={`Lane ${myBet.lane}`} />
-              </div>
-              <div className="text-lg font-semibold text-base-content/70">
-                Payout: {estimatedPayoutWei ? `${formatUnits(estimatedPayoutWei, USDC_DECIMALS)} USDC` : "—"}
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="text-3xl font-black text-primary drop-shadow">Betting open</div>
-              <div className="text-lg font-semibold text-base-content/70">Place your bets!</div>
-            </>
-          )}
+          <div className="text-3xl font-black text-primary drop-shadow">Betting open</div>
+          <div className="text-lg font-semibold text-base-content/70">Place your bets!</div>
           <div className="w-full mt-2">
             <BlockCountdownBar
               label="Betting closes in"
@@ -232,30 +202,8 @@ export const RaceOverlay = ({
           className="flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-base-100/90 backdrop-blur-sm shadow-lg"
           style={{ minWidth: 320 }}
         >
-          {myBet?.hasBet ? (
-            <>
-              <div className="text-3xl font-black text-primary drop-shadow">Bet placed</div>
-              <div className="text-lg font-semibold text-base-content/80 flex items-center gap-2">
-                <span>You bet {formatUnits(myBet.amount, USDC_DECIMALS)} USDC on</span>
-                <GiraffeAnimated
-                  idPrefix={`overlay-bet-closed-${(viewingRaceId ?? 0n).toString()}-${myBet.lane}`}
-                  tokenId={laneTokenIds[myBet.lane] ?? 0n}
-                  playbackRate={1}
-                  playing={true}
-                  sizePx={48}
-                />
-                <LaneName tokenId={laneTokenIds[myBet.lane] ?? 0n} fallback={`Lane ${myBet.lane}`} />
-              </div>
-              <div className="text-lg font-semibold text-base-content/70">
-                Payout: {estimatedPayoutWei ? `${formatUnits(estimatedPayoutWei, USDC_DECIMALS)} USDC` : "—"}
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="text-3xl font-black text-primary drop-shadow">Betting closed</div>
-              <div className="text-lg font-semibold text-base-content/70">Race starts soon!</div>
-            </>
-          )}
+          <div className="text-3xl font-black text-primary drop-shadow">Betting closed</div>
+          <div className="text-lg font-semibold text-base-content/70">Race starts soon!</div>
         </div>
       ) : status === "settled" || status === "cooldown" ? (
         // Race is settled or in cooldown - show waiting for next race
