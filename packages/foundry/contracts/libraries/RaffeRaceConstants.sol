@@ -41,15 +41,6 @@ library RaffeRaceConstants {
     
     /// @notice Minimum decimal odds in basis points (1.01x)
     uint32 internal constant MIN_DECIMAL_ODDS_BPS = 10100;
-    
-    /// @notice Fallback fixed odds when no probability table (5.70x)
-    uint32 internal constant TEMP_FIXED_DECIMAL_ODDS_BPS = 57000;
-    
-    /// @notice Fixed Place odds (2.40x) - temporary until dynamic odds
-    uint32 internal constant TEMP_FIXED_PLACE_ODDS_BPS = 24000;
-    
-    /// @notice Fixed Show odds (1.60x) - temporary until dynamic odds
-    uint32 internal constant TEMP_FIXED_SHOW_ODDS_BPS = 16000;
 
     // ============ Bet Types ============
     

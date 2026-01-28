@@ -34,16 +34,10 @@ abstract contract RaffeRaceBase {
     uint16 public constant ODDS_SCALE = 10000;
     uint16 public constant MAX_HOUSE_EDGE_BPS = 3000;
     uint32 public constant MIN_DECIMAL_ODDS_BPS = 10100;
-    uint32 public constant TEMP_FIXED_DECIMAL_ODDS_BPS = 57000;
     uint64 public constant ODDS_WINDOW_BLOCKS = 10;
     uint64 public constant BETTING_WINDOW_BLOCKS = 30;
     uint64 public constant POST_RACE_COOLDOWN_BLOCKS = 30;
     uint16 public constant MAX_QUEUE_SIZE = 128;
-    
-    // Fixed odds for Place and Show (temporary until dynamic odds)
-    // Win: 5.70x (existing), Place: 2.40x, Show: 1.60x
-    uint32 public constant TEMP_FIXED_PLACE_ODDS_BPS = 24000;
-    uint32 public constant TEMP_FIXED_SHOW_ODDS_BPS = 16000;
 
     // ============ Bet Types ============
     
@@ -68,9 +62,6 @@ abstract contract RaffeRaceBase {
         assert(ODDS_SCALE == C.ODDS_SCALE);
         assert(MAX_HOUSE_EDGE_BPS == C.MAX_HOUSE_EDGE_BPS);
         assert(MIN_DECIMAL_ODDS_BPS == C.MIN_DECIMAL_ODDS_BPS);
-        assert(TEMP_FIXED_DECIMAL_ODDS_BPS == C.TEMP_FIXED_DECIMAL_ODDS_BPS);
-        assert(TEMP_FIXED_PLACE_ODDS_BPS == C.TEMP_FIXED_PLACE_ODDS_BPS);
-        assert(TEMP_FIXED_SHOW_ODDS_BPS == C.TEMP_FIXED_SHOW_ODDS_BPS);
         assert(BET_TYPE_WIN == C.BET_TYPE_WIN);
         assert(BET_TYPE_PLACE == C.BET_TYPE_PLACE);
         assert(BET_TYPE_SHOW == C.BET_TYPE_SHOW);
