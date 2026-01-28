@@ -3,18 +3,14 @@
 import React, { memo } from "react";
 import {
   BASE_REPLAY_SPEED_MULTIPLIER,
-  GIRAFFE_SIZE_PX,
   LANE_COUNT,
   PX_PER_UNIT,
   SPEED_RANGE,
-  TRACK_BASE_Y_PX,
-  TRACK_HEIGHT_PX,
   TRACK_LENGTH,
   TRACK_LENGTH_PX,
-  TRACK_VERTICAL_SPREAD_PX,
-  WORLD_PADDING_LEFT_PX,
-  WORLD_WIDTH_PX,
+  WORLD_PADDING_RIGHT_PX,
 } from "../constants";
+import { TrackDimensions } from "../hooks/useTrackDimensions";
 import { MyBets, ParsedGiraffes, PlaybackSpeed } from "../types";
 import { LaneName } from "./LaneName";
 import { GiraffeAnimated } from "~~/components/assets/GiraffeAnimated";
@@ -22,6 +18,9 @@ import { GiraffeAnimated } from "~~/components/assets/GiraffeAnimated";
 interface RaceTrackProps {
   // Viewport refs
   cameraScrollRefCb: (el: HTMLDivElement | null) => void;
+
+  // Responsive dimensions
+  dimensions: TrackDimensions;
 
   // Race state
   simulation: unknown | null;
@@ -46,10 +45,10 @@ interface RaceTrackProps {
  * Compute Y position for a giraffe based on lane index.
  * Creates depth illusion: lane 0 at top (furthest), lane 5 at bottom (closest).
  */
-const getLaneY = (laneIndex: number): number => {
+const getLaneY = (laneIndex: number, trackBaseY: number, trackVerticalSpread: number): number => {
   // Linear interpolation: lane 0 is at top, lane 5 is at bottom
   const t = laneIndex / (LANE_COUNT - 1);
-  return TRACK_BASE_Y_PX - TRACK_VERTICAL_SPREAD_PX / 2 + t * TRACK_VERTICAL_SPREAD_PX;
+  return trackBaseY - trackVerticalSpread / 2 + t * trackVerticalSpread;
 };
 
 /**
@@ -67,6 +66,7 @@ const getLaneScale = (_laneIndex: number): number => 1.0;
 
 export const RaceTrack = memo(function RaceTrack({
   cameraScrollRefCb,
+  dimensions,
   simulation,
   lineupFinalized,
   parsedGiraffes,
@@ -80,12 +80,17 @@ export const RaceTrack = memo(function RaceTrack({
   svgResetNonce,
   myBets,
 }: RaceTrackProps) {
+  const { trackHeight, trackBaseY, trackVerticalSpread, giraffeSize, worldPaddingLeft } = dimensions;
+
+  // Compute world width dynamically based on responsive padding
+  const worldWidth = worldPaddingLeft + TRACK_LENGTH_PX + WORLD_PADDING_RIGHT_PX;
+
   return (
     <>
       {/* Camera viewport */}
       <div className="absolute inset-0">
         <div ref={cameraScrollRefCb} className="absolute inset-0 overflow-hidden">
-          <div className="relative" style={{ width: `${WORLD_WIDTH_PX}px`, height: `${TRACK_HEIGHT_PX}px` }}>
+          <div className="relative" style={{ width: `${worldWidth}px`, height: `${trackHeight}px` }}>
             {/* Track background - single wide track with perspective */}
             <div className="absolute inset-0">
               {/* Ground/track surface with perspective gradient */}
@@ -107,7 +112,7 @@ export const RaceTrack = memo(function RaceTrack({
 
               {/* Track surface texture lines for depth */}
               {Array.from({ length: 14 }).map((_, i) => {
-                const y = (i / 13) * TRACK_HEIGHT_PX;
+                const y = (i / 13) * trackHeight;
                 const opacity = 0.08 + (i / 13) * 0.12;
                 return (
                   <div
@@ -126,10 +131,10 @@ export const RaceTrack = memo(function RaceTrack({
               <div
                 className="absolute bg-white/40"
                 style={{
-                  left: `${WORLD_PADDING_LEFT_PX}px`,
+                  left: `${worldPaddingLeft}px`,
                   top: 0,
                   width: "4px",
-                  height: `${TRACK_HEIGHT_PX}px`,
+                  height: `${trackHeight}px`,
                   transform: "skewY(-3deg)",
                 }}
               />
@@ -138,10 +143,10 @@ export const RaceTrack = memo(function RaceTrack({
               <div
                 className="absolute"
                 style={{
-                  left: `${WORLD_PADDING_LEFT_PX + TRACK_LENGTH_PX}px`,
+                  left: `${worldPaddingLeft + TRACK_LENGTH_PX}px`,
                   top: 0,
                   width: "6px",
-                  height: `${TRACK_HEIGHT_PX}px`,
+                  height: `${trackHeight}px`,
                   transform: "skewY(-3deg)",
                   background: "repeating-linear-gradient(180deg, #fff 0px, #fff 6px, #222 6px, #222 12px)",
                 }}
@@ -150,7 +155,7 @@ export const RaceTrack = memo(function RaceTrack({
               {/* Distance markers with perspective */}
               {Array.from({ length: Math.floor(TRACK_LENGTH / 100) - 1 }).map((_, idx) => {
                 const dist = (idx + 1) * 100;
-                const x = WORLD_PADDING_LEFT_PX + (dist / TRACK_LENGTH) * TRACK_LENGTH_PX;
+                const x = worldPaddingLeft + (dist / TRACK_LENGTH) * TRACK_LENGTH_PX;
                 return (
                   <div
                     key={dist}
@@ -159,7 +164,7 @@ export const RaceTrack = memo(function RaceTrack({
                       left: `${x}px`,
                       top: 0,
                       width: "2px",
-                      height: `${TRACK_HEIGHT_PX}px`,
+                      height: `${trackHeight}px`,
                       background: "rgba(255,255,255,0.5)",
                       transform: "skewY(-3deg)",
                     }}
@@ -195,8 +200,8 @@ export const RaceTrack = memo(function RaceTrack({
 
                     // Allow giraffes to run past the finish line to their actual distances
                     // Distance is in race units, convert to pixels directly (no upper clamp)
-                    const x = WORLD_PADDING_LEFT_PX + Math.max(0, d) * PX_PER_UNIT - GIRAFFE_SIZE_PX / 2;
-                    const y = getLaneY(i);
+                    const x = worldPaddingLeft + Math.max(0, d) * PX_PER_UNIT - giraffeSize / 2;
+                    const y = getLaneY(i, trackBaseY, trackVerticalSpread);
                     const scale = getLaneScale(i);
                     const zIndex = getLaneZIndex(i);
 
@@ -220,15 +225,15 @@ export const RaceTrack = memo(function RaceTrack({
                             playbackRate={speedFactor}
                             resetNonce={svgResetNonce}
                             playing={simulation ? isPlaying && raceStarted && frame < lastFrameIndex : false}
-                            sizePx={GIRAFFE_SIZE_PX}
+                            sizePx={giraffeSize}
                           />
                           {/* Name label - positioned to the right of the giraffe's face */}
                           {parsedGiraffes?.tokenIds?.[i] ? (
                             <div
                               className="absolute pointer-events-none select-none whitespace-nowrap"
                               style={{
-                                left: `${GIRAFFE_SIZE_PX * 1.05}px`,
-                                top: `${GIRAFFE_SIZE_PX * 0.1}px`,
+                                left: `${giraffeSize * 1.05}px`,
+                                top: `${giraffeSize * 0.1}px`,
                               }}
                             >
                               <span

@@ -3,12 +3,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BASE_REPLAY_SPEED_MULTIPLIER,
-  FINISH_LINE_X,
   GIRAFFE_SIZE_PX,
   TRACK_LENGTH,
   TRACK_LENGTH_PX,
-  WORLD_PADDING_LEFT_PX,
-  WORLD_WIDTH_PX,
+  WORLD_PADDING_RIGHT_PX,
 } from "../constants";
 import { PlaybackSpeed } from "../types";
 
@@ -16,9 +14,17 @@ interface UseRaceCameraProps {
   simulation: unknown | null;
   currentDistances: number[];
   playbackSpeed: PlaybackSpeed;
+  cameraStartX: number;
+  worldPaddingLeft: number;
 }
 
-export const useRaceCamera = ({ simulation, currentDistances, playbackSpeed }: UseRaceCameraProps) => {
+export const useRaceCamera = ({
+  simulation,
+  currentDistances,
+  playbackSpeed,
+  cameraStartX,
+  worldPaddingLeft,
+}: UseRaceCameraProps) => {
   const [viewportEl, setViewportEl] = useState<HTMLDivElement | null>(null);
   const viewportRefCb = useMemo(() => (el: HTMLDivElement | null) => setViewportEl(el), []);
   const [viewportWidthPx, setViewportWidthPx] = useState(0);
@@ -26,8 +32,8 @@ export const useRaceCamera = ({ simulation, currentDistances, playbackSpeed }: U
   const [cameraScrollEl, setCameraScrollEl] = useState<HTMLDivElement | null>(null);
   const cameraScrollRefCb = useMemo(() => (el: HTMLDivElement | null) => setCameraScrollEl(el), []);
 
-  const [cameraX, setCameraX] = useState(0);
-  const cameraTargetXRef = useRef(0);
+  const [cameraX, setCameraX] = useState(cameraStartX);
+  const cameraTargetXRef = useRef(cameraStartX);
   const cameraSmoothRafRef = useRef<number | null>(null);
   const cameraSmoothLastTsRef = useRef<number | null>(null);
   const playbackSpeedRef = useRef(playbackSpeed);
@@ -54,23 +60,27 @@ export const useRaceCamera = ({ simulation, currentDistances, playbackSpeed }: U
   // Compute cameraX from simulation state
   useEffect(() => {
     if (!simulation) {
-      setCameraX(0);
+      setCameraX(cameraStartX);
       return;
     }
 
     const viewportWorldWidth = viewportWidthPx > 0 ? viewportWidthPx : 0;
     if (viewportWorldWidth <= 0) {
-      setCameraX(0);
+      setCameraX(cameraStartX);
       return;
     }
+
+    // Compute derived values from responsive worldPaddingLeft
+    const worldWidth = worldPaddingLeft + TRACK_LENGTH_PX + WORLD_PADDING_RIGHT_PX;
+    const finishLineX = worldPaddingLeft + TRACK_LENGTH_PX;
 
     const distances = currentDistances.map(x => Number(x ?? 0));
     const maxDist = Math.max(...distances);
     const spriteHalf = GIRAFFE_SIZE_PX / 2;
-    const maxRunnerX = WORLD_PADDING_LEFT_PX + (maxDist / TRACK_LENGTH) * TRACK_LENGTH_PX - spriteHalf;
+    const maxRunnerX = worldPaddingLeft + (maxDist / TRACK_LENGTH) * TRACK_LENGTH_PX - spriteHalf;
 
     const avgDist = distances.length ? distances.reduce((sum, d) => sum + d, 0) / distances.length : 0;
-    const focalX = WORLD_PADDING_LEFT_PX + (avgDist / TRACK_LENGTH) * TRACK_LENGTH_PX - spriteHalf;
+    const focalX = worldPaddingLeft + (avgDist / TRACK_LENGTH) * TRACK_LENGTH_PX - spriteHalf;
 
     const spritePad = 12;
     const minLeaderScreenX = spriteHalf + spritePad;
@@ -82,18 +92,18 @@ export const useRaceCamera = ({ simulation, currentDistances, playbackSpeed }: U
     const targetFocalScreenX = viewportWorldWidth * 0.5;
     const desiredFocalScreenX = Math.min(maxLeaderScreenX, Math.max(minLeaderScreenX, targetFocalScreenX));
 
-    const maxCameraX = Math.max(0, WORLD_WIDTH_PX - viewportWorldWidth);
+    const maxCameraX = Math.max(0, worldWidth - viewportWorldWidth);
 
     const finishInset = 150;
-    const freezeX = Math.min(maxCameraX, Math.max(0, FINISH_LINE_X - (viewportWorldWidth - finishInset)));
+    const freezeX = Math.min(maxCameraX, Math.max(0, finishLineX - (viewportWorldWidth - finishInset)));
 
     const followFocalX = Math.min(maxCameraX, Math.max(0, focalX - desiredFocalScreenX));
     const keepMaxVisibleX = Math.min(maxCameraX, Math.max(0, maxRunnerX - maxLeaderScreenX));
     const followX = Math.max(followFocalX, keepMaxVisibleX);
 
-    const nextCameraX = maxRunnerX < followStartX ? 0 : Math.min(followX, freezeX);
+    const nextCameraX = maxRunnerX < followStartX ? cameraStartX : Math.min(followX, freezeX);
     setCameraX(nextCameraX);
-  }, [simulation, currentDistances, viewportWidthPx]);
+  }, [simulation, currentDistances, viewportWidthPx, cameraStartX, worldPaddingLeft]);
 
   useEffect(() => {
     cameraTargetXRef.current = Math.max(0, cameraX);
@@ -103,11 +113,11 @@ export const useRaceCamera = ({ simulation, currentDistances, playbackSpeed }: U
   useEffect(() => {
     if (!cameraScrollEl) return;
     if (!simulation) {
-      cameraScrollEl.scrollLeft = 0;
-      cameraSpringXRef.current = 0;
+      cameraScrollEl.scrollLeft = cameraStartX;
+      cameraSpringXRef.current = cameraStartX;
       cameraSpringVRef.current = 0;
     }
-  }, [cameraScrollEl, simulation]);
+  }, [cameraScrollEl, simulation, cameraStartX]);
 
   // Smooth camera with spring
   useEffect(() => {

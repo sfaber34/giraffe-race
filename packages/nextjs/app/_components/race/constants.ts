@@ -29,16 +29,23 @@ export const BASE_REPLAY_SPEED_MULTIPLIER = 1.5;
 export const WORLD_PADDING_LEFT_PX = 100;
 export const WORLD_PADDING_RIGHT_PX = 140;
 export const PX_PER_UNIT = 3;
-export const GIRAFFE_SIZE_PX = 100;
 
-// Track height - fixed to fill parent container
-export const TRACK_HEIGHT_PX = 328;
-
-// Side-view specific: giraffes span nearly full track height with ~15px padding
-// Lane 0 = furthest from camera (top), Lane 5 = closest to camera (bottom)
-// All giraffes same size for cartoon style
-export const TRACK_BASE_Y_PX = 164; // Center of track
-export const TRACK_VERTICAL_SPREAD_PX = 198; // Spread between lane 0 and lane 5 centers
+// ============================================================================
+// RESPONSIVE TRACK DIMENSIONS
+// ============================================================================
+// Track height, giraffe size, and vertical spread are now RESPONSIVE.
+// - CSS variables defined in globals.css (single source of truth for breakpoints)
+// - useTrackDimensions() hook reads current values for JS calculations
+//
+// Mobile (< 768px): 328px height, 100px giraffe
+// Desktop (>= 768px): 650px height, 140px giraffe
+//
+// The following constants are FALLBACKS only - use useTrackDimensions() hook instead.
+// ============================================================================
+export const GIRAFFE_SIZE_PX = 100; // Fallback - use dimensions.giraffeSize
+export const TRACK_HEIGHT_PX = 328; // Fallback - use dimensions.trackHeight
+export const TRACK_BASE_Y_PX = 164; // Fallback - use dimensions.trackBaseY
+export const TRACK_VERTICAL_SPREAD_PX = 198; // Fallback - use dimensions.trackVerticalSpread
 
 // Legacy export for compatibility (now unused in rendering)
 export const LANE_HEIGHT_PX = 86;

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ClaimPayoutCard, EnterNftCard, PlaceBetCard, RaceOverlay, RaceTrack } from "./race/components";
-import { LANE_COUNT, TRACK_HEIGHT_PX, USDC_DECIMALS } from "./race/constants";
+import { LANE_COUNT, USDC_DECIMALS } from "./race/constants";
 import {
   useMyBets,
   useRaceCamera,
@@ -11,6 +11,7 @@ import {
   useRaceQueue,
   useRaceReplay,
   useRaceStatus,
+  useTrackDimensions,
   useViewingRace,
   useWinningClaims,
 } from "./race/hooks";
@@ -20,6 +21,9 @@ import { useBlockNumber } from "wagmi";
 import { useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 
 export const RaceDashboard = () => {
+  // Responsive track dimensions
+  const trackDimensions = useTrackDimensions();
+
   // Core data hooks
   const raceData = useRaceData();
   const {
@@ -99,6 +103,8 @@ export const RaceDashboard = () => {
     simulation: replay.simulation,
     currentDistances: replay.currentDistances,
     playbackSpeed: replay.playbackSpeed,
+    cameraStartX: trackDimensions.cameraStartX,
+    worldPaddingLeft: trackDimensions.worldPaddingLeft,
   });
 
   // Local UI state
@@ -289,7 +295,7 @@ export const RaceDashboard = () => {
               <div
                 ref={camera.viewportRefCb}
                 className="relative w-full bg-base-100 border border-base-300 overflow-hidden"
-                style={{ height: `${TRACK_HEIGHT_PX}px` }}
+                style={{ height: `${trackDimensions.trackHeight}px` }}
               >
                 {/* Center overlay */}
                 <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
@@ -315,6 +321,7 @@ export const RaceDashboard = () => {
 
                 <RaceTrack
                   cameraScrollRefCb={camera.cameraScrollRefCb}
+                  dimensions={trackDimensions}
                   simulation={replay.simulation}
                   lineupFinalized={lineupFinalized}
                   parsedGiraffes={parsedGiraffes}

@@ -104,6 +104,27 @@
 :root,
 [data-theme] {
   background: var(--color-base-200);
+
+  /* Race track dimensions - responsive */
+  --track-height: 328px;
+  --track-base-y: 164px;
+  --track-vertical-spread: 198px;
+  --giraffe-size: 100px;
+  --world-padding-left: 100px;
+  --camera-start-x: 0px;
+}
+
+/* Desktop: taller track with proportionally scaled elements */
+@media (min-width: 1000px) {
+  :root,
+  [data-theme] {
+    --track-height: 650px;
+    --track-base-y: 325px;
+    --track-vertical-spread: 418px;
+    --giraffe-size: 180px;
+    --world-padding-left: 180px;
+    --camera-start-x: 0px;
+  }
 }
 
 .btn {
