@@ -8,7 +8,6 @@ import {
   SPEED_RANGE,
   TRACK_LENGTH,
   TRACK_LENGTH_PX,
-  WORLD_PADDING_RIGHT_PX,
 } from "../constants";
 import { TrackDimensions } from "../hooks/useTrackDimensions";
 import { MyBets, ParsedGiraffes, PlaybackSpeed } from "../types";
@@ -80,10 +79,10 @@ export const RaceTrack = memo(function RaceTrack({
   svgResetNonce,
   myBets,
 }: RaceTrackProps) {
-  const { trackHeight, trackBaseY, trackVerticalSpread, giraffeSize, worldPaddingLeft } = dimensions;
+  const { trackHeight, trackBaseY, trackVerticalSpread, giraffeSize, worldPaddingLeft, worldPaddingRight } = dimensions;
 
   // Compute world width dynamically based on responsive padding
-  const worldWidth = worldPaddingLeft + TRACK_LENGTH_PX + WORLD_PADDING_RIGHT_PX;
+  const worldWidth = worldPaddingLeft + TRACK_LENGTH_PX + worldPaddingRight;
 
   return (
     <>

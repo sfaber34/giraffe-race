@@ -105,6 +105,8 @@ export const RaceDashboard = () => {
     playbackSpeed: replay.playbackSpeed,
     cameraStartX: trackDimensions.cameraStartX,
     worldPaddingLeft: trackDimensions.worldPaddingLeft,
+    worldPaddingRight: trackDimensions.worldPaddingRight,
+    cameraFinishInset: trackDimensions.cameraFinishInset,
   });
 
   // Local UI state

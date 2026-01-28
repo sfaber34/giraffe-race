@@ -1,13 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  BASE_REPLAY_SPEED_MULTIPLIER,
-  GIRAFFE_SIZE_PX,
-  TRACK_LENGTH,
-  TRACK_LENGTH_PX,
-  WORLD_PADDING_RIGHT_PX,
-} from "../constants";
+import { BASE_REPLAY_SPEED_MULTIPLIER, GIRAFFE_SIZE_PX, TRACK_LENGTH, TRACK_LENGTH_PX } from "../constants";
 import { PlaybackSpeed } from "../types";
 
 interface UseRaceCameraProps {
@@ -16,6 +10,8 @@ interface UseRaceCameraProps {
   playbackSpeed: PlaybackSpeed;
   cameraStartX: number;
   worldPaddingLeft: number;
+  worldPaddingRight: number;
+  cameraFinishInset: number;
 }
 
 export const useRaceCamera = ({
@@ -24,6 +20,8 @@ export const useRaceCamera = ({
   playbackSpeed,
   cameraStartX,
   worldPaddingLeft,
+  worldPaddingRight,
+  cameraFinishInset,
 }: UseRaceCameraProps) => {
   const [viewportEl, setViewportEl] = useState<HTMLDivElement | null>(null);
   const viewportRefCb = useMemo(() => (el: HTMLDivElement | null) => setViewportEl(el), []);
@@ -70,8 +68,8 @@ export const useRaceCamera = ({
       return;
     }
 
-    // Compute derived values from responsive worldPaddingLeft
-    const worldWidth = worldPaddingLeft + TRACK_LENGTH_PX + WORLD_PADDING_RIGHT_PX;
+    // Compute derived values from responsive padding
+    const worldWidth = worldPaddingLeft + TRACK_LENGTH_PX + worldPaddingRight;
     const finishLineX = worldPaddingLeft + TRACK_LENGTH_PX;
 
     const distances = currentDistances.map(x => Number(x ?? 0));
@@ -94,8 +92,7 @@ export const useRaceCamera = ({
 
     const maxCameraX = Math.max(0, worldWidth - viewportWorldWidth);
 
-    const finishInset = 150;
-    const freezeX = Math.min(maxCameraX, Math.max(0, finishLineX - (viewportWorldWidth - finishInset)));
+    const freezeX = Math.min(maxCameraX, Math.max(0, finishLineX - (viewportWorldWidth - cameraFinishInset)));
 
     const followFocalX = Math.min(maxCameraX, Math.max(0, focalX - desiredFocalScreenX));
     const keepMaxVisibleX = Math.min(maxCameraX, Math.max(0, maxRunnerX - maxLeaderScreenX));
@@ -103,7 +100,15 @@ export const useRaceCamera = ({
 
     const nextCameraX = maxRunnerX < followStartX ? cameraStartX : Math.min(followX, freezeX);
     setCameraX(nextCameraX);
-  }, [simulation, currentDistances, viewportWidthPx, cameraStartX, worldPaddingLeft]);
+  }, [
+    simulation,
+    currentDistances,
+    viewportWidthPx,
+    cameraStartX,
+    worldPaddingLeft,
+    worldPaddingRight,
+    cameraFinishInset,
+  ]);
 
   useEffect(() => {
     cameraTargetXRef.current = Math.max(0, cameraX);

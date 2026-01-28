@@ -7,7 +7,9 @@ const DEFAULTS = {
   trackVerticalSpread: 198,
   giraffeSize: 100,
   worldPaddingLeft: 100,
+  worldPaddingRight: 140,
   cameraStartX: 0,
+  cameraFinishInset: 150,
 };
 
 export interface TrackDimensions {
@@ -16,7 +18,9 @@ export interface TrackDimensions {
   trackVerticalSpread: number;
   giraffeSize: number;
   worldPaddingLeft: number;
+  worldPaddingRight: number;
   cameraStartX: number;
+  cameraFinishInset: number;
 }
 
 /**
@@ -43,7 +47,9 @@ export function useTrackDimensions(): TrackDimensions {
       trackVerticalSpread: parseVar("--track-vertical-spread", DEFAULTS.trackVerticalSpread),
       giraffeSize: parseVar("--giraffe-size", DEFAULTS.giraffeSize),
       worldPaddingLeft: parseVar("--world-padding-left", DEFAULTS.worldPaddingLeft),
+      worldPaddingRight: parseVar("--world-padding-right", DEFAULTS.worldPaddingRight),
       cameraStartX: parseVar("--camera-start-x", DEFAULTS.cameraStartX),
+      cameraFinishInset: parseVar("--camera-finish-inset", DEFAULTS.cameraFinishInset),
     };
   }, []);
 
