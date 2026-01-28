@@ -61,8 +61,8 @@ contract RaffeRaceSimulator {
         pure
         returns (uint8 winner)
     {
-        (uint8[LANE_COUNT] memory winners,,) = _simulateOptimized(seed, scores);
-        winner = winners[0];
+        FinishOrder memory finishOrder = _simulateFullRace(seed, scores);
+        winner = finishOrder.first.lanes[0];
     }
 
     /// @notice Deterministically simulate a race and return ALL winners (for dead heat support).
@@ -79,6 +79,7 @@ contract RaffeRaceSimulator {
     
     /// @notice Simulate a race and return complete finish order (1st, 2nd, 3rd with dead heat support)
     /// @dev Runs until all racers are 10 units past the finish line
+    /// @dev WINNER DETERMINATION: First to cross the finish line (1000 units) wins!
     /// @param seed The deterministic seed for the race
     /// @param scores Lane scores (1-10)
     /// @return finishOrder Complete finish order with dead heat info
@@ -92,16 +93,9 @@ contract RaffeRaceSimulator {
 
     function simulate(bytes32 seed) external pure returns (uint8 winner, uint16[LANE_COUNT] memory distances) {
         uint8[LANE_COUNT] memory score = [uint8(10), 10, 10, 10, 10, 10];
-        (,, distances) = _simulateOptimized(seed, score);
-        // For backwards compatibility, return first winner
-        uint16 best = distances[0];
-        winner = 0;
-        for (uint8 i = 1; i < LANE_COUNT; i++) {
-            if (distances[i] > best) {
-                best = distances[i];
-                winner = i;
-            }
-        }
+        FinishOrder memory finishOrder = _simulateFullRace(seed, score);
+        winner = finishOrder.first.lanes[0];
+        distances = finishOrder.distances;
     }
 
     /// @notice Deterministically simulate a race given a seed + lane effective score snapshot.
@@ -111,9 +105,9 @@ contract RaffeRaceSimulator {
         pure
         returns (uint8 winner, uint16[LANE_COUNT] memory distances)
     {
-        uint8[LANE_COUNT] memory winners;
-        (winners,, distances) = _simulateOptimized(seed, scores);
-        winner = winners[0]; // Return first winner for backwards compatibility
+        FinishOrder memory finishOrder = _simulateFullRace(seed, scores);
+        winner = finishOrder.first.lanes[0];
+        distances = finishOrder.distances;
     }
 
     function _scoreBps(uint8 score) internal pure returns (uint16) {
@@ -151,7 +145,14 @@ contract RaffeRaceSimulator {
         uint256 setupGas = gasStart - gasCheckpoint;
         gasStart = gasleft();
 
-        bool finished = false;
+        // Track which tick each lane crosses the finish line (type(uint16).max = hasn't crossed)
+        uint16[LANE_COUNT] memory finishTick;
+        for (uint8 i = 0; i < LANE_COUNT; i++) {
+            finishTick[i] = type(uint16).max;
+        }
+        
+        uint16 finishTarget = TRACK_LENGTH + FINISH_OVERSHOOT;
+        bool allFinished = false;
         uint256 tickCount = 0;
 
         for (uint256 t = 0; t < MAX_TICKS; t++) {
@@ -181,27 +182,35 @@ contract RaffeRaceSimulator {
                 }
                 
                 if (q == 0) q = 1;
+                
+                uint16 prevDist = distances[a];
                 distances[a] += uint16(q);
+                
+                // Check if this lane just crossed the finish line THIS tick
+                if (finishTick[a] == type(uint16).max && prevDist < TRACK_LENGTH && distances[a] >= TRACK_LENGTH) {
+                    finishTick[a] = uint16(t);
+                }
             }
 
-            // Check for finish
+            // Check if ALL lanes have passed the finish target
+            allFinished = true;
             for (uint8 i = 0; i < LANE_COUNT; i++) {
-                if (distances[i] >= TRACK_LENGTH) {
-                    finished = true;
+                if (distances[i] < finishTarget) {
+                    allFinished = false;
                     break;
                 }
             }
-            if (finished) break;
+            if (allFinished) break;
         }
 
-        require(finished, "RaffeRace: race did not finish");
+        require(allFinished, "RaffeRace: race did not finish");
 
         gasCheckpoint = gasleft();
         uint256 mainLoopGas = gasStart - gasCheckpoint;
         gasStart = gasleft();
 
-        // Determine winner(s)
-        (winners, winnerCount) = _findWinners(distances);
+        // Determine winner(s) - first to cross finish line wins
+        (winners, winnerCount) = _findWinnersByFinishTick(finishTick, distances);
 
         uint256 winnerCalcGas = gasCheckpoint - gasleft();
 
@@ -214,88 +223,61 @@ contract RaffeRaceSimulator {
         );
     }
 
-    /// @notice Pure optimized simulation (no gas profiling)
+    /// @notice Pure optimized simulation (no gas profiling) - LEGACY, use simulateFullRace
     function _simulateOptimized(bytes32 seed, uint8[LANE_COUNT] memory scores)
         internal
         pure
         returns (uint8[LANE_COUNT] memory winners, uint8 winnerCount, uint16[LANE_COUNT] memory distances)
     {
-        // Pre-calculate BPS multipliers
-        uint16[LANE_COUNT] memory bps;
-        for (uint8 a = 0; a < LANE_COUNT; a++) {
-            bps[a] = _scoreBps(scores[a]);
+        FinishOrder memory finishOrder = _simulateFullRace(seed, scores);
+        distances = finishOrder.distances;
+        winnerCount = finishOrder.first.count;
+        for (uint8 i = 0; i < winnerCount; i++) {
+            winners[i] = finishOrder.first.lanes[i];
         }
-
-        bool finished = false;
-
-        for (uint256 t = 0; t < MAX_TICKS; t++) {
-            // One hash per tick - all entropy we need
-            bytes32 tickEntropy = keccak256(abi.encodePacked(seed, t));
-
-            for (uint256 a = 0; a < LANE_COUNT; a++) {
-                // Speed roll: 1 byte, % 10, gives 0-9, then +1 for 1-10
-                uint256 baseSpeed = (uint8(tickEntropy[a]) % SPEED_RANGE) + 1;
-                
-                // Apply handicap
-                uint256 raw = baseSpeed * uint256(bps[a]);
-                uint256 q = raw / uint256(BPS_DENOM);
-                uint256 rem = raw % uint256(BPS_DENOM);
-                
-                // Probabilistic rounding using 2 bytes for rounding decision
-                if (rem > 0) {
-                    // Extract 2 bytes for this lane's rounding roll (bytes 6-17)
-                    uint256 roundingRoll = (uint256(uint8(tickEntropy[6 + a * 2])) << 8) 
-                                         | uint256(uint8(tickEntropy[7 + a * 2]));
-                    // % BPS_DENOM gives 0-9999
-                    if ((roundingRoll % BPS_DENOM) < rem) {
-                        q += 1;
-                    }
-                }
-                
-                if (q == 0) q = 1;
-                distances[a] += uint16(q);
-            }
-
-            // Check for finish
-            for (uint8 i = 0; i < LANE_COUNT; i++) {
-                if (distances[i] >= TRACK_LENGTH) {
-                    finished = true;
-                    break;
-                }
-            }
-            if (finished) break;
-        }
-
-        require(finished, "RaffeRace: race did not finish");
-
-        // Determine winner(s)
-        (winners, winnerCount) = _findWinners(distances);
     }
 
-    /// @notice Find all winners (supports dead heat)
-    function _findWinners(uint16[LANE_COUNT] memory distances)
+    /// @notice Find winners based on who crossed the finish line first
+    function _findWinnersByFinishTick(uint16[LANE_COUNT] memory finishTick, uint16[LANE_COUNT] memory distances)
         internal
         pure
         returns (uint8[LANE_COUNT] memory winners, uint8 winnerCount)
     {
-        uint16 best = distances[0];
+        // Find the earliest finish tick (winner)
+        uint16 bestTick = finishTick[0];
         winnerCount = 1;
         winners[0] = 0;
 
         for (uint8 i = 1; i < LANE_COUNT; i++) {
-            uint16 d = distances[i];
-            if (d > best) {
-                best = d;
+            uint16 tick = finishTick[i];
+            if (tick < bestTick) {
+                // New winner - earlier tick
+                bestTick = tick;
                 winnerCount = 1;
                 winners[0] = i;
-            } else if (d == best) {
+            } else if (tick == bestTick) {
+                // Dead heat - same tick
                 winners[winnerCount] = i;
                 winnerCount++;
+            }
+        }
+        
+        // If dead heat, sort by distance descending for consistent ordering
+        if (winnerCount > 1) {
+            for (uint8 i = 0; i < winnerCount; i++) {
+                for (uint8 j = i + 1; j < winnerCount; j++) {
+                    if (distances[winners[j]] > distances[winners[i]]) {
+                        uint8 tmp = winners[i];
+                        winners[i] = winners[j];
+                        winners[j] = tmp;
+                    }
+                }
             }
         }
     }
     
     /// @notice Simulate a full race until all racers are 10 units past the finish line
+    /// @dev WINNER DETERMINATION: First to cross the finish line (1000 units) wins!
     /// @dev Returns complete finish order with dead heat support for 1st, 2nd, 3rd
     function _simulateFullRace(bytes32 seed, uint8[LANE_COUNT] memory scores)
         internal
@@ -309,6 +291,13 @@ contract RaffeRaceSimulator {
         }
 
         uint16[LANE_COUNT] memory distances;
+        
+        // Track which tick each lane crosses the finish line (type(uint16).max = hasn't crossed)
+        uint16[LANE_COUNT] memory finishTick;
+        for (uint8 i = 0; i < LANE_COUNT; i++) {
+            finishTick[i] = type(uint16).max;
+        }
+        
         uint16 finishTarget = TRACK_LENGTH + FINISH_OVERSHOOT;
         bool allFinished = false;
 
@@ -337,7 +326,14 @@ contract RaffeRaceSimulator {
                 }
                 
                 if (q == 0) q = 1;
+                
+                uint16 prevDist = distances[a];
                 distances[a] += uint16(q);
+                
+                // Check if this lane just crossed the finish line THIS tick
+                if (finishTick[a] == type(uint16).max && prevDist < TRACK_LENGTH && distances[a] >= TRACK_LENGTH) {
+                    finishTick[a] = uint16(t);
+                }
             }
 
             // Check if ALL lanes have passed the finish target (finish line + 10)
@@ -355,30 +351,45 @@ contract RaffeRaceSimulator {
         
         finishOrder.distances = distances;
         
-        // Determine finish order (1st, 2nd, 3rd with dead heat support)
-        _calculateFinishOrder(distances, finishOrder);
+        // Determine finish order based on WHEN each lane crossed the finish line
+        _calculateFinishOrderByTick(finishTick, distances, finishOrder);
     }
     
-    /// @notice Calculate finish positions from final distances
-    /// @dev Handles dead heats - multiple lanes can tie for any position
-    function _calculateFinishOrder(uint16[LANE_COUNT] memory distances, FinishOrder memory finishOrder) internal pure {
-        // Sort lanes by distance (descending) while tracking original indices
-        // We need to identify distinct distance values and group lanes by them
-        
-        // Find unique distances in descending order
+    /// @notice Calculate finish positions based on WHEN each lane crossed the finish line
+    /// @dev Earlier tick = higher position. Same tick = dead heat.
+    function _calculateFinishOrderByTick(
+        uint16[LANE_COUNT] memory finishTick, 
+        uint16[LANE_COUNT] memory distances,
+        FinishOrder memory finishOrder
+    ) internal pure {
+        // Create sorted array of {tick, distance, lane} - sort by tick ascending, then distance descending
+        uint16[LANE_COUNT] memory sortedTicks;
         uint16[LANE_COUNT] memory sortedDistances;
         uint8[LANE_COUNT] memory sortedLanes;
         
-        // Copy and sort using simple bubble sort (small fixed size)
         for (uint8 i = 0; i < LANE_COUNT; i++) {
+            sortedTicks[i] = finishTick[i];
             sortedDistances[i] = distances[i];
             sortedLanes[i] = i;
         }
         
-        // Bubble sort descending by distance
+        // Bubble sort by tick ascending, then distance descending for tiebreaker ordering
         for (uint8 i = 0; i < LANE_COUNT; i++) {
             for (uint8 j = i + 1; j < LANE_COUNT; j++) {
-                if (sortedDistances[j] > sortedDistances[i]) {
+                bool shouldSwap = false;
+                if (sortedTicks[j] < sortedTicks[i]) {
+                    // Earlier tick = better position
+                    shouldSwap = true;
+                } else if (sortedTicks[j] == sortedTicks[i] && sortedDistances[j] > sortedDistances[i]) {
+                    // Same tick: higher distance for consistent ordering (they still tie though)
+                    shouldSwap = true;
+                }
+                
+                if (shouldSwap) {
+                    // Swap ticks
+                    uint16 tmpTick = sortedTicks[i];
+                    sortedTicks[i] = sortedTicks[j];
+                    sortedTicks[j] = tmpTick;
                     // Swap distances
                     uint16 tmpDist = sortedDistances[i];
                     sortedDistances[i] = sortedDistances[j];
@@ -396,12 +407,12 @@ contract RaffeRaceSimulator {
         uint8 sortIdx = 0;
         
         while (sortIdx < LANE_COUNT && positionIdx < 3) {
-            uint16 currentDist = sortedDistances[sortIdx];
+            uint16 currentTick = sortedTicks[sortIdx];
             
-            // Count how many lanes have this same distance (dead heat)
+            // Count how many lanes crossed on this same tick (dead heat)
             uint8 tieCount = 0;
             uint8 tieStartIdx = sortIdx;
-            while (sortIdx < LANE_COUNT && sortedDistances[sortIdx] == currentDist) {
+            while (sortIdx < LANE_COUNT && sortedTicks[sortIdx] == currentTick) {
                 tieCount++;
                 sortIdx++;
             }
@@ -439,5 +450,28 @@ contract RaffeRaceSimulator {
             }
         }
     }
-}
 
+    /// @notice Find all winners (supports dead heat) - LEGACY, based on final distance
+    /// @dev DEPRECATED: Use _findWinnersByFinishTick instead
+    function _findWinners(uint16[LANE_COUNT] memory distances)
+        internal
+        pure
+        returns (uint8[LANE_COUNT] memory winners, uint8 winnerCount)
+    {
+        uint16 best = distances[0];
+        winnerCount = 1;
+        winners[0] = 0;
+
+        for (uint8 i = 1; i < LANE_COUNT; i++) {
+            uint16 d = distances[i];
+            if (d > best) {
+                best = d;
+                winnerCount = 1;
+                winners[0] = i;
+            } else if (d == best) {
+                winners[winnerCount] = i;
+                winnerCount++;
+            }
+        }
+    }
+}

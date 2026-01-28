@@ -52,7 +52,12 @@ const scoreBps = (score: number) => {
  *   Bytes 0-5:   Speed rolls for lanes 0-5 (1 byte each, % 10)
  *   Bytes 6-17:  Rounding rolls for lanes 0-5 (2 bytes each, % 10000)
  *
- * Updated to run until ALL racers are 10 units past the finish line (for Win/Place/Show).
+ * WINNER DETERMINATION: First to cross the finish line (1000 units) wins!
+ * - Track which tick each racer crosses 1000
+ * - Earliest tick = higher position
+ * - Same tick = dead heat (tie)
+ *
+ * Run continues until all are 10 units past finish for visual replay purposes.
  */
 export function simulateRaceFromSeed({
   seed,
@@ -72,6 +77,9 @@ export function simulateRaceFromSeed({
   const distances = Array.from({ length: laneCount }, () => 0);
   const frames: number[][] = [distances.slice()];
   const bps = Array.from({ length: laneCount }, (_, i) => scoreBps(score?.[i] ?? 10));
+
+  // Track which tick each lane crosses the finish line (-1 = hasn't crossed yet)
+  const finishTick: number[] = Array.from({ length: laneCount }, () => -1);
 
   const finishTarget = trackLength + FINISH_OVERSHOOT;
   let allFinished = false;
@@ -101,7 +109,13 @@ export function simulateRaceFromSeed({
         }
       }
 
+      const prevDist = distances[a];
       distances[a] += Math.max(1, q);
+
+      // Check if this lane just crossed the finish line THIS tick
+      if (finishTick[a] === -1 && prevDist < trackLength && distances[a] >= trackLength) {
+        finishTick[a] = t;
+      }
     }
     frames.push(distances.slice());
     ticks = t + 1;
@@ -115,29 +129,32 @@ export function simulateRaceFromSeed({
     throw new Error("Race did not finish (increase maxTicks?)");
   }
 
-  // Calculate finish order (1st, 2nd, 3rd with dead heat support)
-  const finishOrder = calculateFinishOrder(distances);
+  // Calculate finish order based on WHEN each lane crossed the finish line
+  const finishOrder = calculateFinishOrder(finishTick, distances);
 
   // Legacy fields for backwards compatibility
-  const best = Math.max(...distances);
-  const winners = distances
-    .map((d, i) => ({ d, i }))
-    .filter(x => x.d === best)
-    .map(x => x.i);
+  const firstPlaceLanes = finishOrder.first.lanes;
+  const winner = firstPlaceLanes[0]!;
+  const deadHeatCount = firstPlaceLanes.length;
 
-  const winner = winners[0]!;
-  const deadHeatCount = winners.length;
-
-  return { winner, winners, deadHeatCount, distances, frames, ticks, finishOrder };
+  return { winner, winners: firstPlaceLanes, deadHeatCount, distances, frames, ticks, finishOrder };
 }
 
 /**
- * Calculate finish positions from final distances.
- * Handles dead heats - multiple lanes can tie for any position.
+ * Calculate finish positions based on WHEN each lane crossed the finish line.
+ * - Earlier tick = higher position
+ * - Same tick = dead heat (use final distance as tiebreaker for ordering, but they still tie)
  */
-function calculateFinishOrder(distances: number[]): FinishOrder {
-  // Create array of {distance, laneIndex} and sort descending by distance
-  const sorted = distances.map((d, i) => ({ d, i })).sort((a, b) => b.d - a.d);
+function calculateFinishOrder(finishTick: number[], distances: number[]): FinishOrder {
+  // Create array of {tick, distance, laneIndex} and sort by:
+  // 1. finishTick ascending (earlier = better)
+  // 2. distance descending (tiebreaker for same tick)
+  const sorted = finishTick
+    .map((tick, i) => ({ tick, d: distances[i]!, i }))
+    .sort((a, b) => {
+      if (a.tick !== b.tick) return a.tick - b.tick; // Earlier tick wins
+      return b.d - a.d; // Same tick: higher distance as tiebreaker for ordering
+    });
 
   const finishOrder: FinishOrder = {
     first: { lanes: [], count: 0 },
@@ -149,12 +166,12 @@ function calculateFinishOrder(distances: number[]): FinishOrder {
   let sortIdx = 0;
 
   while (sortIdx < sorted.length && positionIdx < 3) {
-    const currentDist = sorted[sortIdx]!.d;
+    const currentTick = sorted[sortIdx]!.tick;
 
-    // Count how many lanes have this same distance (dead heat)
+    // Count how many lanes crossed on this same tick (dead heat)
     const tieStartIdx = sortIdx;
     let tieCount = 0;
-    while (sortIdx < sorted.length && sorted[sortIdx]!.d === currentDist) {
+    while (sortIdx < sorted.length && sorted[sortIdx]!.tick === currentTick) {
       tieCount++;
       sortIdx++;
     }
