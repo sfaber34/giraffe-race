@@ -465,8 +465,7 @@ export const RaffeNfts = () => {
   return (
     <div className="flex flex-col gap-8 w-full max-w-4xl px-6 py-10">
       <div className="flex flex-col gap-2">
-        <h1 className="text-4xl font-bold">Raffe NFTs</h1>
-        <p className="text-base-content/70">Mint and view your Raffe NFTs.</p>
+        <h1 className="text-4xl font-bold">Your Raffes</h1>
       </div>
 
       <div className="grid grid-cols-1 gap-4">
@@ -474,14 +473,7 @@ export const RaffeNfts = () => {
         <div className="card bg-base-200 shadow">
           <div className="card-body gap-3">
             <div className="flex items-center justify-between">
-              <h2 className="card-title">Mint a Raffe NFT</h2>
-              <div className="text-xs opacity-70">
-                {isRaffeNftDeployedOnChain === null
-                  ? "Checking deployment…"
-                  : isRaffeNftDeployedOnChain
-                    ? "RaffeNFT deployed"
-                    : "Not deployed"}
-              </div>
+              <h2 className="card-title">Mint a Raffe</h2>
             </div>
 
             {isRaffeNftDeployedOnChain === false && (
@@ -683,7 +675,7 @@ export const RaffeNfts = () => {
         <div className="card bg-base-200 shadow">
           <div className="card-body gap-3">
             <div className="flex items-center justify-between">
-              <h2 className="card-title">Your Raffe NFTs</h2>
+              <h2 className="card-title">Your Raffes</h2>
               <div className="text-xs opacity-70">{isLoadingOwnedNfts ? "Loading…" : `${ownedNfts.length} found`}</div>
             </div>
 
@@ -692,7 +684,7 @@ export const RaffeNfts = () => {
                 <span className="text-sm">Connect a wallet to see your NFTs.</span>
               </div>
             ) : ownedNfts.length === 0 ? (
-              <div className="text-sm opacity-70">No NFTs found.</div>
+              <div className="text-sm opacity-70">No raffes found.</div>
             ) : (
               <div className="flex flex-col gap-2">
                 {[...ownedNfts]
