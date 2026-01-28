@@ -1,10 +1,14 @@
 "use client";
 
+import { useMemo } from "react";
 import { USDC_DECIMALS } from "../constants";
 import { BET_TYPE, NextWinningClaim } from "../types";
 import { LaneName } from "./LaneName";
 import { formatUnits } from "viem";
 import { RaffeAnimated } from "~~/components/assets/RaffeAnimated";
+
+// Matches contract constant CLAIM_EXPIRATION_BLOCKS
+const CLAIM_EXPIRATION_BLOCKS = 5400n;
 
 interface ClaimPayoutCardProps {
   connectedAddress: `0x${string}` | undefined;
@@ -13,6 +17,7 @@ interface ClaimPayoutCardProps {
   hasRevealedClaimSnapshot: boolean;
   displayedNextWinningClaim: NextWinningClaim | null;
   displayedWinningClaimRemaining: bigint | null;
+  activeBlockNumber: bigint | null;
   onClaimPayout: () => Promise<void>;
 }
 
@@ -29,6 +34,13 @@ const getBetTypeName = (betType: number): string => {
   }
 };
 
+interface CountdownState {
+  blocksRemaining: bigint;
+  percentRemaining: number;
+  isExpired: boolean;
+  colorClass: string;
+}
+
 export const ClaimPayoutCard = ({
   connectedAddress,
   raffeRaceContract,
@@ -36,8 +48,62 @@ export const ClaimPayoutCard = ({
   hasRevealedClaimSnapshot,
   displayedNextWinningClaim,
   displayedWinningClaimRemaining,
+  activeBlockNumber,
   onClaimPayout,
 }: ClaimPayoutCardProps) => {
+  // Calculate countdown state based on settledAtBlock and current block
+  const countdown = useMemo<CountdownState | null>(() => {
+    if (!displayedNextWinningClaim?.hasClaim || !activeBlockNumber || displayedNextWinningClaim.settledAtBlock === 0n) {
+      return null;
+    }
+
+    const expirationBlock = displayedNextWinningClaim.settledAtBlock + CLAIM_EXPIRATION_BLOCKS;
+
+    if (activeBlockNumber >= expirationBlock) {
+      return {
+        blocksRemaining: 0n,
+        percentRemaining: 0,
+        isExpired: true,
+        colorClass: "bg-error",
+      };
+    }
+
+    const blocksRemaining = expirationBlock - activeBlockNumber;
+    const percentRemaining = Number((blocksRemaining * 100n) / CLAIM_EXPIRATION_BLOCKS);
+
+    // Color thresholds: green (>50%), yellow (20-50%), red (<20%)
+    let colorClass = "bg-success";
+    if (percentRemaining <= 20) {
+      colorClass = "bg-error";
+    } else if (percentRemaining <= 50) {
+      colorClass = "bg-warning";
+    }
+
+    return {
+      blocksRemaining,
+      percentRemaining,
+      isExpired: false,
+      colorClass,
+    };
+  }, [displayedNextWinningClaim, activeBlockNumber]);
+
+  // Estimate time remaining (2 seconds per block on Base)
+  const timeRemaining = useMemo<string | null>(() => {
+    if (!countdown || countdown.isExpired) return null;
+
+    const secondsRemaining = Number(countdown.blocksRemaining) * 2;
+    if (secondsRemaining >= 3600) {
+      const hours = Math.floor(secondsRemaining / 3600);
+      const minutes = Math.floor((secondsRemaining % 3600) / 60);
+      return `~${hours}h ${minutes}m`;
+    }
+    if (secondsRemaining >= 60) {
+      const minutes = Math.floor(secondsRemaining / 60);
+      return `~${minutes}m`;
+    }
+    return `~${secondsRemaining}s`;
+  }, [countdown]);
+
   return (
     <div className="card bg-base-100 border border-base-300 shadow-sm">
       <div className="card-body gap-3 p-4">
@@ -98,15 +164,47 @@ export const ClaimPayoutCard = ({
                 {formatUnits(displayedNextWinningClaim.payout, USDC_DECIMALS)} USDC
               </span>
             </div>
+
+            {/* Claim Expiration Countdown */}
+            {countdown && (
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="opacity-70">Claim expires in</span>
+                  {countdown.isExpired ? (
+                    <span className="text-error font-semibold">Expired</span>
+                  ) : (
+                    <span
+                      className={
+                        countdown.percentRemaining <= 20
+                          ? "text-error"
+                          : countdown.percentRemaining <= 50
+                            ? "text-warning"
+                            : ""
+                      }
+                    >
+                      {countdown.blocksRemaining.toString()} blocks {timeRemaining && `(${timeRemaining})`}
+                    </span>
+                  )}
+                </div>
+                <div className="w-full h-2 bg-base-300 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full transition-all duration-300 ${countdown.colorClass}`}
+                    style={{ width: `${countdown.percentRemaining}%` }}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         )}
 
         <button
           className="btn btn-sm btn-primary"
-          disabled={!raffeRaceContract || !connectedAddress || !displayedNextWinningClaim?.hasClaim}
+          disabled={
+            !raffeRaceContract || !connectedAddress || !displayedNextWinningClaim?.hasClaim || countdown?.isExpired
+          }
           onClick={onClaimPayout}
         >
-          Claim payout
+          {countdown?.isExpired ? "Claim expired" : "Claim payout"}
         </button>
       </div>
     </div>

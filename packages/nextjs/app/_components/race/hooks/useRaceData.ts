@@ -696,6 +696,7 @@ export const useWinningClaims = (connectedAddress: `0x${string}` | undefined, ra
       winner: Number(out?.winner ?? 0),
       payout: BigInt(out?.payout ?? 0),
       bettingCloseBlock: BigInt(out?.bettingCloseBlock ?? 0),
+      settledAtBlock: BigInt(out?.settledAtBlock ?? 0),
     };
   }, [nextWinningClaimData]);
 

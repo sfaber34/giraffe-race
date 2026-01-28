@@ -37,6 +37,7 @@ abstract contract RaffeRaceBase {
     uint64 public constant ODDS_WINDOW_BLOCKS = 10;
     uint64 public constant BETTING_WINDOW_BLOCKS = 30;
     uint64 public constant POST_RACE_COOLDOWN_BLOCKS = 30;
+    uint64 public constant CLAIM_EXPIRATION_BLOCKS = 5400;
     uint16 public constant MAX_QUEUE_SIZE = 128;
 
     // ============ Bet Types ============
@@ -68,6 +69,7 @@ abstract contract RaffeRaceBase {
         assert(ODDS_WINDOW_BLOCKS == C.ODDS_WINDOW_BLOCKS);
         assert(BETTING_WINDOW_BLOCKS == C.BETTING_WINDOW_BLOCKS);
         assert(POST_RACE_COOLDOWN_BLOCKS == C.POST_RACE_COOLDOWN_BLOCKS);
+        assert(CLAIM_EXPIRATION_BLOCKS == C.CLAIM_EXPIRATION_BLOCKS);
         assert(MAX_QUEUE_SIZE == C.MAX_QUEUE_SIZE);
         assert(CLAIM_STATUS_BLOCKHASH_UNAVAILABLE == C.CLAIM_STATUS_BLOCKHASH_UNAVAILABLE);
         assert(CLAIM_STATUS_READY_TO_SETTLE == C.CLAIM_STATUS_READY_TO_SETTLE);
@@ -147,6 +149,7 @@ abstract contract RaffeRaceBase {
         uint8 winner;
         uint256 payout;
         uint64 bettingCloseBlock;
+        uint64 settledAtBlock;  // For claim expiration countdown
     }
     
     /// @notice View struct for queue entries
@@ -255,6 +258,7 @@ abstract contract RaffeRaceBase {
     event RaceSettled(uint256 indexed raceId, bytes32 seed, uint8 winner);
     event RaceSettledDeadHeat(uint256 indexed raceId, bytes32 seed, uint8 deadHeatCount, uint8[6] winners);
     event Claimed(uint256 indexed raceId, address indexed bettor, uint256 payout);
+    event ClaimExpired(uint256 indexed raceId, address indexed bettor, uint256 forfeitedPayout);
     event RaffeAssigned(uint256 indexed raceId, uint256 indexed tokenId, address indexed originalOwner, uint8 lane);
     event HouseRaffeAssigned(uint256 indexed raceId, uint256 indexed tokenId, uint8 lane);
     event HouseEdgeUpdated(uint16 oldEdgeBps, uint16 newEdgeBps);

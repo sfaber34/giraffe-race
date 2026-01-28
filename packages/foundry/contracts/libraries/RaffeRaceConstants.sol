@@ -58,6 +58,9 @@ library RaffeRaceConstants {
     
     /// @notice Cooldown blocks after settlement before new race
     uint64 internal constant POST_RACE_COOLDOWN_BLOCKS = 30;
+    
+    /// @notice Blocks after settlement before claim expires (~3 hours on Base with 2s blocks)
+    uint64 internal constant CLAIM_EXPIRATION_BLOCKS = 5400;
 
     // ============ Limits ============
     

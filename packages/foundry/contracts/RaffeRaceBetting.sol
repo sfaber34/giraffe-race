@@ -149,6 +149,19 @@ abstract contract RaffeRaceBetting is RaffeRaceBase {
 
             UserRaceBets storage userBets = _userBets[raceId][bettor];
             
+            // Check if claim has expired (only for settled races)
+            if (r.settled && block.number > uint256(r.settledAtBlock) + CLAIM_EXPIRATION_BLOCKS) {
+                // Claim expired - forfeit unclaimed winnings and free up liability
+                uint256 forfeitedPayout = _forfeitExpiredClaims(r, userBets);
+                if (forfeitedPayout > 0) {
+                    settledLiability -= forfeitedPayout;
+                    emit ClaimExpired(raceId, bettor, forfeitedPayout);
+                }
+                idx++;
+                _nextClaimIndex[bettor] = idx;
+                continue;
+            }
+            
             // Try to process each bet type in order: Win, Place, Show
             (bool found, uint256 p, bool isWin) = _processNextBet(r, userBets, bettor, raceId, skipLosses);
             
@@ -181,6 +194,48 @@ abstract contract RaffeRaceBetting is RaffeRaceBase {
 
         _nextClaimIndex[bettor] = ids.length;
         revert NoClaimableBets();
+    }
+    
+    /// @notice Forfeit expired claims and return total forfeited payout
+    function _forfeitExpiredClaims(Race storage r, UserRaceBets storage userBets) internal returns (uint256 forfeited) {
+        // Mark all unclaimed bets as claimed and calculate forfeited winnings
+        if (userBets.winBet.amount != 0 && !userBets.winBet.claimed) {
+            userBets.winBet.claimed = true;
+            if (ClaimLib.isLaneInPosition(r.firstPlace, userBets.winBet.lane)) {
+                forfeited += ClaimLib.calculatePayout(
+                    uint256(userBets.winBet.amount),
+                    r.decimalOddsBps[userBets.winBet.lane],
+                    r.firstPlace.count
+                );
+            }
+        }
+        if (userBets.placeBet.amount != 0 && !userBets.placeBet.claimed) {
+            userBets.placeBet.claimed = true;
+            bool isFirst = ClaimLib.isLaneInPosition(r.firstPlace, userBets.placeBet.lane);
+            bool isSecond = ClaimLib.isLaneInPosition(r.secondPlace, userBets.placeBet.lane);
+            if (isFirst || isSecond) {
+                uint8 dh = isSecond && r.secondPlace.count > 1 ? r.secondPlace.count : 1;
+                forfeited += ClaimLib.calculatePayout(
+                    uint256(userBets.placeBet.amount),
+                    r.placeOddsBps[userBets.placeBet.lane],
+                    dh
+                );
+            }
+        }
+        if (userBets.showBet.amount != 0 && !userBets.showBet.claimed) {
+            userBets.showBet.claimed = true;
+            bool isFirst = ClaimLib.isLaneInPosition(r.firstPlace, userBets.showBet.lane);
+            bool isSecond = ClaimLib.isLaneInPosition(r.secondPlace, userBets.showBet.lane);
+            bool isThird = ClaimLib.isLaneInPosition(r.thirdPlace, userBets.showBet.lane);
+            if (isFirst || isSecond || isThird) {
+                uint8 dh = isThird && r.thirdPlace.count > 1 ? r.thirdPlace.count : 1;
+                forfeited += ClaimLib.calculatePayout(
+                    uint256(userBets.showBet.amount),
+                    r.showOddsBps[userBets.showBet.lane],
+                    dh
+                );
+            }
+        }
     }
     
     /// @notice Process the next unclaimed bet for a user in a race
@@ -380,7 +435,15 @@ abstract contract RaffeRaceBetting is RaffeRaceBase {
         for (uint256 i = idx; i < ids.length; ) {
             uint256 rid = ids[i];
             Race storage r = _races[rid];
+            
+            // Skip unsettled races
             if (!r.settled) {
+                unchecked { ++i; }
+                continue;
+            }
+            
+            // Skip expired claims
+            if (block.number > uint256(r.settledAtBlock) + CLAIM_EXPIRATION_BLOCKS) {
                 unchecked { ++i; }
                 continue;
             }
@@ -400,6 +463,7 @@ abstract contract RaffeRaceBetting is RaffeRaceBase {
                     out.winner = r.winner;
                     out.payout = ClaimLib.calculatePayout(uint256(ub.winBet.amount), r.decimalOddsBps[ub.winBet.lane], r.firstPlace.count);
                     out.bettingCloseBlock = r.bettingCloseBlock;
+                    out.settledAtBlock = r.settledAtBlock;
                     return out;
                 }
             }
@@ -420,6 +484,7 @@ abstract contract RaffeRaceBetting is RaffeRaceBase {
                     out.winner = r.winner;
                     out.payout = ClaimLib.calculatePayout(uint256(ub.placeBet.amount), r.placeOddsBps[ub.placeBet.lane], dh);
                     out.bettingCloseBlock = r.bettingCloseBlock;
+                    out.settledAtBlock = r.settledAtBlock;
                     return out;
                 }
             }
@@ -441,6 +506,7 @@ abstract contract RaffeRaceBetting is RaffeRaceBase {
                     out.winner = r.winner;
                     out.payout = ClaimLib.calculatePayout(uint256(ub.showBet.amount), r.showOddsBps[ub.showBet.lane], dh);
                     out.bettingCloseBlock = r.bettingCloseBlock;
+                    out.settledAtBlock = r.settledAtBlock;
                     return out;
                 }
             }
@@ -476,6 +542,12 @@ abstract contract RaffeRaceBetting is RaffeRaceBase {
                 // Similar for place/show...
             }
 
+            // Skip expired settled claims
+            if (r.settled && block.number > uint256(r.settledAtBlock) + CLAIM_EXPIRATION_BLOCKS) {
+                idx++;
+                continue;
+            }
+
             if (!r.settled) {
                 // Check if any unclaimed bets exist
                 bool hasUnclaimed = (ub.winBet.amount != 0 && !ub.winBet.claimed) ||
@@ -503,6 +575,7 @@ abstract contract RaffeRaceBetting is RaffeRaceBase {
                     out.winner = r.winner;
                     out.payout = isWin ? ClaimLib.calculatePayout(uint256(ub.winBet.amount), r.decimalOddsBps[ub.winBet.lane], r.firstPlace.count) : 0;
                     out.bettingCloseBlock = cb;
+                    out.settledAtBlock = r.settledAtBlock;
                     return out;
                 }
                 // Similar for place/show bets...

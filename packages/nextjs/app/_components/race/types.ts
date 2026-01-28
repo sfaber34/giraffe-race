@@ -95,6 +95,7 @@ export interface NextWinningClaim {
   winner: number;
   payout: bigint;
   bettingCloseBlock: bigint;
+  settledAtBlock: bigint; // For claim expiration countdown
 }
 
 export interface ClaimSnapshot {
