@@ -5,6 +5,150 @@ import { BlockCountdownBar } from "./BlockCountdownBar";
 import { LaneName } from "./LaneName";
 import { GiraffeAnimated } from "~~/components/assets/GiraffeAnimated";
 
+/* ─────────────────────────────────────────────────────────────────────────────
+ * RaceResultsOverlay - Reusable component for showing race finish results
+ * ───────────────────────────────────────────────────────────────────────────── */
+
+interface RaceResultsOverlayProps {
+  idPrefix: string;
+  viewingRaceId: bigint | null;
+  laneTokenIds: bigint[];
+  parsedFinishOrder: ParsedFinishOrder | null;
+  parsed: ParsedRace | null;
+  cooldownStatus: CooldownStatus | null;
+  parsedSchedule: ParsedSchedule | null;
+  blockNumber: bigint | undefined;
+}
+
+const RaceResultsOverlay = ({
+  idPrefix,
+  viewingRaceId,
+  laneTokenIds,
+  parsedFinishOrder,
+  parsed,
+  cooldownStatus,
+  parsedSchedule,
+  blockNumber,
+}: RaceResultsOverlayProps) => {
+  const raceIdStr = (viewingRaceId ?? 0n).toString();
+
+  return (
+    <div
+      className="flex flex-col items-center gap-3 px-6 py-4 rounded-2xl bg-base-100/90 backdrop-blur-sm shadow-lg pointer-events-auto"
+      style={{ minWidth: 400 }}
+    >
+      <div className="text-3xl font-black text-primary drop-shadow">Race complete</div>
+
+      {parsedFinishOrder ? (
+        <div className="flex flex-col gap-2 w-full">
+          {/* 1st Place */}
+          {parsedFinishOrder.first.lanes.length > 0 && (
+            <div className="flex items-center gap-2 text-base">
+              <span className="text-warning font-bold text-lg">1st:</span>
+              {parsedFinishOrder.first.lanes.map((lane, idx) => {
+                const tokenId = laneTokenIds[lane] ?? 0n;
+                return (
+                  <div key={lane} className="flex items-center gap-1.5">
+                    {idx > 0 && <span className="opacity-50">,</span>}
+                    <GiraffeAnimated
+                      idPrefix={`${idPrefix}-1st-${raceIdStr}-${lane}`}
+                      tokenId={tokenId}
+                      playbackRate={1}
+                      playing={false}
+                      sizePx={40}
+                    />
+                    <span className="font-semibold">
+                      <LaneName tokenId={tokenId} fallback={`Lane ${lane}`} />
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* 2nd Place */}
+          {parsedFinishOrder.second.lanes.length > 0 && (
+            <div className="flex items-center gap-2 text-base">
+              <span className="text-info font-bold text-lg">2nd:</span>
+              {parsedFinishOrder.second.lanes.map((lane, idx) => {
+                const tokenId = laneTokenIds[lane] ?? 0n;
+                return (
+                  <div key={lane} className="flex items-center gap-1.5">
+                    {idx > 0 && <span className="opacity-50">,</span>}
+                    <GiraffeAnimated
+                      idPrefix={`${idPrefix}-2nd-${raceIdStr}-${lane}`}
+                      tokenId={tokenId}
+                      playbackRate={1}
+                      playing={false}
+                      sizePx={40}
+                    />
+                    <span className="font-semibold">
+                      <LaneName tokenId={tokenId} fallback={`Lane ${lane}`} />
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* 3rd Place */}
+          {parsedFinishOrder.third.lanes.length > 0 && (
+            <div className="flex items-center gap-2 text-base">
+              <span className="text-success font-bold text-lg">3rd:</span>
+              {parsedFinishOrder.third.lanes.map((lane, idx) => {
+                const tokenId = laneTokenIds[lane] ?? 0n;
+                return (
+                  <div key={lane} className="flex items-center gap-1.5">
+                    {idx > 0 && <span className="opacity-50">,</span>}
+                    <GiraffeAnimated
+                      idPrefix={`${idPrefix}-3rd-${raceIdStr}-${lane}`}
+                      tokenId={tokenId}
+                      playbackRate={1}
+                      playing={false}
+                      sizePx={40}
+                    />
+                    <span className="font-semibold">
+                      <LaneName tokenId={tokenId} fallback={`Lane ${lane}`} />
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ) : parsed?.winner !== undefined ? (
+        // Fallback to just winner if no finish order data
+        <div className="text-lg font-semibold text-base-content/70 flex items-center gap-2">
+          <span>Winner:</span>
+          <GiraffeAnimated
+            idPrefix={`${idPrefix}-winner-${raceIdStr}-${parsed.winner}`}
+            tokenId={laneTokenIds[parsed.winner] ?? 0n}
+            playbackRate={1}
+            playing={false}
+            sizePx={40}
+          />
+          <LaneName tokenId={laneTokenIds[parsed.winner] ?? 0n} fallback={`Lane ${parsed.winner}`} />
+        </div>
+      ) : null}
+
+      {cooldownStatus && cooldownStatus.cooldownEndsAtBlock > 0n && (
+        <div className="w-full mt-2">
+          <BlockCountdownBar
+            label={cooldownStatus.canCreate ? "Next race available" : "Next race in"}
+            current={blockNumber}
+            start={parsedSchedule?.settledAtBlock ?? undefined}
+            end={cooldownStatus.cooldownEndsAtBlock}
+          />
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * RaceOverlay - Main overlay component
+ * ───────────────────────────────────────────────────────────────────────────── */
+
 interface RaceOverlayProps {
   // State
   status: RaceStatus;
@@ -69,102 +213,17 @@ export const RaceOverlay = ({
               {Math.max(1, Math.ceil(startDelayRemainingMs / 1000))}
             </div>
           </div>
-        ) : raceIsOver && parsedFinishOrder ? (
-          // Race is over - show all 3 places
-          <div
-            className="flex flex-col items-center gap-3 px-6 py-4 rounded-2xl bg-base-100/90 backdrop-blur-sm shadow-lg pointer-events-auto"
-            style={{ minWidth: 400 }}
-          >
-            <div className="text-3xl font-black text-primary drop-shadow">Race complete</div>
-
-            <div className="flex flex-col gap-2 w-full">
-              {/* 1st Place */}
-              {parsedFinishOrder.first.lanes.length > 0 && (
-                <div className="flex items-center gap-2 text-base">
-                  <span className="text-warning font-bold text-lg">1st:</span>
-                  {parsedFinishOrder.first.lanes.map((lane, idx) => {
-                    const tokenId = laneTokenIds[lane] ?? 0n;
-                    return (
-                      <div key={lane} className="flex items-center gap-1.5">
-                        {idx > 0 && <span className="opacity-50">,</span>}
-                        <GiraffeAnimated
-                          idPrefix={`overlay-1st-${(viewingRaceId ?? 0n).toString()}-${lane}`}
-                          tokenId={tokenId}
-                          playbackRate={1}
-                          playing={false}
-                          sizePx={40}
-                        />
-                        <span className="font-semibold">
-                          <LaneName tokenId={tokenId} fallback={`Lane ${lane}`} />
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* 2nd Place */}
-              {parsedFinishOrder.second.lanes.length > 0 && (
-                <div className="flex items-center gap-2 text-base">
-                  <span className="text-info font-bold text-lg">2nd:</span>
-                  {parsedFinishOrder.second.lanes.map((lane, idx) => {
-                    const tokenId = laneTokenIds[lane] ?? 0n;
-                    return (
-                      <div key={lane} className="flex items-center gap-1.5">
-                        {idx > 0 && <span className="opacity-50">,</span>}
-                        <GiraffeAnimated
-                          idPrefix={`overlay-2nd-${(viewingRaceId ?? 0n).toString()}-${lane}`}
-                          tokenId={tokenId}
-                          playbackRate={1}
-                          playing={false}
-                          sizePx={40}
-                        />
-                        <span className="font-semibold">
-                          <LaneName tokenId={tokenId} fallback={`Lane ${lane}`} />
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* 3rd Place */}
-              {parsedFinishOrder.third.lanes.length > 0 && (
-                <div className="flex items-center gap-2 text-base">
-                  <span className="text-success font-bold text-lg">3rd:</span>
-                  {parsedFinishOrder.third.lanes.map((lane, idx) => {
-                    const tokenId = laneTokenIds[lane] ?? 0n;
-                    return (
-                      <div key={lane} className="flex items-center gap-1.5">
-                        {idx > 0 && <span className="opacity-50">,</span>}
-                        <GiraffeAnimated
-                          idPrefix={`overlay-3rd-${(viewingRaceId ?? 0n).toString()}-${lane}`}
-                          tokenId={tokenId}
-                          playbackRate={1}
-                          playing={false}
-                          sizePx={40}
-                        />
-                        <span className="font-semibold">
-                          <LaneName tokenId={tokenId} fallback={`Lane ${lane}`} />
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {cooldownStatus && cooldownStatus.cooldownEndsAtBlock > 0n && (
-              <div className="w-full mt-2">
-                <BlockCountdownBar
-                  label={cooldownStatus.canCreate ? "Next race available" : "Next race in"}
-                  current={blockNumber}
-                  start={parsedSchedule?.settledAtBlock ?? undefined}
-                  end={cooldownStatus.cooldownEndsAtBlock}
-                />
-              </div>
-            )}
-          </div>
+        ) : raceIsOver ? (
+          <RaceResultsOverlay
+            idPrefix="overlay-sim"
+            viewingRaceId={viewingRaceId}
+            laneTokenIds={laneTokenIds}
+            parsedFinishOrder={parsedFinishOrder}
+            parsed={parsed}
+            cooldownStatus={cooldownStatus}
+            parsedSchedule={parsedSchedule}
+            blockNumber={blockNumber}
+          />
         ) : null}
       </>
     );
@@ -178,7 +237,7 @@ export const RaceOverlay = ({
           className="flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-base-100/90 backdrop-blur-sm shadow-lg"
           style={{ minWidth: 320 }}
         >
-          <div className="text-3xl font-black text-primary drop-shadow">⏳ Setting odds</div>
+          <div className="text-3xl font-black text-primary drop-shadow">Setting odds</div>
           <div className="text-lg font-semibold text-base-content/70">Betting opens soon!</div>
         </div>
       ) : status === "betting_open" ? (
@@ -206,116 +265,16 @@ export const RaceOverlay = ({
           <div className="text-lg font-semibold text-base-content/70">Race starts soon!</div>
         </div>
       ) : status === "settled" || status === "cooldown" ? (
-        // Race is settled or in cooldown - show all 3 places
-        <div
-          className="flex flex-col items-center gap-3 px-6 py-4 rounded-2xl bg-base-100/90 backdrop-blur-sm shadow-lg pointer-events-auto"
-          style={{ minWidth: 400 }}
-        >
-          <div className="text-3xl font-black text-primary drop-shadow">Race complete</div>
-
-          {parsedFinishOrder ? (
-            <div className="flex flex-col gap-2 w-full">
-              {/* 1st Place */}
-              {parsedFinishOrder.first.lanes.length > 0 && (
-                <div className="flex items-center gap-2 text-base">
-                  <span className="text-warning font-bold text-lg">1st:</span>
-                  {parsedFinishOrder.first.lanes.map((lane, idx) => {
-                    const tokenId = laneTokenIds[lane] ?? 0n;
-                    return (
-                      <div key={lane} className="flex items-center gap-1.5">
-                        {idx > 0 && <span className="opacity-50">,</span>}
-                        <GiraffeAnimated
-                          idPrefix={`overlay-settled-1st-${(viewingRaceId ?? 0n).toString()}-${lane}`}
-                          tokenId={tokenId}
-                          playbackRate={1}
-                          playing={false}
-                          sizePx={40}
-                        />
-                        <span className="font-semibold">
-                          <LaneName tokenId={tokenId} fallback={`Lane ${lane}`} />
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* 2nd Place */}
-              {parsedFinishOrder.second.lanes.length > 0 && (
-                <div className="flex items-center gap-2 text-base">
-                  <span className="text-info font-bold text-lg">2nd:</span>
-                  {parsedFinishOrder.second.lanes.map((lane, idx) => {
-                    const tokenId = laneTokenIds[lane] ?? 0n;
-                    return (
-                      <div key={lane} className="flex items-center gap-1.5">
-                        {idx > 0 && <span className="opacity-50">,</span>}
-                        <GiraffeAnimated
-                          idPrefix={`overlay-settled-2nd-${(viewingRaceId ?? 0n).toString()}-${lane}`}
-                          tokenId={tokenId}
-                          playbackRate={1}
-                          playing={false}
-                          sizePx={40}
-                        />
-                        <span className="font-semibold">
-                          <LaneName tokenId={tokenId} fallback={`Lane ${lane}`} />
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* 3rd Place */}
-              {parsedFinishOrder.third.lanes.length > 0 && (
-                <div className="flex items-center gap-2 text-base">
-                  <span className="text-success font-bold text-lg">3rd:</span>
-                  {parsedFinishOrder.third.lanes.map((lane, idx) => {
-                    const tokenId = laneTokenIds[lane] ?? 0n;
-                    return (
-                      <div key={lane} className="flex items-center gap-1.5">
-                        {idx > 0 && <span className="opacity-50">,</span>}
-                        <GiraffeAnimated
-                          idPrefix={`overlay-settled-3rd-${(viewingRaceId ?? 0n).toString()}-${lane}`}
-                          tokenId={tokenId}
-                          playbackRate={1}
-                          playing={false}
-                          sizePx={40}
-                        />
-                        <span className="font-semibold">
-                          <LaneName tokenId={tokenId} fallback={`Lane ${lane}`} />
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          ) : parsed?.winner !== undefined ? (
-            // Fallback to just winner if no finish order data
-            <div className="text-lg font-semibold text-base-content/70 flex items-center gap-2">
-              <span>Winner:</span>
-              <GiraffeAnimated
-                idPrefix={`overlay-settled-winner-${(viewingRaceId ?? 0n).toString()}-${parsed.winner}`}
-                tokenId={laneTokenIds[parsed.winner] ?? 0n}
-                playbackRate={1}
-                playing={false}
-                sizePx={40}
-              />
-              <LaneName tokenId={laneTokenIds[parsed.winner] ?? 0n} fallback={`Lane ${parsed.winner}`} />
-            </div>
-          ) : null}
-
-          {cooldownStatus && cooldownStatus.cooldownEndsAtBlock > 0n && (
-            <div className="w-full mt-2">
-              <BlockCountdownBar
-                label={cooldownStatus.canCreate ? "Next race available" : "Next race in"}
-                current={blockNumber}
-                start={parsedSchedule?.settledAtBlock ?? undefined}
-                end={cooldownStatus.cooldownEndsAtBlock}
-              />
-            </div>
-          )}
-        </div>
+        <RaceResultsOverlay
+          idPrefix="overlay-settled"
+          viewingRaceId={viewingRaceId}
+          laneTokenIds={laneTokenIds}
+          parsedFinishOrder={parsedFinishOrder}
+          parsed={parsed}
+          cooldownStatus={cooldownStatus}
+          parsedSchedule={parsedSchedule}
+          blockNumber={blockNumber}
+        />
       ) : status === "no_race" ? (
         // No race exists - prompt to create one
         <div

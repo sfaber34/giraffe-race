@@ -428,65 +428,63 @@ export const RaceDashboard = () => {
         </div>
 
         <div>
-          <div className="card-body gap-4">
-            <div className="grid grid-cols-1 gap-4">
-              {showPlaceBetCard ? (
-                <PlaceBetCard
-                  viewingRaceId={viewingRaceId}
-                  lineupFinalized={lineupFinalized}
-                  laneTokenIds={laneTokenIds}
-                  laneStats={laneStats}
-                  parsedGiraffes={parsedGiraffes}
-                  parsedOdds={parsedOdds}
-                  betAmountUsdc={betAmountUsdc}
-                  setBetAmountUsdc={setBetAmountUsdc}
-                  placeBetValue={placeBetValue}
-                  connectedAddress={connectedAddress}
-                  userUsdcBalance={userUsdcBalance}
-                  maxBetAmount={maxBetAmount}
-                  myBets={myBets}
-                  canBet={canBet}
-                  isViewingLatest={isViewingLatest}
-                  giraffeRaceContract={giraffeRaceContract}
-                  needsApproval={needsApproval}
-                  hasEnoughUsdc={hasEnoughUsdc}
-                  exceedsMaxBet={exceedsMaxBet}
-                  isApproving={isApproving}
-                  onApprove={handleApprove}
-                  onPlaceBet={handlePlaceBet}
-                />
-              ) : null}
-
-              {/* Claim payout card - between Place a bet and Enter Queue */}
-              <ClaimPayoutCard
+          <div className="grid grid-cols-1 gap-4">
+            {showPlaceBetCard ? (
+              <PlaceBetCard
+                viewingRaceId={viewingRaceId}
+                lineupFinalized={lineupFinalized}
+                laneTokenIds={laneTokenIds}
+                laneStats={laneStats}
+                parsedGiraffes={parsedGiraffes}
+                parsedOdds={parsedOdds}
+                betAmountUsdc={betAmountUsdc}
+                setBetAmountUsdc={setBetAmountUsdc}
+                placeBetValue={placeBetValue}
                 connectedAddress={connectedAddress}
+                userUsdcBalance={userUsdcBalance}
+                maxBetAmount={maxBetAmount}
+                myBets={myBets}
+                canBet={canBet}
+                isViewingLatest={isViewingLatest}
                 giraffeRaceContract={giraffeRaceContract}
-                claimUiUnlocked={claimUiUnlocked}
-                hasRevealedClaimSnapshot={hasRevealedClaimSnapshot}
-                displayedNextWinningClaim={displayedNextWinningClaim}
-                displayedWinningClaimRemaining={displayedWinningClaimRemaining}
-                onClaimPayout={handleClaimPayout}
+                needsApproval={needsApproval}
+                hasEnoughUsdc={hasEnoughUsdc}
+                exceedsMaxBet={exceedsMaxBet}
+                isApproving={isApproving}
+                onApprove={handleApprove}
+                onPlaceBet={handlePlaceBet}
               />
+            ) : null}
 
-              {showQueueSection ? (
-                <EnterNftCard
-                  connectedAddress={connectedAddress}
-                  ownedTokenIds={ownedTokenIds}
-                  ownedTokenNameById={ownedTokenNameById}
-                  isOwnedTokensLoading={isOwnedTokensLoading}
-                  isLoadingOwnedTokenNames={isLoadingOwnedTokenNames}
-                  selectedTokenId={selectedTokenId}
-                  setSelectedTokenId={setSelectedTokenId}
-                  userInQueue={userInQueue}
-                  userQueuedToken={userQueuedToken}
-                  userQueuePosition={userQueuePosition}
-                  queueEntries={queueEntries}
-                  activeQueueLength={activeQueueLength}
-                  giraffeRaceContract={giraffeRaceContract}
-                  onEnterQueue={handleEnterQueue}
-                />
-              ) : null}
-            </div>
+            {/* Claim payout card - between Place a bet and Enter Queue */}
+            <ClaimPayoutCard
+              connectedAddress={connectedAddress}
+              giraffeRaceContract={giraffeRaceContract}
+              claimUiUnlocked={claimUiUnlocked}
+              hasRevealedClaimSnapshot={hasRevealedClaimSnapshot}
+              displayedNextWinningClaim={displayedNextWinningClaim}
+              displayedWinningClaimRemaining={displayedWinningClaimRemaining}
+              onClaimPayout={handleClaimPayout}
+            />
+
+            {showQueueSection ? (
+              <EnterNftCard
+                connectedAddress={connectedAddress}
+                ownedTokenIds={ownedTokenIds}
+                ownedTokenNameById={ownedTokenNameById}
+                isOwnedTokensLoading={isOwnedTokensLoading}
+                isLoadingOwnedTokenNames={isLoadingOwnedTokenNames}
+                selectedTokenId={selectedTokenId}
+                setSelectedTokenId={setSelectedTokenId}
+                userInQueue={userInQueue}
+                userQueuedToken={userQueuedToken}
+                userQueuePosition={userQueuePosition}
+                queueEntries={queueEntries}
+                activeQueueLength={activeQueueLength}
+                giraffeRaceContract={giraffeRaceContract}
+                onEnterQueue={handleEnterQueue}
+              />
+            ) : null}
           </div>
         </div>
       </div>
