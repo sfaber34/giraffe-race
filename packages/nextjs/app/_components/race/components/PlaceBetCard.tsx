@@ -89,6 +89,7 @@ export const PlaceBetCard = ({
   const hasWinBet = myBets?.win.hasBet ?? false;
   const hasPlaceBet = myBets?.place.hasBet ?? false;
   const hasShowBet = myBets?.show.hasBet ?? false;
+  const hasAllBets = hasWinBet && hasPlaceBet && hasShowBet;
 
   // Get the lane for each bet type if placed
   const winBetLane = hasWinBet ? myBets?.win.lane : null;
@@ -117,7 +118,7 @@ export const PlaceBetCard = ({
     return (
       <button
         key={betType}
-        className={`btn btn-xs px-2 min-w-0 ${isThisBetPlaced ? "btn-primary" : "btn-outline"} ${
+        className={`btn px-4 min-w-0 ${isThisBetPlaced ? "btn-primary" : "btn-outline"} ${
           isBetTypeDisabled && !isThisBetPlaced ? "opacity-50" : ""
         }`}
         disabled={btnDisabled}
@@ -152,23 +153,36 @@ export const PlaceBetCard = ({
           race.
         </p>
 
-        {/* Bet amount input - always visible */}
+        {/* Bet amount input and approval button - on same line */}
         <div className={!canBet ? "opacity-50 pointer-events-none" : ""}>
           <div className="flex flex-col gap-1">
-            <div className="relative">
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                className="input input-bordered w-full pr-16"
-                placeholder="Bet amount"
-                value={betAmountUsdc}
-                onChange={e => {
-                  if (!canBet) return;
-                  setBetAmountUsdc(e.target.value);
-                }}
-              />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm opacity-70">USDC</span>
+            <div className="flex gap-2 items-center">
+              <div className="relative flex-1">
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  className="input input-bordered w-full pr-16"
+                  placeholder="Bet amount"
+                  value={betAmountUsdc}
+                  onChange={e => {
+                    if (!canBet) return;
+                    setBetAmountUsdc(e.target.value);
+                  }}
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm opacity-70">USDC</span>
+              </div>
+              {/* Approval button - always visible, disabled when not needed */}
+              <button
+                className="btn btn-outline flex-shrink-0"
+                disabled={
+                  !needsApproval || !placeBetValue || isApproving || !hasEnoughUsdc || exceedsMaxBet || hasAllBets
+                }
+                onClick={onApprove}
+              >
+                {isApproving ? <span className="loading loading-spinner loading-xs" /> : null}
+                Approve USDC
+              </button>
             </div>
             {connectedAddress && userUsdcBalance !== undefined && (
               <div className="text-xs opacity-60">Balance: {formatUnits(userUsdcBalance, USDC_DECIMALS)} USDC</div>
@@ -186,18 +200,6 @@ export const PlaceBetCard = ({
             )}
           </div>
         </div>
-
-        {/* Approval button if needed */}
-        {needsApproval && placeBetValue && (
-          <button
-            className="btn btn-outline w-full"
-            disabled={isApproving || !hasEnoughUsdc || exceedsMaxBet}
-            onClick={onApprove}
-          >
-            {isApproving ? <span className="loading loading-spinner loading-xs" /> : null}
-            Approve USDC
-          </button>
-        )}
 
         {!needsApproval && placeBetValue && <div className="text-xs text-success">✓ Approved — ready to place bet</div>}
 
