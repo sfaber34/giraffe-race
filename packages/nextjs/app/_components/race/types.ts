@@ -88,6 +88,7 @@ export interface NextWinningClaim {
   hasClaim: boolean;
   raceId: bigint;
   status: number;
+  betType: number; // 0=Win, 1=Place, 2=Show
   betLane: number;
   betTokenId: bigint;
   betAmount: bigint;

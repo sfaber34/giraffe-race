@@ -80,10 +80,10 @@ library SettlementLib {
         if (race.totalPot != 0) {
             // Win bet liability
             newSettledLiability += ClaimLib.calculateRaceLiability(race);
-            // Place bet liability
-            newSettledLiability += ClaimLib.calculatePlaceLiability(race, C.TEMP_FIXED_PLACE_ODDS_BPS);
-            // Show bet liability
-            newSettledLiability += ClaimLib.calculateShowLiability(race, C.TEMP_FIXED_SHOW_ODDS_BPS);
+            // Place bet liability - use per-lane odds to match payout calculation
+            newSettledLiability += ClaimLib.calculatePlaceLiabilityPerLane(race);
+            // Show bet liability - use per-lane odds to match payout calculation
+            newSettledLiability += ClaimLib.calculateShowLiabilityPerLane(race);
         }
 
         // Emit appropriate event

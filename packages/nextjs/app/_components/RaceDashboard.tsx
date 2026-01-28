@@ -473,6 +473,7 @@ export const RaceDashboard = () => {
               hasRevealedClaimSnapshot={hasRevealedClaimSnapshot}
               displayedNextWinningClaim={displayedNextWinningClaim}
               displayedWinningClaimRemaining={displayedWinningClaimRemaining}
+              activeBlockNumber={activeBlockNumber}
               onClaimPayout={handleClaimPayout}
             />
 

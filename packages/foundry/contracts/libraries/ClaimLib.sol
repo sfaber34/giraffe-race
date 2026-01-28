@@ -157,7 +157,7 @@ library ClaimLib {
         }
     }
 
-    /// @notice Calculate total liability for Place bets (1st or 2nd place)
+    /// @notice Calculate total liability for Place bets (1st or 2nd place) - fixed odds
     /// @param race The race struct
     /// @param placeOddsBps Fixed odds for Place bets
     /// @return liability Total Place bet liability
@@ -184,7 +184,32 @@ library ClaimLib {
         }
     }
 
-    /// @notice Calculate total liability for Show bets (1st, 2nd, or 3rd place)
+    /// @notice Calculate total liability for Place bets using per-lane odds
+    /// @param race The race struct
+    /// @return liability Total Place bet liability
+    function calculatePlaceLiabilityPerLane(
+        RaffeRaceBase.Race storage race
+    ) internal view returns (uint256 liability) {
+        // 1st place lanes get full payout
+        for (uint8 i = 0; i < race.firstPlace.count; ) {
+            uint8 lane = race.firstPlace.lanes[i];
+            uint256 lanePayout = (race.totalPlaceOnLane[lane] * uint256(race.placeOddsBps[lane])) / ODDS_SCALE;
+            liability += lanePayout;
+            unchecked { ++i; }
+        }
+        
+        // 2nd place lanes: split if dead heat
+        uint8 secondCount = race.secondPlace.count;
+        for (uint8 i = 0; i < secondCount; ) {
+            uint8 lane = race.secondPlace.lanes[i];
+            uint256 lanePayout = (race.totalPlaceOnLane[lane] * uint256(race.placeOddsBps[lane])) / ODDS_SCALE;
+            // Split payout if dead heat for 2nd
+            liability += lanePayout / uint256(secondCount > 1 ? secondCount : 1);
+            unchecked { ++i; }
+        }
+    }
+
+    /// @notice Calculate total liability for Show bets (1st, 2nd, or 3rd place) - fixed odds
     /// @param race The race struct
     /// @param showOddsBps Fixed odds for Show bets
     /// @return liability Total Show bet liability
@@ -213,6 +238,39 @@ library ClaimLib {
         for (uint8 i = 0; i < thirdCount; ) {
             uint8 lane = race.thirdPlace.lanes[i];
             uint256 lanePayout = (race.totalShowOnLane[lane] * uint256(showOddsBps)) / ODDS_SCALE;
+            // Split payout if dead heat for 3rd
+            liability += lanePayout / uint256(thirdCount > 1 ? thirdCount : 1);
+            unchecked { ++i; }
+        }
+    }
+
+    /// @notice Calculate total liability for Show bets using per-lane odds
+    /// @param race The race struct
+    /// @return liability Total Show bet liability
+    function calculateShowLiabilityPerLane(
+        RaffeRaceBase.Race storage race
+    ) internal view returns (uint256 liability) {
+        // 1st place lanes get full payout
+        for (uint8 i = 0; i < race.firstPlace.count; ) {
+            uint8 lane = race.firstPlace.lanes[i];
+            uint256 lanePayout = (race.totalShowOnLane[lane] * uint256(race.showOddsBps[lane])) / ODDS_SCALE;
+            liability += lanePayout;
+            unchecked { ++i; }
+        }
+        
+        // 2nd place lanes get full payout
+        for (uint8 i = 0; i < race.secondPlace.count; ) {
+            uint8 lane = race.secondPlace.lanes[i];
+            uint256 lanePayout = (race.totalShowOnLane[lane] * uint256(race.showOddsBps[lane])) / ODDS_SCALE;
+            liability += lanePayout;
+            unchecked { ++i; }
+        }
+        
+        // 3rd place lanes: split if dead heat
+        uint8 thirdCount = race.thirdPlace.count;
+        for (uint8 i = 0; i < thirdCount; ) {
+            uint8 lane = race.thirdPlace.lanes[i];
+            uint256 lanePayout = (race.totalShowOnLane[lane] * uint256(race.showOddsBps[lane])) / ODDS_SCALE;
             // Split payout if dead heat for 3rd
             liability += lanePayout / uint256(thirdCount > 1 ? thirdCount : 1);
             unchecked { ++i; }

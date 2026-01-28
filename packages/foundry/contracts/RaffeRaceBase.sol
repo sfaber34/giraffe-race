@@ -149,6 +149,7 @@ abstract contract RaffeRaceBase {
         bool hasClaim;
         uint256 raceId;
         uint8 status;
+        uint8 betType;      // 0=Win, 1=Place, 2=Show
         uint8 betLane;
         uint256 betTokenId;
         uint128 betAmount;

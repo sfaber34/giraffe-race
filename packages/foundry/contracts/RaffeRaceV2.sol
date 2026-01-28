@@ -47,7 +47,7 @@ contract RaffeRace is
         houseRaffeTokenIds = _houseRaffeTokenIds;
         
         // Set defaults
-        houseEdgeBps = 500; // 5%
+        houseEdgeBps = 1000; // 10%
         maxBetAmount = 5_000_000; // 5 USDC (6 decimals)
 
         // Validate house raffe token IDs

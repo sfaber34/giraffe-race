@@ -381,6 +381,7 @@ abstract contract RaffeRaceBetting is RaffeRaceBase {
                     out.hasClaim = true;
                     out.raceId = rid;
                     out.status = CLAIM_STATUS_WIN;
+                    out.betType = BET_TYPE_WIN;
                     out.betLane = ub.winBet.lane;
                     out.betTokenId = _raceRaffes[rid].tokenIds[ub.winBet.lane];
                     out.betAmount = ub.winBet.amount;
@@ -400,6 +401,7 @@ abstract contract RaffeRaceBetting is RaffeRaceBase {
                     out.hasClaim = true;
                     out.raceId = rid;
                     out.status = CLAIM_STATUS_WIN;
+                    out.betType = BET_TYPE_PLACE;
                     out.betLane = ub.placeBet.lane;
                     out.betTokenId = _raceRaffes[rid].tokenIds[ub.placeBet.lane];
                     out.betAmount = ub.placeBet.amount;
@@ -420,6 +422,7 @@ abstract contract RaffeRaceBetting is RaffeRaceBase {
                     out.hasClaim = true;
                     out.raceId = rid;
                     out.status = CLAIM_STATUS_WIN;
+                    out.betType = BET_TYPE_SHOW;
                     out.betLane = ub.showBet.lane;
                     out.betTokenId = _raceRaffes[rid].tokenIds[ub.showBet.lane];
                     out.betAmount = ub.showBet.amount;

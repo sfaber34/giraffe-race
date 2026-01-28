@@ -689,6 +689,7 @@ export const useWinningClaims = (connectedAddress: `0x${string}` | undefined, ra
       hasClaim: Boolean(out?.hasClaim),
       raceId: BigInt(out?.raceId ?? 0),
       status: Number(out?.status ?? 0),
+      betType: Number(out?.betType ?? 0),
       betLane: Number(out?.betLane ?? 0),
       betTokenId: BigInt(out?.betTokenId ?? 0),
       betAmount: BigInt(out?.betAmount ?? 0),
