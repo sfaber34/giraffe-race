@@ -1,8 +1,14 @@
 "use client";
 
-import { QueueEntry } from "../types";
+import { useEffect, useMemo, useState } from "react";
+import { LANE_COUNT } from "../constants";
+import { LaneStats, QueueEntry } from "../types";
+import { parseStats } from "../utils";
 import { LaneName } from "./LaneName";
+import { Address } from "@scaffold-ui/components";
+import { usePublicClient } from "wagmi";
 import { GiraffeAnimated } from "~~/components/assets/GiraffeAnimated";
+import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
 
 interface EnterNftCardProps {
   // State
@@ -46,6 +52,57 @@ export const EnterNftCard = ({
   giraffeRaceContract,
   onEnterQueue,
 }: EnterNftCardProps) => {
+  const publicClient = usePublicClient();
+  const { data: giraffeNftContract } = useDeployedContractInfo({ contractName: "GiraffeNFT" });
+
+  // Fetch stats for all queue entries
+  const [queueStats, setQueueStats] = useState<Record<string, LaneStats>>({});
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      if (!publicClient || !giraffeNftContract?.address || !giraffeNftContract?.abi || queueEntries.length === 0) {
+        setQueueStats({});
+        return;
+      }
+
+      try {
+        const calls = queueEntries.map(entry => ({
+          address: giraffeNftContract.address as `0x${string}`,
+          abi: giraffeNftContract.abi as any,
+          functionName: "statsOf",
+          args: [entry.tokenId],
+        }));
+
+        const results = await publicClient.multicall({ contracts: calls as any, allowFailure: true });
+
+        const statsMap: Record<string, LaneStats> = {};
+        queueEntries.forEach((entry, i) => {
+          const result = results[i];
+          if (result.status === "success") {
+            statsMap[entry.tokenId.toString()] = parseStats(result.result);
+          } else {
+            statsMap[entry.tokenId.toString()] = { zip: 10, moxie: 10, hustle: 10 };
+          }
+        });
+        setQueueStats(statsMap);
+      } catch {
+        // Fallback to default stats
+        const statsMap: Record<string, LaneStats> = {};
+        queueEntries.forEach(entry => {
+          statsMap[entry.tokenId.toString()] = { zip: 10, moxie: 10, hustle: 10 };
+        });
+        setQueueStats(statsMap);
+      }
+    };
+
+    void fetchStats();
+  }, [publicClient, giraffeNftContract, queueEntries]);
+
+  // Determine which entries are "Up Next" (first LANE_COUNT entries)
+  const upNextTokenIds = useMemo(() => {
+    return new Set(queueEntries.slice(0, LANE_COUNT).map(e => e.tokenId.toString()));
+  }, [queueEntries]);
+
   return (
     <div className="card bg-base-100 border border-base-300">
       <div className="card-body gap-3">
@@ -128,7 +185,7 @@ export const EnterNftCard = ({
           You can have one giraffe in the queue at a time. Once entered, your giraffe is committed until it races.
         </div>
 
-        {/* Queue Display */}
+        {/* Queue Display - List View */}
         <div className="divider my-2"></div>
         <div className="flex items-center justify-between">
           <h4 className="font-semibold text-sm">Race Queue</h4>
@@ -140,31 +197,66 @@ export const EnterNftCard = ({
         {queueEntries.length === 0 ? (
           <div className="text-sm opacity-70">No giraffes in the queue yet. Be the first to join!</div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+          <div className="flex flex-col gap-2">
             {queueEntries.map((entry, idx) => {
               const isUserGiraffe = userInQueue && userQueuedToken !== null && entry.tokenId === userQueuedToken;
+              const isUpNext = upNextTokenIds.has(entry.tokenId.toString());
+              const stats = queueStats[entry.tokenId.toString()] ?? { zip: 10, moxie: 10, hustle: 10 };
+
               return (
                 <div
                   key={entry.tokenId.toString()}
-                  className={`relative rounded-xl border border-base-300 bg-base-200/40 p-2 ${
-                    isUserGiraffe ? "ring-2 ring-primary ring-offset-2 ring-offset-base-100" : ""
+                  className={`flex items-center gap-3 p-3 rounded-xl border bg-base-200/40 ${
+                    isUserGiraffe
+                      ? "border-primary ring-1 ring-primary"
+                      : isUpNext
+                        ? "border-warning/50"
+                        : "border-base-300"
                   }`}
                 >
-                  <div className="absolute top-1 left-1 badge badge-sm badge-ghost">{idx + 1}</div>
-                  <GiraffeAnimated
-                    idPrefix={`queue-${entry.tokenId.toString()}`}
-                    tokenId={entry.tokenId}
-                    playbackRate={1}
-                    playing={false}
-                    sizePx={84}
-                    className="mx-auto block"
-                  />
-                  <div className="mt-1 text-[11px] text-center opacity-70 truncate max-w-[84px] mx-auto">
-                    <LaneName tokenId={entry.tokenId} fallback={`#${entry.tokenId.toString()}`} />
+                  {/* Queue Position */}
+                  <div className="flex-shrink-0 w-8 text-center">
+                    <span className="font-mono font-bold text-lg opacity-60">#{idx + 1}</span>
                   </div>
-                  {isUserGiraffe ? (
-                    <div className="absolute top-1 right-1 badge badge-primary badge-sm">You</div>
-                  ) : null}
+
+                  {/* NFT Avatar */}
+                  <div className="flex-shrink-0">
+                    <GiraffeAnimated
+                      idPrefix={`queue-${entry.tokenId.toString()}`}
+                      tokenId={entry.tokenId}
+                      playbackRate={1}
+                      playing={false}
+                      sizePx={48}
+                    />
+                  </div>
+
+                  {/* Name & Badges */}
+                  <div className="flex flex-col gap-1 flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold truncate">
+                        <LaneName tokenId={entry.tokenId} fallback={`#${entry.tokenId.toString()}`} />
+                      </span>
+                      {isUserGiraffe && <span className="badge badge-primary badge-sm">You</span>}
+                      {isUpNext && <span className="badge badge-warning badge-sm">Up Next</span>}
+                    </div>
+                    {/* Owner Address */}
+                    <div className="text-xs opacity-70">
+                      <Address address={entry.owner} size="xs" />
+                    </div>
+                  </div>
+
+                  {/* Stats */}
+                  <div className="flex-shrink-0 text-right text-xs opacity-70 leading-tight">
+                    <div>
+                      <span className="opacity-60">Zip:</span> <span className="font-medium">{stats.zip}</span>
+                    </div>
+                    <div>
+                      <span className="opacity-60">Moxie:</span> <span className="font-medium">{stats.moxie}</span>
+                    </div>
+                    <div>
+                      <span className="opacity-60">Hustle:</span> <span className="font-medium">{stats.hustle}</span>
+                    </div>
+                  </div>
                 </div>
               );
             })}
