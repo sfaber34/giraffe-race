@@ -14,6 +14,11 @@ import os from "node:os";
  *   - Place probability: chance of finishing 1st OR 2nd
  *   - Show probability: chance of finishing 1st, 2nd, OR 3rd
  *
+ * WINNER DETERMINATION: First to cross the finish line (1000 units) wins!
+ * - Track which tick each racer crosses 1000
+ * - Earliest tick = higher position
+ * - Same tick = dead heat (tie)
+ *
  * Dead Heat Rules:
  *   - If tied for last qualifying position, probability is split
  *   - Example: 2-way tie for 2nd → each gets 0.5 credit for Place
@@ -115,9 +120,14 @@ function scoreBps(score) {
  * Simulate a full race and return the finish order.
  * Runs until ALL racers are past TRACK_LENGTH + FINISH_OVERSHOOT.
  *
+ * WINNER DETERMINATION: First to cross the finish line (1000 units) wins!
+ * - Tracks which tick each lane crosses 1000
+ * - Earlier tick = higher position
+ * - Same tick = dead heat
+ *
  * @param {number} seed - Numeric seed for RNG
  * @param {number[]} scores - Array of 6 scores (1-10)
- * @returns {{ finishOrder: FinishOrder, finalDistances: number[] }}
+ * @returns {{ finishOrder: FinishOrder, finalDistances: number[], finishTicks: number[] }}
  */
 function simulateFullRace(seed, scores) {
   const rng = new FastRng(seed);
@@ -130,6 +140,9 @@ function simulateFullRace(seed, scores) {
     scoreBps(scores[4]),
     scoreBps(scores[5]),
   ];
+
+  // Track which tick each lane crosses the finish line (-1 = hasn't crossed)
+  const finishTicks = [-1, -1, -1, -1, -1, -1];
 
   const finishLine = TRACK_LENGTH + FINISH_OVERSHOOT;
 
@@ -158,37 +171,51 @@ function simulateFullRace(seed, scores) {
         const pick = rng.roll(10_000);
         if (pick < rem) q += 1;
       }
+
+      const prevDist = distances[a];
       distances[a] += q > 0 ? q : 1;
+
+      // Check if this lane just crossed the finish line THIS tick
+      if (finishTicks[a] === -1 && prevDist < TRACK_LENGTH && distances[a] >= TRACK_LENGTH) {
+        finishTicks[a] = t;
+      }
     }
   }
 
-  // Calculate finish order from final distances
-  const finishOrder = calculateFinishOrder(distances);
+  // Calculate finish order based on WHEN each lane crossed the finish line
+  const finishOrder = calculateFinishOrder(finishTicks, distances);
 
-  return { finishOrder, finalDistances: distances };
+  return { finishOrder, finalDistances: distances, finishTicks };
 }
 
 /**
- * Calculate finish order with dead heat handling.
- * Groups lanes by their final distance (higher = better).
+ * Calculate finish order based on WHEN each lane crossed the finish line.
+ * - Earlier tick = higher position
+ * - Same tick = dead heat (distance as tiebreaker for ordering, but they still tie)
  *
- * @param {number[]} distances
+ * @param {number[]} finishTicks - Tick when each lane crossed 1000 (-1 if not crossed)
+ * @param {number[]} distances - Final distances (for tiebreaker ordering)
  * @returns {FinishOrder}
  */
-function calculateFinishOrder(distances) {
-  // Sort lanes by distance (descending - higher distance = better)
-  const sorted = distances.map((d, i) => ({ lane: i, distance: d })).sort((a, b) => b.distance - a.distance);
+function calculateFinishOrder(finishTicks, distances) {
+  // Sort lanes by tick (ascending - earlier = better), then distance descending for ordering
+  const sorted = finishTicks
+    .map((tick, lane) => ({ lane, tick, distance: distances[lane] }))
+    .sort((a, b) => {
+      if (a.tick !== b.tick) return a.tick - b.tick; // Earlier tick wins
+      return b.distance - a.distance; // Same tick: higher distance for consistent ordering
+    });
 
-  // Group by distance for dead heat detection
+  // Group by tick for dead heat detection
   const groups = [];
-  let currentGroup = { distance: sorted[0].distance, lanes: [sorted[0].lane] };
+  let currentGroup = { tick: sorted[0].tick, lanes: [sorted[0].lane] };
 
   for (let i = 1; i < sorted.length; i++) {
-    if (sorted[i].distance === currentGroup.distance) {
+    if (sorted[i].tick === currentGroup.tick) {
       currentGroup.lanes.push(sorted[i].lane);
     } else {
       groups.push(currentGroup);
-      currentGroup = { distance: sorted[i].distance, lanes: [sorted[i].lane] };
+      currentGroup = { tick: sorted[i].tick, lanes: [sorted[i].lane] };
     }
   }
   groups.push(currentGroup);
@@ -393,6 +420,11 @@ function usage() {
   console.log("  --samples N                   (default 10000)");
   console.log("  --salt    X                   (optional; numeric salt for seed variety)");
   console.log("  --json                        (output raw JSON for programmatic use)");
+  console.log("");
+  console.log("WINNER DETERMINATION: First to cross the finish line (1000 units) wins!");
+  console.log("  - Tracks which tick each racer crosses 1000");
+  console.log("  - Earlier tick = higher position");
+  console.log("  - Same tick = dead heat (tie)");
   console.log("");
   console.log("Output:");
   console.log("  Win:   Probability of finishing 1st (in basis points)");
