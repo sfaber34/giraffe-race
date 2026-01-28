@@ -28,6 +28,9 @@ export const useRaceReplay = ({ seed, settled, laneScore }: UseRaceReplayProps) 
   const prevRaceStartedRef = useRef(false);
   const [svgResetNonce, setSvgResetNonce] = useState(0);
 
+  // Stable string representation of laneScore for dependency comparison
+  const laneScoreKey = laneScore.join(",");
+
   // Check if we can simulate
   const canSimulate = useMemo(() => {
     if (!settled) return false;
@@ -35,7 +38,7 @@ export const useRaceReplay = ({ seed, settled, laneScore }: UseRaceReplayProps) 
     return isHex(seed) && seed !== "0x" + "0".repeat(64);
   }, [settled, seed]);
 
-  // Run simulation
+  // Run simulation (uses laneScoreKey for stable dependency)
   const simulation = useMemo(() => {
     if (!canSimulate || !seed) return null;
     return simulateRaceFromSeed({
@@ -46,7 +49,8 @@ export const useRaceReplay = ({ seed, settled, laneScore }: UseRaceReplayProps) 
       trackLength: TRACK_LENGTH,
       score: laneScore,
     });
-  }, [canSimulate, seed, laneScore]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canSimulate, seed, laneScoreKey]);
 
   const frames = useMemo(() => simulation?.frames ?? [], [simulation]);
   const lastFrameIndex = Math.max(0, frames.length - 1);
@@ -56,13 +60,13 @@ export const useRaceReplay = ({ seed, settled, laneScore }: UseRaceReplayProps) 
     frameRef.current = frame;
   }, [frame]);
 
-  // Reset on new seed
+  // Reset on new seed OR when laneScore changes (simulation will be different)
   useEffect(() => {
     setFrame(0);
     setRaceStarted(false);
     setStartDelayRemainingMs(3000);
     setSvgResetNonce(n => n + 1);
-  }, [seed]);
+  }, [seed, laneScoreKey]);
 
   // Start-delay logic (3s hold at start line)
   const startDelayRemainingMsRef = useRef(startDelayRemainingMs);

@@ -340,6 +340,34 @@ export const RaceDashboard = () => {
                 />
               </div>
 
+              {/* Debug: Lane positions */}
+              {replay.simulation && (
+                <div className="text-xs font-mono mt-1 px-1 opacity-70 space-y-1">
+                  <div className="flex gap-4">
+                    <span className="opacity-50">
+                      Frame {replay.frame}/{replay.lastFrameIndex}:
+                    </span>
+                    {Array.from({ length: LANE_COUNT }).map((_, i) => (
+                      <span key={i}>
+                        <span className="opacity-50">L{i}:</span>{" "}
+                        <span className={replay.currentDistances[i] >= 1000 ? "text-success" : ""}>
+                          {replay.currentDistances[i]?.toFixed(0) ?? 0}
+                        </span>
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex gap-4">
+                    <span className="opacity-50">Final distances:</span>
+                    {Array.from({ length: LANE_COUNT }).map((_, i) => (
+                      <span key={i}>
+                        <span className="opacity-50">L{i}:</span>{" "}
+                        <span>{replay.simulation?.distances[i]?.toFixed(0) ?? 0}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Finish Order Comparison (Solidity vs Frontend) */}
               {parsed?.settled && replay.simulation?.finishOrder && parsedFinishOrder ? (
                 <details className="collapse collapse-arrow bg-base-100 mt-2">
