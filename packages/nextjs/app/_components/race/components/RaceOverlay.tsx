@@ -1,6 +1,6 @@
 "use client";
 
-import { CooldownStatus, ParsedFinishOrder, ParsedRace, ParsedSchedule, RaceStatus } from "../types";
+import { ParsedFinishOrder, ParsedRace, ParsedSchedule, RaceStatus } from "../types";
 import { BlockCountdownBar } from "./BlockCountdownBar";
 import { LaneName } from "./LaneName";
 import { RaffeAnimated } from "~~/components/assets/RaffeAnimated";
@@ -15,7 +15,6 @@ interface RaceResultsOverlayProps {
   laneTokenIds: bigint[];
   parsedFinishOrder: ParsedFinishOrder | null;
   parsed: ParsedRace | null;
-  cooldownStatus: CooldownStatus | null;
   parsedSchedule: ParsedSchedule | null;
   blockNumber: bigint | undefined;
 }
@@ -26,7 +25,6 @@ const RaceResultsOverlay = ({
   laneTokenIds,
   parsedFinishOrder,
   parsed,
-  cooldownStatus,
   parsedSchedule,
   blockNumber,
 }: RaceResultsOverlayProps) => {
@@ -131,13 +129,13 @@ const RaceResultsOverlay = ({
         </div>
       ) : null}
 
-      {cooldownStatus && cooldownStatus.cooldownEndsAtBlock > 0n && (
+      {parsedSchedule?.settledAtBlock && (
         <div className="w-full mt-2">
           <BlockCountdownBar
-            label={cooldownStatus.canCreate ? "Next race available" : "Next race in"}
+            label="Next race in"
             current={blockNumber}
-            start={parsedSchedule?.settledAtBlock ?? undefined}
-            end={cooldownStatus.cooldownEndsAtBlock}
+            start={parsedSchedule.settledAtBlock}
+            end={parsedSchedule.settledAtBlock + 30n}
           />
         </div>
       )}
@@ -164,7 +162,6 @@ interface RaceOverlayProps {
   viewingRaceId: bigint | null;
   parsed: ParsedRace | null;
   parsedSchedule: ParsedSchedule | null;
-  cooldownStatus: CooldownStatus | null;
   laneTokenIds: bigint[];
   parsedFinishOrder: ParsedFinishOrder | null;
 
@@ -187,7 +184,6 @@ export const RaceOverlay = ({
   viewingRaceId,
   parsed,
   parsedSchedule,
-  cooldownStatus,
   laneTokenIds,
   parsedFinishOrder,
   blockNumber,
@@ -220,7 +216,6 @@ export const RaceOverlay = ({
             laneTokenIds={laneTokenIds}
             parsedFinishOrder={parsedFinishOrder}
             parsed={parsed}
-            cooldownStatus={cooldownStatus}
             parsedSchedule={parsedSchedule}
             blockNumber={blockNumber}
           />
@@ -271,7 +266,6 @@ export const RaceOverlay = ({
           laneTokenIds={laneTokenIds}
           parsedFinishOrder={parsedFinishOrder}
           parsed={parsed}
-          cooldownStatus={cooldownStatus}
           parsedSchedule={parsedSchedule}
           blockNumber={blockNumber}
         />
