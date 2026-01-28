@@ -132,6 +132,18 @@ abstract contract RaffeRaceBetting is RaffeRaceBase {
 
             // On-demand settlement (skip if cancelled)
             if (!r.settled && !r.cancelled) {
+                // Check if blockhash is still available for settlement
+                uint64 cb = r.bettingCloseBlock;
+                if (cb != 0 && block.number > cb) {
+                    bytes32 bh = blockhash(cb);
+                    if (bh == bytes32(0)) {
+                        // Blockhash unavailable - skip this race entirely and advance index
+                        // User's bets on this race are forfeited (admin should cancel for refunds)
+                        idx++;
+                        _nextClaimIndex[bettor] = idx;
+                        continue;
+                    }
+                }
                 settledLiability = SettlementLib.settleRace(r, raceId, _raceScore[raceId], simulator, settledLiability);
             }
 

@@ -87,8 +87,9 @@ export const AdminDashboard = () => {
 
   // Write hooks
   const { writeContractAsync: writeRaffeRaceAsync } = useScaffoldWriteContract({ contractName: "RaffeRace" });
+  // Default to MockUSDC if not yet determined to prevent invalid contract lookups
   const { writeContractAsync: writeUsdcAsync } = useScaffoldWriteContract({
-    contractName: usdcContractName as any,
+    contractName: (usdcContractName ?? "MockUSDC") as any,
   });
 
   // Derived state

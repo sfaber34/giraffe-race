@@ -190,8 +190,9 @@ export const RaffeNfts = () => {
   }, [mintFeeRequired, usdcBalance]);
 
   // Use dynamic USDC contract name (USDC for Base, MockUSDC for local)
+  // Default to MockUSDC if not yet determined to prevent invalid contract lookups
   const { writeContractAsync: writeUsdcAsync } = useScaffoldWriteContract({
-    contractName: usdcContractName as any,
+    contractName: (usdcContractName ?? "MockUSDC") as any,
   });
 
   // Fetch pending commits from chain

@@ -122,8 +122,9 @@ export const RaceDashboard = () => {
   // Write hooks
   const { writeContractAsync: writeRaffeRaceAsync } = useScaffoldWriteContract({ contractName: "RaffeRace" });
   // Use dynamic USDC contract name (USDC for Base, MockUSDC for local)
+  // Default to MockUSDC if not yet determined to prevent invalid contract lookups
   const { writeContractAsync: writeUsdcAsync } = useScaffoldWriteContract({
-    contractName: usdcContractName as any,
+    contractName: (usdcContractName ?? "MockUSDC") as any,
   });
 
   // Jump to next winning claim after claim
@@ -473,7 +474,6 @@ export const RaceDashboard = () => {
               hasRevealedClaimSnapshot={hasRevealedClaimSnapshot}
               displayedNextWinningClaim={displayedNextWinningClaim}
               displayedWinningClaimRemaining={displayedWinningClaimRemaining}
-              activeBlockNumber={activeBlockNumber}
               onClaimPayout={handleClaimPayout}
             />
 

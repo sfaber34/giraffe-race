@@ -6,9 +6,6 @@ import { LaneName } from "./LaneName";
 import { formatUnits } from "viem";
 import { RaffeAnimated } from "~~/components/assets/RaffeAnimated";
 
-// Blockhash is available for 256 blocks after bettingCloseBlock
-const BLOCKHASH_WINDOW = 256n;
-
 interface ClaimPayoutCardProps {
   connectedAddress: `0x${string}` | undefined;
   raffeRaceContract: any;
@@ -16,7 +13,6 @@ interface ClaimPayoutCardProps {
   hasRevealedClaimSnapshot: boolean;
   displayedNextWinningClaim: NextWinningClaim | null;
   displayedWinningClaimRemaining: bigint | null;
-  activeBlockNumber: bigint | undefined;
   onClaimPayout: () => Promise<void>;
 }
 
@@ -40,29 +36,8 @@ export const ClaimPayoutCard = ({
   hasRevealedClaimSnapshot,
   displayedNextWinningClaim,
   displayedWinningClaimRemaining,
-  activeBlockNumber,
   onClaimPayout,
 }: ClaimPayoutCardProps) => {
-  // Calculate countdown for payout lock
-  const getCountdownInfo = () => {
-    if (!displayedNextWinningClaim?.hasClaim || !activeBlockNumber) {
-      return { blocksRemaining: 0n, progress: 0, isLocked: true };
-    }
-
-    const deadline = displayedNextWinningClaim.bettingCloseBlock + BLOCKHASH_WINDOW;
-    const blocksRemaining = deadline > activeBlockNumber ? deadline - activeBlockNumber : 0n;
-    const elapsed =
-      activeBlockNumber > displayedNextWinningClaim.bettingCloseBlock
-        ? activeBlockNumber - displayedNextWinningClaim.bettingCloseBlock
-        : 0n;
-    const progress = Number(elapsed) / Number(BLOCKHASH_WINDOW);
-    const isLocked = blocksRemaining === 0n;
-
-    return { blocksRemaining, progress: Math.min(progress, 1), isLocked };
-  };
-
-  const countdown = getCountdownInfo();
-
   return (
     <div className="card bg-base-100 border border-base-300 shadow-sm">
       <div className="card-body gap-3 p-4">
@@ -123,42 +98,16 @@ export const ClaimPayoutCard = ({
                 {formatUnits(displayedNextWinningClaim.payout, USDC_DECIMALS)} USDC
               </span>
             </div>
-
-            {/* Countdown Bar */}
-            <div className="space-y-1">
-              <div className="flex items-center justify-between text-xs">
-                <span className="opacity-70">Time to claim</span>
-                <span className={countdown.isLocked ? "text-error font-medium" : "font-mono"}>
-                  {countdown.isLocked ? "Expired" : `${countdown.blocksRemaining.toString()} blocks`}
-                </span>
-              </div>
-              <div className="w-full h-2 bg-base-300 rounded-full overflow-hidden">
-                <div
-                  className={`h-full transition-all duration-300 ${
-                    countdown.progress > 0.8 ? "bg-error" : countdown.progress > 0.5 ? "bg-warning" : "bg-success"
-                  }`}
-                  style={{ width: `${(1 - countdown.progress) * 100}%` }}
-                />
-              </div>
-            </div>
           </div>
         )}
 
         <button
           className="btn btn-sm btn-primary"
-          disabled={
-            !raffeRaceContract || !connectedAddress || !displayedNextWinningClaim?.hasClaim || countdown.isLocked
-          }
+          disabled={!raffeRaceContract || !connectedAddress || !displayedNextWinningClaim?.hasClaim}
           onClick={onClaimPayout}
         >
           Claim payout
         </button>
-
-        {countdown.isLocked && displayedNextWinningClaim?.hasClaim && (
-          <div className="text-xs text-error opacity-70">
-            Claim window has expired. The blockhash is no longer available.
-          </div>
-        )}
       </div>
     </div>
   );

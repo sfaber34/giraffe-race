@@ -762,7 +762,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 7,
+      deployedOnBlock: 3,
     },
     RaffeNFT: {
       address: "0xb19b36b1456e65e3a6d514d3f715f204bd59f431",
@@ -2112,7 +2112,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 9,
+      deployedOnBlock: 5,
     },
     RaffeRaceSimulator: {
       address: "0x8ce361602b935680e8dec218b820ff5056beb7af",
@@ -2354,7 +2354,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 10,
+      deployedOnBlock: 6,
     },
     HouseTreasury: {
       address: "0xe1aa25618fa0c7a1cfdab5d6b456af611873b629",
@@ -2759,7 +2759,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 11,
+      deployedOnBlock: 7,
     },
     RaffeRace: {
       address: "0x196dbcbb54b8ec4958c959d8949ebfe87ac2aaaf",
@@ -3101,45 +3101,6 @@ const deployedContracts = {
         },
         {
           type: "function",
-          name: "TEMP_FIXED_DECIMAL_ODDS_BPS",
-          inputs: [],
-          outputs: [
-            {
-              name: "",
-              type: "uint32",
-              internalType: "uint32",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "TEMP_FIXED_PLACE_ODDS_BPS",
-          inputs: [],
-          outputs: [
-            {
-              name: "",
-              type: "uint32",
-              internalType: "uint32",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
-          name: "TEMP_FIXED_SHOW_ODDS_BPS",
-          inputs: [],
-          outputs: [
-            {
-              name: "",
-              type: "uint32",
-              internalType: "uint32",
-            },
-          ],
-          stateMutability: "view",
-        },
-        {
-          type: "function",
           name: "TRACK_LENGTH",
           inputs: [],
           outputs: [
@@ -3404,6 +3365,11 @@ const deployedContracts = {
                   internalType: "uint8",
                 },
                 {
+                  name: "betType",
+                  type: "uint8",
+                  internalType: "uint8",
+                },
+                {
                   name: "betLane",
                   type: "uint8",
                   internalType: "uint8",
@@ -3466,6 +3432,11 @@ const deployedContracts = {
                 },
                 {
                   name: "status",
+                  type: "uint8",
+                  internalType: "uint8",
+                },
+                {
+                  name: "betType",
                   type: "uint8",
                   internalType: "uint8",
                 },
@@ -5026,7 +4997,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 18,
+      deployedOnBlock: 14,
     },
   },
 } as const;
