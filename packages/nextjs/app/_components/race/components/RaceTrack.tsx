@@ -1,14 +1,7 @@
 "use client";
 
 import React, { memo } from "react";
-import {
-  BASE_REPLAY_SPEED_MULTIPLIER,
-  LANE_COUNT,
-  PX_PER_UNIT,
-  SPEED_RANGE,
-  TRACK_LENGTH,
-  TRACK_LENGTH_PX,
-} from "../constants";
+import { BASE_REPLAY_SPEED_MULTIPLIER, LANE_COUNT, PX_PER_UNIT, SPEED_RANGE, TRACK_LENGTH } from "../constants";
 import { TrackDimensions } from "../hooks/useTrackDimensions";
 import { MyBets, ParsedGiraffes, PlaybackSpeed } from "../types";
 import { LaneName } from "./LaneName";
@@ -79,17 +72,14 @@ export const RaceTrack = memo(function RaceTrack({
   svgResetNonce,
   myBets,
 }: RaceTrackProps) {
-  const { trackHeight, trackBaseY, trackVerticalSpread, giraffeSize, worldPaddingLeft, worldPaddingRight } = dimensions;
-
-  // Compute world width dynamically based on responsive padding
-  const worldWidth = worldPaddingLeft + TRACK_LENGTH_PX + worldPaddingRight;
+  const { trackBaseY, trackVerticalSpread, giraffeSize, worldPaddingLeft } = dimensions;
 
   return (
     <>
       {/* Camera viewport */}
       <div className="absolute inset-0">
         <div ref={cameraScrollRefCb} className="absolute inset-0 overflow-hidden">
-          <div className="relative" style={{ width: `${worldWidth}px`, height: `${trackHeight}px` }}>
+          <div className="relative" style={{ width: "var(--world-width)", height: "var(--track-height)" }}>
             {/* Track background - single wide track with perspective */}
             <div className="absolute inset-0">
               {/* Ground/track surface with perspective gradient */}
@@ -111,14 +101,14 @@ export const RaceTrack = memo(function RaceTrack({
 
               {/* Track surface texture lines for depth */}
               {Array.from({ length: 14 }).map((_, i) => {
-                const y = (i / 13) * trackHeight;
+                const pct = (i / 13) * 100;
                 const opacity = 0.08 + (i / 13) * 0.12;
                 return (
                   <div
                     key={`line-${i}`}
                     className="absolute left-0 right-0 pointer-events-none"
                     style={{
-                      top: `${y}px`,
+                      top: `${pct}%`,
                       height: "1px",
                       background: `linear-gradient(90deg, transparent 0%, rgba(0,0,0,${opacity}) 10%, rgba(0,0,0,${opacity}) 90%, transparent 100%)`,
                     }}
@@ -130,10 +120,10 @@ export const RaceTrack = memo(function RaceTrack({
               <div
                 className="absolute bg-white/40"
                 style={{
-                  left: `${worldPaddingLeft}px`,
+                  left: "var(--world-padding-left)",
                   top: 0,
                   width: "4px",
-                  height: `${trackHeight}px`,
+                  height: "var(--track-height)",
                   transform: "skewY(-3deg)",
                 }}
               />
@@ -142,10 +132,10 @@ export const RaceTrack = memo(function RaceTrack({
               <div
                 className="absolute"
                 style={{
-                  left: `${worldPaddingLeft + TRACK_LENGTH_PX}px`,
+                  left: "calc(var(--world-padding-left) + var(--track-length-px))",
                   top: 0,
                   width: "6px",
-                  height: `${trackHeight}px`,
+                  height: "var(--track-height)",
                   transform: "skewY(-3deg)",
                   background: "repeating-linear-gradient(180deg, #fff 0px, #fff 6px, #222 6px, #222 12px)",
                 }}
@@ -154,16 +144,16 @@ export const RaceTrack = memo(function RaceTrack({
               {/* Distance markers with perspective */}
               {Array.from({ length: Math.floor(TRACK_LENGTH / 100) - 1 }).map((_, idx) => {
                 const dist = (idx + 1) * 100;
-                const x = worldPaddingLeft + (dist / TRACK_LENGTH) * TRACK_LENGTH_PX;
+                const pct = (dist / TRACK_LENGTH) * 100;
                 return (
                   <div
                     key={dist}
                     className="absolute opacity-20 pointer-events-none"
                     style={{
-                      left: `${x}px`,
+                      left: `calc(var(--world-padding-left) + var(--track-length-px) * ${pct / 100})`,
                       top: 0,
                       width: "2px",
-                      height: `${trackHeight}px`,
+                      height: "var(--track-height)",
                       background: "rgba(255,255,255,0.5)",
                       transform: "skewY(-3deg)",
                     }}

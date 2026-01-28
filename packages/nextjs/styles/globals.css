@@ -112,6 +112,9 @@
   --giraffe-size: 100px;
   --world-padding-left: 100px;
   --world-padding-right: 140px;
+  /* Track length is constant: TRACK_LENGTH (1000) * PX_PER_UNIT (3) = 3000px */
+  --track-length-px: 3000px;
+  --world-width: calc(var(--world-padding-left) + var(--track-length-px) + var(--world-padding-right));
   --camera-start-x: 0px;
   --camera-finish-inset: 150px;
 }
@@ -126,6 +129,7 @@
     --giraffe-size: 180px;
     --world-padding-left: 180px;
     --world-padding-right: 260px;
+    --world-width: calc(var(--world-padding-left) + var(--track-length-px) + var(--world-padding-right));
     --camera-start-x: 0px;
     --camera-finish-inset: 260px;
   }

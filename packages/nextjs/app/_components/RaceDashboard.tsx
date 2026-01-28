@@ -297,7 +297,7 @@ export const RaceDashboard = () => {
               <div
                 ref={camera.viewportRefCb}
                 className="relative w-full bg-base-100 border border-base-300 overflow-hidden"
-                style={{ height: `${trackDimensions.trackHeight}px` }}
+                style={{ height: "var(--track-height)" }}
               >
                 {/* Center overlay */}
                 <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
