@@ -228,7 +228,7 @@ export const RaceTrack = memo(function RaceTrack({
                               <span
                                 className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-semibold"
                                 style={{
-                                  textShadow: "0 1px 3px rgba(150,150,150,0.8), 0 2px 6px rgba(100,100,100,0.5)",
+                                  textShadow: "0 1px 3px rgba(150,150,150,0.8)",
                                 }}
                               >
                                 <LaneName tokenId={parsedRaffes.tokenIds[i]} fallback={`#${i + 1}`} />
