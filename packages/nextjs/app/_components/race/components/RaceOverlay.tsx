@@ -1,6 +1,6 @@
 "use client";
 
-import { ParsedFinishOrder, ParsedRace, ParsedSchedule, RaceStatus } from "../types";
+import { MyBets, ParsedFinishOrder, ParsedRace, ParsedSchedule, RaceStatus } from "../types";
 import { BlockCountdownBar } from "./BlockCountdownBar";
 import { LaneName } from "./LaneName";
 import { RaffeAnimated } from "~~/components/assets/RaffeAnimated";
@@ -17,6 +17,7 @@ interface RaceResultsOverlayProps {
   parsed: ParsedRace | null;
   parsedSchedule: ParsedSchedule | null;
   blockNumber: bigint | undefined;
+  myBets: MyBets | null;
 }
 
 const RaceResultsOverlay = ({
@@ -27,8 +28,33 @@ const RaceResultsOverlay = ({
   parsed,
   parsedSchedule,
   blockNumber,
+  myBets,
 }: RaceResultsOverlayProps) => {
   const raceIdStr = (viewingRaceId ?? 0n).toString();
+
+  // Check if user placed any bets and if any won
+  const hasAnyBet = myBets?.win.hasBet || myBets?.place.hasBet || myBets?.show.hasBet;
+
+  let winningBetCount = 0;
+  if (myBets && parsedFinishOrder) {
+    const firstLanes = parsedFinishOrder.first.lanes;
+    const secondLanes = parsedFinishOrder.second.lanes;
+    const thirdLanes = parsedFinishOrder.third.lanes;
+
+    // Win bet: lane must be in 1st
+    if (myBets.win.hasBet && firstLanes.includes(myBets.win.lane)) winningBetCount++;
+    // Place bet: lane must be in 1st or 2nd
+    if (myBets.place.hasBet && (firstLanes.includes(myBets.place.lane) || secondLanes.includes(myBets.place.lane)))
+      winningBetCount++;
+    // Show bet: lane must be in 1st, 2nd, or 3rd
+    if (
+      myBets.show.hasBet &&
+      (firstLanes.includes(myBets.show.lane) ||
+        secondLanes.includes(myBets.show.lane) ||
+        thirdLanes.includes(myBets.show.lane))
+    )
+      winningBetCount++;
+  }
 
   return (
     <div
@@ -36,6 +62,14 @@ const RaceResultsOverlay = ({
       style={{ minWidth: 400 }}
     >
       <div className="text-3xl font-black text-primary drop-shadow">Race complete</div>
+
+      {hasAnyBet && (
+        <div className={`text-lg font-semibold ${winningBetCount > 0 ? "text-success" : "text-base-content/70"}`}>
+          {winningBetCount > 0
+            ? `Your bet${winningBetCount > 1 ? "s" : ""} hit! Claim your winnings below`
+            : "Sorry, none of your bets hit"}
+        </div>
+      )}
 
       {parsedFinishOrder ? (
         <div className="flex flex-col gap-2 w-full">
@@ -164,6 +198,7 @@ interface RaceOverlayProps {
   parsedSchedule: ParsedSchedule | null;
   laneTokenIds: bigint[];
   parsedFinishOrder: ParsedFinishOrder | null;
+  myBets: MyBets | null;
 
   // Block data
   blockNumber: bigint | undefined;
@@ -186,6 +221,7 @@ export const RaceOverlay = ({
   parsedSchedule,
   laneTokenIds,
   parsedFinishOrder,
+  myBets,
   blockNumber,
   bettingCloseBlock,
 }: RaceOverlayProps) => {
@@ -218,6 +254,7 @@ export const RaceOverlay = ({
             parsed={parsed}
             parsedSchedule={parsedSchedule}
             blockNumber={blockNumber}
+            myBets={myBets}
           />
         ) : null}
       </>
@@ -268,6 +305,7 @@ export const RaceOverlay = ({
           parsed={parsed}
           parsedSchedule={parsedSchedule}
           blockNumber={blockNumber}
+          myBets={myBets}
         />
       ) : status === "no_race" ? (
         // No race exists - prompt to create one

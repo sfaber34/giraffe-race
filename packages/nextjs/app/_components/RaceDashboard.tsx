@@ -316,6 +316,7 @@ export const RaceDashboard = () => {
                     parsedSchedule={parsedSchedule}
                     laneTokenIds={laneTokenIds}
                     parsedFinishOrder={parsedFinishOrder}
+                    myBets={myBets}
                     blockNumber={activeBlockNumber}
                     bettingCloseBlock={bettingCloseBlock}
                   />
