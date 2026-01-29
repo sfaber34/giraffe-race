@@ -24,6 +24,7 @@ export type RaceSimulation = {
 };
 
 const FINISH_OVERSHOOT = 10; // Match Solidity: run until last place is 10 units past finish
+const FINISH_TIME_PRECISION = 10000; // Precision for fractional tick calculation
 
 const clampScore = (r: number) => {
   // Clamp to [1, 10]
@@ -53,9 +54,10 @@ const scoreBps = (score: number) => {
  *   Bytes 6-17:  Rounding rolls for lanes 0-5 (2 bytes each, % 10000)
  *
  * WINNER DETERMINATION: First to cross the finish line (1000 units) wins!
- * - Track which tick each racer crosses 1000
- * - Earliest tick = higher position
- * - Same tick = dead heat (tie)
+ * - Uses fractional tick interpolation for precise ordering
+ * - Calculates exactly when within a tick each racer crosses 1000
+ * - Lower finish time = higher position
+ * - Dead heats only when finish time is exactly equal (very rare)
  *
  * Run continues until all are 10 units past finish for visual replay purposes.
  */
@@ -78,8 +80,11 @@ export function simulateRaceFromSeed({
   const frames: number[][] = [distances.slice()];
   const bps = Array.from({ length: laneCount }, (_, i) => scoreBps(score?.[i] ?? 10));
 
-  // Track which tick each lane crosses the finish line (-1 = hasn't crossed yet)
-  const finishTick: number[] = Array.from({ length: laneCount }, () => -1);
+  // Track precise finish time for each lane (-1 = hasn't crossed yet)
+  // Format: tick * FINISH_TIME_PRECISION + fractionalPart
+  // fractionalPart = (distanceToFinish * PRECISION) / speedThisTick
+  // Lower value = crossed finish line earlier within the tick
+  const finishTime: number[] = Array.from({ length: laneCount }, () => -1);
 
   const finishTarget = trackLength + FINISH_OVERSHOOT;
   let allFinished = false;
@@ -109,12 +114,19 @@ export function simulateRaceFromSeed({
         }
       }
 
+      const speed = Math.max(1, q);
       const prevDist = distances[a];
-      distances[a] += Math.max(1, q);
+      distances[a] += speed;
 
       // Check if this lane just crossed the finish line THIS tick
-      if (finishTick[a] === -1 && prevDist < trackLength && distances[a] >= trackLength) {
-        finishTick[a] = t;
+      if (finishTime[a] === -1 && prevDist < trackLength && distances[a] >= trackLength) {
+        // Calculate precise finish time using linear interpolation:
+        // What fraction of this tick did it take to reach exactly trackLength?
+        // fraction = (trackLength - prevDist) / speed
+        // Lower fraction = crossed earlier within the tick
+        const distanceToFinish = trackLength - prevDist;
+        const fractional = Math.floor((distanceToFinish * FINISH_TIME_PRECISION) / speed);
+        finishTime[a] = t * FINISH_TIME_PRECISION + fractional;
       }
     }
     frames.push(distances.slice());
@@ -129,8 +141,8 @@ export function simulateRaceFromSeed({
     throw new Error("Race did not finish (increase maxTicks?)");
   }
 
-  // Calculate finish order based on WHEN each lane crossed the finish line
-  const finishOrder = calculateFinishOrder(finishTick, distances);
+  // Calculate finish order based on precise finish time
+  const finishOrder = calculateFinishOrder(finishTime, distances);
 
   // Legacy fields for backwards compatibility
   const firstPlaceLanes = finishOrder.first.lanes;
@@ -141,19 +153,19 @@ export function simulateRaceFromSeed({
 }
 
 /**
- * Calculate finish positions based on WHEN each lane crossed the finish line.
- * - Earlier tick = higher position
- * - Same tick = dead heat (use final distance as tiebreaker for ordering, but they still tie)
+ * Calculate finish positions based on precise finish time (with fractional tick interpolation).
+ * - Lower finishTime = crossed finish line earlier = higher position
+ * - Dead heats only occur when finishTime is exactly equal (very rare with interpolation)
  */
-function calculateFinishOrder(finishTick: number[], distances: number[]): FinishOrder {
-  // Create array of {tick, distance, laneIndex} and sort by:
-  // 1. finishTick ascending (earlier = better)
-  // 2. distance descending (tiebreaker for same tick)
-  const sorted = finishTick
-    .map((tick, i) => ({ tick, d: distances[i]!, i }))
+function calculateFinishOrder(finishTime: number[], distances: number[]): FinishOrder {
+  // Create array of {time, distance, laneIndex} and sort by:
+  // 1. finishTime ascending (earlier = better)
+  // 2. distance descending (tiebreaker for exact same time)
+  const sorted = finishTime
+    .map((time, i) => ({ time, d: distances[i]!, i }))
     .sort((a, b) => {
-      if (a.tick !== b.tick) return a.tick - b.tick; // Earlier tick wins
-      return b.d - a.d; // Same tick: higher distance as tiebreaker for ordering
+      if (a.time !== b.time) return a.time - b.time; // Earlier time wins
+      return b.d - a.d; // Same time: higher distance as tiebreaker for ordering
     });
 
   const finishOrder: FinishOrder = {
@@ -166,12 +178,12 @@ function calculateFinishOrder(finishTick: number[], distances: number[]): Finish
   let sortIdx = 0;
 
   while (sortIdx < sorted.length && positionIdx < 3) {
-    const currentTick = sorted[sortIdx]!.tick;
+    const currentTime = sorted[sortIdx]!.time;
 
-    // Count how many lanes crossed on this same tick (dead heat)
+    // Count how many lanes have exactly the same finish time (dead heat - rare with interpolation)
     const tieStartIdx = sortIdx;
     let tieCount = 0;
-    while (sortIdx < sorted.length && sorted[sortIdx]!.tick === currentTick) {
+    while (sortIdx < sorted.length && sorted[sortIdx]!.time === currentTime) {
       tieCount++;
       sortIdx++;
     }

@@ -18,6 +18,7 @@ contract RaffeRaceSimulator {
     uint8 internal constant SPEED_RANGE = 10;
     uint16 internal constant BPS_DENOM = 10000;
     uint16 internal constant FINISH_OVERSHOOT = 10; // Run until last place is 10 units past finish
+    uint64 internal constant FINISH_TIME_PRECISION = 10000; // Precision for fractional tick calculation
     
     /// @notice Finish position info for a single position (1st, 2nd, or 3rd)
     /// @dev lanes array holds the lane indices that finished in this position
@@ -145,10 +146,10 @@ contract RaffeRaceSimulator {
         uint256 setupGas = gasStart - gasCheckpoint;
         gasStart = gasleft();
 
-        // Track which tick each lane crosses the finish line (type(uint16).max = hasn't crossed)
-        uint16[LANE_COUNT] memory finishTick;
+        // Track precise finish time for each lane (type(uint64).max = hasn't crossed)
+        uint64[LANE_COUNT] memory finishTime;
         for (uint8 i = 0; i < LANE_COUNT; i++) {
-            finishTick[i] = type(uint16).max;
+            finishTime[i] = type(uint64).max;
         }
         
         uint16 finishTarget = TRACK_LENGTH + FINISH_OVERSHOOT;
@@ -187,8 +188,12 @@ contract RaffeRaceSimulator {
                 distances[a] += uint16(q);
                 
                 // Check if this lane just crossed the finish line THIS tick
-                if (finishTick[a] == type(uint16).max && prevDist < TRACK_LENGTH && distances[a] >= TRACK_LENGTH) {
-                    finishTick[a] = uint16(t);
+                if (finishTime[a] == type(uint64).max && prevDist < TRACK_LENGTH && distances[a] >= TRACK_LENGTH) {
+                    // Calculate precise finish time using linear interpolation
+                    uint256 distanceToFinish = uint256(TRACK_LENGTH) - uint256(prevDist);
+                    uint256 speed = q;
+                    uint256 fractional = (distanceToFinish * uint256(FINISH_TIME_PRECISION)) / speed;
+                    finishTime[a] = uint64(t) * FINISH_TIME_PRECISION + uint64(fractional);
                 }
             }
 
@@ -209,8 +214,8 @@ contract RaffeRaceSimulator {
         uint256 mainLoopGas = gasStart - gasCheckpoint;
         gasStart = gasleft();
 
-        // Determine winner(s) - first to cross finish line wins
-        (winners, winnerCount) = _findWinnersByFinishTick(finishTick, distances);
+        // Determine winner(s) - first to cross finish line wins (using precise time)
+        (winners, winnerCount) = _findWinnersByFinishTime(finishTime, distances);
 
         uint256 winnerCalcGas = gasCheckpoint - gasleft();
 
@@ -237,26 +242,26 @@ contract RaffeRaceSimulator {
         }
     }
 
-    /// @notice Find winners based on who crossed the finish line first
-    function _findWinnersByFinishTick(uint16[LANE_COUNT] memory finishTick, uint16[LANE_COUNT] memory distances)
+    /// @notice Find winners based on who crossed the finish line first (using precise time)
+    function _findWinnersByFinishTime(uint64[LANE_COUNT] memory finishTime, uint16[LANE_COUNT] memory distances)
         internal
         pure
         returns (uint8[LANE_COUNT] memory winners, uint8 winnerCount)
     {
-        // Find the earliest finish tick (winner)
-        uint16 bestTick = finishTick[0];
+        // Find the earliest finish time (winner)
+        uint64 bestTime = finishTime[0];
         winnerCount = 1;
         winners[0] = 0;
 
         for (uint8 i = 1; i < LANE_COUNT; i++) {
-            uint16 tick = finishTick[i];
-            if (tick < bestTick) {
-                // New winner - earlier tick
-                bestTick = tick;
+            uint64 time = finishTime[i];
+            if (time < bestTime) {
+                // New winner - earlier time
+                bestTime = time;
                 winnerCount = 1;
                 winners[0] = i;
-            } else if (tick == bestTick) {
-                // Dead heat - same tick
+            } else if (time == bestTime) {
+                // Dead heat - exact same time (rare with interpolation)
                 winners[winnerCount] = i;
                 winnerCount++;
             }
@@ -278,6 +283,7 @@ contract RaffeRaceSimulator {
     
     /// @notice Simulate a full race until all racers are 10 units past the finish line
     /// @dev WINNER DETERMINATION: First to cross the finish line (1000 units) wins!
+    /// @dev Uses fractional tick interpolation for precise ordering when racers cross on same tick
     /// @dev Returns complete finish order with dead heat support for 1st, 2nd, 3rd
     function _simulateFullRace(bytes32 seed, uint8[LANE_COUNT] memory scores)
         internal
@@ -292,10 +298,13 @@ contract RaffeRaceSimulator {
 
         uint16[LANE_COUNT] memory distances;
         
-        // Track which tick each lane crosses the finish line (type(uint16).max = hasn't crossed)
-        uint16[LANE_COUNT] memory finishTick;
+        // Track precise finish time for each lane (type(uint64).max = hasn't crossed)
+        // Format: tick * FINISH_TIME_PRECISION + fractionalPart
+        // fractionalPart = (distanceToFinish * PRECISION) / speedThisTick
+        // Lower value = crossed finish line earlier within the tick
+        uint64[LANE_COUNT] memory finishTime;
         for (uint8 i = 0; i < LANE_COUNT; i++) {
-            finishTick[i] = type(uint16).max;
+            finishTime[i] = type(uint64).max;
         }
         
         uint16 finishTarget = TRACK_LENGTH + FINISH_OVERSHOOT;
@@ -331,8 +340,15 @@ contract RaffeRaceSimulator {
                 distances[a] += uint16(q);
                 
                 // Check if this lane just crossed the finish line THIS tick
-                if (finishTick[a] == type(uint16).max && prevDist < TRACK_LENGTH && distances[a] >= TRACK_LENGTH) {
-                    finishTick[a] = uint16(t);
+                if (finishTime[a] == type(uint64).max && prevDist < TRACK_LENGTH && distances[a] >= TRACK_LENGTH) {
+                    // Calculate precise finish time using linear interpolation:
+                    // What fraction of this tick did it take to reach exactly TRACK_LENGTH?
+                    // fraction = (TRACK_LENGTH - prevDist) / speed
+                    // Lower fraction = crossed earlier within the tick
+                    uint256 distanceToFinish = uint256(TRACK_LENGTH) - uint256(prevDist);
+                    uint256 speed = q; // The distance moved this tick
+                    uint256 fractional = (distanceToFinish * uint256(FINISH_TIME_PRECISION)) / speed;
+                    finishTime[a] = uint64(t) * FINISH_TIME_PRECISION + uint64(fractional);
                 }
             }
 
@@ -351,45 +367,46 @@ contract RaffeRaceSimulator {
         
         finishOrder.distances = distances;
         
-        // Determine finish order based on WHEN each lane crossed the finish line
-        _calculateFinishOrderByTick(finishTick, distances, finishOrder);
+        // Determine finish order based on precise finish time
+        _calculateFinishOrderByTime(finishTime, distances, finishOrder);
     }
     
-    /// @notice Calculate finish positions based on WHEN each lane crossed the finish line
-    /// @dev Earlier tick = higher position. Same tick = dead heat.
-    function _calculateFinishOrderByTick(
-        uint16[LANE_COUNT] memory finishTick, 
+    /// @notice Calculate finish positions based on precise finish time (with fractional tick interpolation)
+    /// @dev Lower finishTime = crossed finish line earlier = higher position
+    /// @dev Dead heats only occur when finishTime is exactly equal (very rare with interpolation)
+    function _calculateFinishOrderByTime(
+        uint64[LANE_COUNT] memory finishTime, 
         uint16[LANE_COUNT] memory distances,
         FinishOrder memory finishOrder
     ) internal pure {
-        // Create sorted array of {tick, distance, lane} - sort by tick ascending, then distance descending
-        uint16[LANE_COUNT] memory sortedTicks;
+        // Create sorted array of {finishTime, distance, lane} - sort by finishTime ascending
+        uint64[LANE_COUNT] memory sortedTimes;
         uint16[LANE_COUNT] memory sortedDistances;
         uint8[LANE_COUNT] memory sortedLanes;
         
         for (uint8 i = 0; i < LANE_COUNT; i++) {
-            sortedTicks[i] = finishTick[i];
+            sortedTimes[i] = finishTime[i];
             sortedDistances[i] = distances[i];
             sortedLanes[i] = i;
         }
         
-        // Bubble sort by tick ascending, then distance descending for tiebreaker ordering
+        // Bubble sort by finishTime ascending, then distance descending for exact ties
         for (uint8 i = 0; i < LANE_COUNT; i++) {
             for (uint8 j = i + 1; j < LANE_COUNT; j++) {
                 bool shouldSwap = false;
-                if (sortedTicks[j] < sortedTicks[i]) {
-                    // Earlier tick = better position
+                if (sortedTimes[j] < sortedTimes[i]) {
+                    // Earlier finish time = better position
                     shouldSwap = true;
-                } else if (sortedTicks[j] == sortedTicks[i] && sortedDistances[j] > sortedDistances[i]) {
-                    // Same tick: higher distance for consistent ordering (they still tie though)
+                } else if (sortedTimes[j] == sortedTimes[i] && sortedDistances[j] > sortedDistances[i]) {
+                    // Exact same finish time: higher distance for consistent ordering
                     shouldSwap = true;
                 }
                 
                 if (shouldSwap) {
-                    // Swap ticks
-                    uint16 tmpTick = sortedTicks[i];
-                    sortedTicks[i] = sortedTicks[j];
-                    sortedTicks[j] = tmpTick;
+                    // Swap times
+                    uint64 tmpTime = sortedTimes[i];
+                    sortedTimes[i] = sortedTimes[j];
+                    sortedTimes[j] = tmpTime;
                     // Swap distances
                     uint16 tmpDist = sortedDistances[i];
                     sortedDistances[i] = sortedDistances[j];
@@ -403,16 +420,17 @@ contract RaffeRaceSimulator {
         }
         
         // Now extract 1st, 2nd, 3rd positions accounting for dead heats
+        // Dead heats only occur when finishTime is exactly equal (rare with interpolation)
         uint8 positionIdx = 0; // 0 = filling 1st, 1 = filling 2nd, 2 = filling 3rd
         uint8 sortIdx = 0;
         
         while (sortIdx < LANE_COUNT && positionIdx < 3) {
-            uint16 currentTick = sortedTicks[sortIdx];
+            uint64 currentTime = sortedTimes[sortIdx];
             
-            // Count how many lanes crossed on this same tick (dead heat)
+            // Count how many lanes have exactly the same finish time (dead heat)
             uint8 tieCount = 0;
             uint8 tieStartIdx = sortIdx;
-            while (sortIdx < LANE_COUNT && sortedTicks[sortIdx] == currentTick) {
+            while (sortIdx < LANE_COUNT && sortedTimes[sortIdx] == currentTime) {
                 tieCount++;
                 sortIdx++;
             }
