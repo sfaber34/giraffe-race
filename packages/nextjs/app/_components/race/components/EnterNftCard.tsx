@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { LANE_COUNT } from "../constants";
 import { LaneStats, QueueEntry } from "../types";
 import { parseStats } from "../utils";
@@ -9,6 +9,131 @@ import { Address } from "@scaffold-ui/components";
 import { usePublicClient } from "wagmi";
 import { RaffeAnimated } from "~~/components/assets/RaffeAnimated";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * NftDropdown - Custom dropdown with NFT previews
+ * ───────────────────────────────────────────────────────────────────────────── */
+
+interface NftDropdownProps {
+  ownedTokenIds: bigint[];
+  ownedTokenNameById: Record<string, string>;
+  ownedTokenStats: Record<string, LaneStats>;
+  isLoadingOwnedTokenNames: boolean;
+  selectedTokenId: bigint | null;
+  setSelectedTokenId: (id: bigint | null) => void;
+}
+
+const NftDropdown = ({
+  ownedTokenIds,
+  ownedTokenNameById,
+  ownedTokenStats,
+  isLoadingOwnedTokenNames,
+  selectedTokenId,
+  setSelectedTokenId,
+}: NftDropdownProps) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const getName = (tokenId: bigint) => {
+    const name = ownedTokenNameById[tokenId.toString()] || "";
+    if (name.trim()) return name;
+    if (isLoadingOwnedTokenNames) return "Loading…";
+    return "Unnamed";
+  };
+
+  const getStats = (tokenId: bigint) => {
+    return ownedTokenStats[tokenId.toString()] ?? { zip: 10, moxie: 10, hustle: 10 };
+  };
+
+  const handleSelect = (tokenId: bigint) => {
+    setSelectedTokenId(tokenId);
+    setIsOpen(false);
+  };
+
+  return (
+    <div ref={dropdownRef} className="relative w-full">
+      {/* Trigger button */}
+      <div
+        className="select select-bordered w-full flex items-center justify-between text-left cursor-pointer"
+        onMouseDown={e => {
+          e.preventDefault();
+          setIsOpen(!isOpen);
+        }}
+      >
+        {selectedTokenId !== null ? (
+          <span className="flex items-center gap-2">
+            <span className="pointer-events-none">
+              <RaffeAnimated
+                idPrefix={`dropdown-selected-${selectedTokenId.toString()}`}
+                tokenId={selectedTokenId}
+                playbackRate={1}
+                playing={false}
+                sizePx={24}
+              />
+            </span>
+            <span className="truncate">{getName(selectedTokenId)}</span>
+          </span>
+        ) : (
+          <span className="opacity-50">Select a Raffe…</span>
+        )}
+      </div>
+
+      {/* Dropdown menu */}
+      {isOpen && (
+        <ul className="absolute z-50 mt-1 w-full max-h-60 overflow-auto rounded-lg bg-base-100 border border-base-300 shadow-lg">
+          {ownedTokenIds.map(tokenId => {
+            const stats = getStats(tokenId);
+            return (
+              <li
+                key={tokenId.toString()}
+                className={`flex items-center gap-2 px-3 py-2 hover:bg-base-200 cursor-pointer ${
+                  selectedTokenId === tokenId ? "bg-primary/10" : ""
+                }`}
+                onMouseDown={e => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleSelect(tokenId);
+                }}
+              >
+                <span className="pointer-events-none flex-shrink-0">
+                  <RaffeAnimated
+                    idPrefix={`dropdown-option-${tokenId.toString()}`}
+                    tokenId={tokenId}
+                    playbackRate={1}
+                    playing={false}
+                    sizePx={36}
+                  />
+                </span>
+                <div className="flex flex-col flex-1 min-w-0">
+                  <span className="truncate font-medium">{getName(tokenId)}</span>
+                  <span className="text-xs opacity-60">
+                    Z:{stats.zip} M:{stats.moxie} H:{stats.hustle}
+                  </span>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+};
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * EnterNftCard
+ * ───────────────────────────────────────────────────────────────────────────── */
 
 interface EnterNftCardProps {
   // State
@@ -54,6 +179,48 @@ export const EnterNftCard = ({
 }: EnterNftCardProps) => {
   const publicClient = usePublicClient();
   const { data: raffeNftContract } = useDeployedContractInfo({ contractName: "RaffeNFT" });
+
+  // Fetch stats for owned tokens
+  const [ownedTokenStats, setOwnedTokenStats] = useState<Record<string, LaneStats>>({});
+
+  useEffect(() => {
+    const fetchOwnedStats = async () => {
+      if (!publicClient || !raffeNftContract?.address || !raffeNftContract?.abi || ownedTokenIds.length === 0) {
+        setOwnedTokenStats({});
+        return;
+      }
+
+      try {
+        const calls = ownedTokenIds.map(tokenId => ({
+          address: raffeNftContract.address as `0x${string}`,
+          abi: raffeNftContract.abi as any,
+          functionName: "statsOf",
+          args: [tokenId],
+        }));
+
+        const results = await publicClient.multicall({ contracts: calls as any, allowFailure: true });
+
+        const statsMap: Record<string, LaneStats> = {};
+        ownedTokenIds.forEach((tokenId, i) => {
+          const result = results[i];
+          if (result.status === "success") {
+            statsMap[tokenId.toString()] = parseStats(result.result);
+          } else {
+            statsMap[tokenId.toString()] = { zip: 10, moxie: 10, hustle: 10 };
+          }
+        });
+        setOwnedTokenStats(statsMap);
+      } catch {
+        const statsMap: Record<string, LaneStats> = {};
+        ownedTokenIds.forEach(tokenId => {
+          statsMap[tokenId.toString()] = { zip: 10, moxie: 10, hustle: 10 };
+        });
+        setOwnedTokenStats(statsMap);
+      }
+    };
+
+    void fetchOwnedStats();
+  }, [publicClient, raffeNftContract, ownedTokenIds]);
 
   // Fetch stats for all queue entries
   const [queueStats, setQueueStats] = useState<Record<string, LaneStats>>({});
@@ -107,10 +274,6 @@ export const EnterNftCard = ({
     <div className="card bg-base-100 border border-base-300">
       <div className="card-body gap-3">
         <h3 className="font-semibold">Enter the Race Queue</h3>
-        <p className="text-sm opacity-70">
-          Join the queue to have your raffe compete in future races. First come, first served — races start
-          automatically when 6 raffes are ready.
-        </p>
 
         {userInQueue && userQueuedToken ? (
           // User is already in queue - show their queued raffe
@@ -138,36 +301,21 @@ export const EnterNftCard = ({
           // User is not in queue - show entry form
           <>
             <label className="form-control w-full">
-              <div className="label">
-                <span className="label-text">Select a Raffe</span>
-              </div>
               {!connectedAddress ? (
-                <div className="text-sm opacity-70">Connect your wallet to see your NFTs.</div>
+                <div className="text-sm opacity-70">Connect your wallet to see your Raffes.</div>
               ) : isOwnedTokensLoading ? (
-                <div className="text-sm opacity-70">Loading your NFTs…</div>
+                <div className="text-sm opacity-70">Loading your Raffes...</div>
               ) : ownedTokenIds.length === 0 ? (
-                <div className="text-sm opacity-70">You don&apos;t own any RaffeNFTs yet.</div>
+                <div className="text-sm opacity-70">You don&apos;t own any Raffes yet.</div>
               ) : (
-                <select
-                  className="select select-bordered w-full"
-                  value={selectedTokenId?.toString() ?? ""}
-                  onChange={e => {
-                    setSelectedTokenId(e.target.value ? BigInt(e.target.value) : null);
-                  }}
-                >
-                  <option value="" disabled>
-                    Select an NFT…
-                  </option>
-                  {ownedTokenIds.map(tokenId => (
-                    <option key={tokenId.toString()} value={tokenId.toString()}>
-                      {(ownedTokenNameById[tokenId.toString()] || "").trim()
-                        ? ownedTokenNameById[tokenId.toString()]
-                        : isLoadingOwnedTokenNames
-                          ? "Loading…"
-                          : "Unnamed"}
-                    </option>
-                  ))}
-                </select>
+                <NftDropdown
+                  ownedTokenIds={ownedTokenIds}
+                  ownedTokenNameById={ownedTokenNameById}
+                  ownedTokenStats={ownedTokenStats}
+                  isLoadingOwnedTokenNames={isLoadingOwnedTokenNames}
+                  selectedTokenId={selectedTokenId}
+                  setSelectedTokenId={setSelectedTokenId}
+                />
               )}
             </label>
 
@@ -182,7 +330,8 @@ export const EnterNftCard = ({
         )}
 
         <div className="text-xs opacity-70">
-          You can have one raffe in the queue at a time. Once entered, your raffe is committed until it races.
+          You can have one raffe in the queue at a time. Once entered, your raffe is committed until it races. First
+          come, first served
         </div>
 
         {/* Queue Display - List View */}
