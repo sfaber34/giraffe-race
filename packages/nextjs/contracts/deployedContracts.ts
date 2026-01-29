@@ -832,7 +832,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 5,
+      deployedOnBlock: 14,
     },
     RaffeNFT: {
       address: "0xb19b36b1456e65e3a6d514d3f715f204bd59f431",
@@ -2182,7 +2182,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 7,
+      deployedOnBlock: 16,
     },
     RaffeRaceSimulator: {
       address: "0x8ce361602b935680e8dec218b820ff5056beb7af",
@@ -2424,7 +2424,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 8,
+      deployedOnBlock: 17,
     },
     HouseTreasury: {
       address: "0xe1aa25618fa0c7a1cfdab5d6b456af611873b629",
@@ -2899,7 +2899,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 9,
+      deployedOnBlock: 18,
     },
     RaffeRace: {
       address: "0x196dbcbb54b8ec4958c959d8949ebfe87ac2aaaf",
@@ -5233,7 +5233,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 16,
+      deployedOnBlock: 25,
     },
   },
 } as const;
