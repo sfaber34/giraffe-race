@@ -1,6 +1,6 @@
 "use client";
 
-import React, { memo } from "react";
+import { memo } from "react";
 import { BASE_REPLAY_SPEED_MULTIPLIER, LANE_COUNT, PX_PER_UNIT, SPEED_RANGE, TRACK_LENGTH } from "../constants";
 import { TrackDimensions } from "../hooks/useTrackDimensions";
 import { MyBets, ParsedRaffes, PlaybackSpeed } from "../types";
@@ -228,45 +228,24 @@ export const RaceTrack = memo(function RaceTrack({
                               <span
                                 className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-semibold"
                                 style={{
-                                  textShadow: "0 1px 2px rgba(0,0,0,0.1)",
+                                  textShadow: "0 1px 3px rgba(150,150,150,0.8), 0 2px 6px rgba(100,100,100,0.5)",
                                 }}
                               >
                                 <LaneName tokenId={parsedRaffes.tokenIds[i]} fallback={`#${i + 1}`} />
-                                {(hasWinBet || hasPlaceBet || hasShowBet) && (
-                                  <span className="font-bold">
-                                    (
-                                    {[
-                                      hasWinBet && (
-                                        <span key="w" className="text-yellow-500">
-                                          W
-                                        </span>
-                                      ),
-                                      hasPlaceBet && (
-                                        <span key="p" className="text-blue-400">
-                                          P
-                                        </span>
-                                      ),
-                                      hasShowBet && (
-                                        <span key="s" className="text-green-400">
-                                          S
-                                        </span>
-                                      ),
-                                    ]
-                                      .filter(Boolean)
-                                      .reduce((acc: React.ReactNode[], el, idx) => {
-                                        if (idx > 0)
-                                          acc.push(
-                                            <span key={`slash-${idx}`} className="opacity-70">
-                                              /
-                                            </span>,
-                                          );
-                                        acc.push(el);
-                                        return acc;
-                                      }, [])}
-                                    )
-                                  </span>
-                                )}
                               </span>
+                              {(hasWinBet || hasPlaceBet || hasShowBet) && (
+                                <span className="inline-flex items-center gap-0.5">
+                                  {hasWinBet && (
+                                    <span className="badge badge-xs bg-yellow-500 text-yellow-950 font-bold">W</span>
+                                  )}
+                                  {hasPlaceBet && (
+                                    <span className="badge badge-xs bg-blue-400 text-blue-950 font-bold">P</span>
+                                  )}
+                                  {hasShowBet && (
+                                    <span className="badge badge-xs bg-green-400 text-green-950 font-bold">S</span>
+                                  )}
+                                </span>
+                              )}
                             </div>
                           ) : null}
                         </div>
