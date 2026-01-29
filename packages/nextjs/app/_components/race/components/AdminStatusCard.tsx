@@ -216,13 +216,22 @@ export const AdminStatusCard = ({
           <div className="flex flex-wrap items-center gap-2 mt-1">
             <span className="text-xs opacity-70">Mine blocks (local)</span>
             <button className="btn btn-xs" onClick={() => onMineBlocks(1)} disabled={isMining}>
-              Mine +1
+              +1
             </button>
             <button className="btn btn-xs" onClick={() => onMineBlocks(10)} disabled={isMining}>
-              Mine +10
+              +10
             </button>
             <button className="btn btn-xs" onClick={() => onMineBlocks(50)} disabled={isMining}>
-              Mine +50
+              +50
+            </button>
+            <button className="btn btn-xs" onClick={() => onMineBlocks(100)} disabled={isMining}>
+              +100
+            </button>
+            <button className="btn btn-xs" onClick={() => onMineBlocks(500)} disabled={isMining}>
+              +500
+            </button>
+            <button className="btn btn-xs" onClick={() => onMineBlocks(1000)} disabled={isMining}>
+              +1000
             </button>
           </div>
           <div className="text-xs opacity-70">
@@ -251,6 +260,14 @@ export const AdminStatusCard = ({
                   <span className="opacity-70">Unpaid liability</span>
                   <span className="font-mono">
                     {settledLiability === null ? "-" : `${formatUnits(settledLiability, USDC_DECIMALS)} USDC`}
+                  </span>
+                </div>
+                <div className="flex justify-between font-semibold">
+                  <span className="opacity-70">Available balance</span>
+                  <span className="font-mono">
+                    {treasuryBalance !== undefined && settledLiability !== null
+                      ? `${formatUnits(treasuryBalance - settledLiability, USDC_DECIMALS)} USDC`
+                      : "-"}
                   </span>
                 </div>
                 {connectedAddress && userUsdcBalance !== undefined && (

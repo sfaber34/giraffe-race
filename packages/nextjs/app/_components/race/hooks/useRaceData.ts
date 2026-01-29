@@ -140,12 +140,11 @@ export const useRaceData = () => {
     return { canCreate, blocksRemaining, cooldownEndsAtBlock };
   }, [cooldownData]);
 
-  // Settled liability - doesn't need block-by-block updates
+  // Settled liability - watch to reflect claims and cleanup
   const { data: settledLiabilityData } = useScaffoldReadContract({
     contractName: "RaffeRace",
     functionName: "settledLiability",
-    query: { enabled: !!raffeRaceContract },
-    watch: false,
+    query: { enabled: !!raffeRaceContract, refetchInterval: 5000 },
   });
 
   const settledLiability = useMemo(() => {
@@ -174,13 +173,12 @@ export const useRaceData = () => {
     }
   }, [maxBetAmountData]);
 
-  // USDC balances - watch to reflect transactions
+  // USDC balances - refetch to reflect transactions
   const { data: userUsdcBalance } = useScaffoldReadContract({
     contractName: usdcContractName as any,
     functionName: "balanceOf" as any,
     args: [connectedAddress],
-    query: { enabled: !!usdcContract && !!usdcContractName && !!connectedAddress },
-    // Watch by default to reflect balance changes
+    query: { enabled: !!usdcContract && !!usdcContractName && !!connectedAddress, refetchInterval: 5000 },
   } as any);
 
   const { data: userUsdcAllowance } = useScaffoldReadContract({
@@ -194,8 +192,7 @@ export const useRaceData = () => {
   const { data: treasuryBalance } = useScaffoldReadContract({
     contractName: "HouseTreasury" as any,
     functionName: "balance" as any,
-    query: { enabled: !!treasuryContract },
-    watch: false,
+    query: { enabled: !!treasuryContract, refetchInterval: 5000 },
   } as any);
 
   return {

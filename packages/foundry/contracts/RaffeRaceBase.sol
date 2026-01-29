@@ -109,6 +109,9 @@ abstract contract RaffeRaceBase {
         PositionInfo secondPlace;
         PositionInfo thirdPlace;
         uint16[6] finalDistances;
+        // Track unclaimed winning payouts for this race (for expiration cleanup)
+        uint256 unclaimedLiability;
+        bool liabilityCleaned; // true after expired cleanup
     }
 
     struct RaceRaffes {
@@ -232,6 +235,7 @@ abstract contract RaffeRaceBase {
     error OddsWindowExpired();      // Tried to set probabilities after deadline
     error OddsWindowNotExpired();   // Tried to cancel before deadline
     error NotRaceBot();
+    error ClaimNotExpired();
     
     // Queue errors
     error AlreadyInQueue();
@@ -259,6 +263,7 @@ abstract contract RaffeRaceBase {
     event RaceSettledDeadHeat(uint256 indexed raceId, bytes32 seed, uint8 deadHeatCount, uint8[6] winners);
     event Claimed(uint256 indexed raceId, address indexed bettor, uint256 payout);
     event ClaimExpired(uint256 indexed raceId, address indexed bettor, uint256 forfeitedPayout);
+    event ExpiredLiabilityReleased(uint256 indexed raceId, uint256 amount);
     event RaffeAssigned(uint256 indexed raceId, uint256 indexed tokenId, address indexed originalOwner, uint8 lane);
     event HouseRaffeAssigned(uint256 indexed raceId, uint256 indexed tokenId, uint8 lane);
     event HouseEdgeUpdated(uint16 oldEdgeBps, uint16 newEdgeBps);

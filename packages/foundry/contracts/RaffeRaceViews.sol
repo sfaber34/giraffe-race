@@ -120,6 +120,7 @@ abstract contract RaffeRaceViews is RaffeRaceBase {
     /// @return raceId The race ID relevant to the action (0 if creating new race)
     /// @return blocksRemaining Blocks until action becomes available/expires (context-dependent)
     /// @return scores Lane scores (only populated for SET_ODDS action)
+    /// @return expiredRaceIds Race IDs with expired unclaimed bets needing cleanup
     function getBotDashboard()
         external
         view
@@ -127,12 +128,16 @@ abstract contract RaffeRaceViews is RaffeRaceBase {
             uint8 action,
             uint256 raceId,
             uint64 blocksRemaining,
-            uint8[6] memory scores
+            uint8[6] memory scores,
+            uint256[] memory expiredRaceIds
         )
     {
+        // Get expired races first
+        expiredRaceIds = _getExpiredRaceIds();
+        
         // No races yet - can create
         if (nextRaceId == 0) {
-            return (BOT_ACTION_CREATE_RACE, 0, 0, scores);
+            return (BOT_ACTION_CREATE_RACE, 0, 0, scores, expiredRaceIds);
         }
         
         raceId = nextRaceId - 1;
@@ -142,16 +147,16 @@ abstract contract RaffeRaceViews is RaffeRaceBase {
         if (r.settled) {
             uint64 cooldownEndsAt = r.settledAtBlock + POST_RACE_COOLDOWN_BLOCKS;
             if (block.number >= cooldownEndsAt) {
-                return (BOT_ACTION_CREATE_RACE, raceId + 1, 0, scores);
+                return (BOT_ACTION_CREATE_RACE, raceId + 1, 0, scores, expiredRaceIds);
             } else {
                 blocksRemaining = uint64(cooldownEndsAt - block.number);
-                return (BOT_ACTION_NONE, raceId, blocksRemaining, scores);
+                return (BOT_ACTION_NONE, raceId, blocksRemaining, scores, expiredRaceIds);
             }
         }
         
         // Race is cancelled - can create new race
         if (r.cancelled) {
-            return (BOT_ACTION_CREATE_RACE, raceId + 1, 0, scores);
+            return (BOT_ACTION_CREATE_RACE, raceId + 1, 0, scores, expiredRaceIds);
         }
         
         // Race exists but odds not set
@@ -160,10 +165,10 @@ abstract contract RaffeRaceViews is RaffeRaceBase {
                 // Still in odds window - bot should set odds
                 blocksRemaining = uint64(r.oddsDeadlineBlock - block.number);
                 scores = _raceScore[raceId];
-                return (BOT_ACTION_SET_PROBABILITIES, raceId, blocksRemaining, scores);
+                return (BOT_ACTION_SET_PROBABILITIES, raceId, blocksRemaining, scores, expiredRaceIds);
             } else {
                 // Odds window expired - can cancel (or auto-cancel via createRace)
-                return (BOT_ACTION_CANCEL_RACE, raceId, 0, scores);
+                return (BOT_ACTION_CANCEL_RACE, raceId, 0, scores, expiredRaceIds);
             }
         }
         
@@ -171,18 +176,46 @@ abstract contract RaffeRaceViews is RaffeRaceBase {
         if (block.number <= r.bettingCloseBlock) {
             // Betting still open - nothing for bot to do
             blocksRemaining = uint64(r.bettingCloseBlock - block.number);
-            return (BOT_ACTION_NONE, raceId, blocksRemaining, scores);
+            return (BOT_ACTION_NONE, raceId, blocksRemaining, scores, expiredRaceIds);
         }
         
         // Betting closed - check if can settle
         bool settleBhAvailable = blockhash(r.bettingCloseBlock) != bytes32(0);
         if (settleBhAvailable) {
-            return (BOT_ACTION_SETTLE_RACE, raceId, 0, scores);
+            return (BOT_ACTION_SETTLE_RACE, raceId, 0, scores, expiredRaceIds);
         }
         
         // Blockhash expired - race may be stuck (edge case)
         // In this case, the race would need admin intervention or special handling
-        return (BOT_ACTION_NONE, raceId, 0, scores);
+        return (BOT_ACTION_NONE, raceId, 0, scores, expiredRaceIds);
+    }
+    
+    /// @dev Internal helper to get expired race IDs
+    function _getExpiredRaceIds() internal view returns (uint256[] memory raceIds) {
+        if (nextRaceId == 0) return raceIds;
+        
+        // First pass: count
+        uint256 count = 0;
+        for (uint256 i = 0; i < nextRaceId; i++) {
+            Race storage r = _races[i];
+            if (r.settled && !r.cancelled && !r.liabilityCleaned &&
+                r.unclaimedLiability > 0 &&
+                block.number > uint256(r.settledAtBlock) + CLAIM_EXPIRATION_BLOCKS) {
+                count++;
+            }
+        }
+        
+        // Second pass: populate
+        raceIds = new uint256[](count);
+        uint256 idx = 0;
+        for (uint256 i = 0; i < nextRaceId; i++) {
+            Race storage r = _races[i];
+            if (r.settled && !r.cancelled && !r.liabilityCleaned &&
+                r.unclaimedLiability > 0 &&
+                block.number > uint256(r.settledAtBlock) + CLAIM_EXPIRATION_BLOCKS) {
+                raceIds[idx++] = i;
+            }
+        }
     }
 
     // ============ Race Actionability ============
@@ -251,4 +284,5 @@ abstract contract RaffeRaceViews is RaffeRaceBase {
     {
         return simulator.simulateWithScore(seed, score);
     }
+    
 }

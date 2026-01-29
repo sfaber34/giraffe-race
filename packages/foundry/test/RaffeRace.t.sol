@@ -519,7 +519,7 @@ contract RaffeRaceTest is Test {
     
     function test_BotDashboardCreateRace() public {
         // No races - should indicate CREATE_RACE
-        (uint8 action, uint256 raceId,,) = raffeRace.getBotDashboard();
+        (uint8 action, uint256 raceId,,,) = raffeRace.getBotDashboard();
         assertEq(action, raffeRace.BOT_ACTION_CREATE_RACE());
     }
     
@@ -529,7 +529,7 @@ contract RaffeRaceTest is Test {
         raffeRace.createRace();
         
         // Should indicate SET_PROBABILITIES
-        (uint8 action, uint256 raceId, uint64 blocksRemaining, uint8[6] memory scores) = raffeRace.getBotDashboard();
+        (uint8 action, uint256 raceId, uint64 blocksRemaining, uint8[6] memory scores,) = raffeRace.getBotDashboard();
         assertEq(action, raffeRace.BOT_ACTION_SET_PROBABILITIES());
         assertEq(raceId, 0);
         assertTrue(blocksRemaining > 0);
@@ -545,7 +545,7 @@ contract RaffeRaceTest is Test {
         vm.roll(bettingCloseBlock + 1);
         
         // Should indicate SETTLE_RACE
-        (uint8 action,,,) = raffeRace.getBotDashboard();
+        (uint8 action,,,,) = raffeRace.getBotDashboard();
         assertEq(action, raffeRace.BOT_ACTION_SETTLE_RACE());
     }
     
@@ -558,7 +558,7 @@ contract RaffeRaceTest is Test {
         vm.roll(block.number + 11);
         
         // Should indicate CANCEL_RACE
-        (uint8 action,,,) = raffeRace.getBotDashboard();
+        (uint8 action,,,,) = raffeRace.getBotDashboard();
         assertEq(action, raffeRace.BOT_ACTION_CANCEL_RACE());
     }
 

@@ -59,6 +59,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "availableBalance",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "balance",
           inputs: [],
           outputs: [
@@ -116,6 +129,32 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "getUnpaidLiability",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "liabilityTracker",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "owner",
           inputs: [],
           outputs: [
@@ -160,6 +199,19 @@ const deployedContracts = {
               name: "amount",
               type: "uint256",
               internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "setLiabilityTracker",
+          inputs: [
+            {
+              name: "tracker",
+              type: "address",
+              internalType: "address",
             },
           ],
           outputs: [],
@@ -290,6 +342,19 @@ const deployedContracts = {
         },
         {
           type: "event",
+          name: "LiabilityTrackerSet",
+          inputs: [
+            {
+              name: "tracker",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
           name: "OwnershipTransferred",
           inputs: [
             {
@@ -376,6 +441,11 @@ const deployedContracts = {
             },
           ],
           anonymous: false,
+        },
+        {
+          type: "error",
+          name: "ExceedsAvailableBalance",
+          inputs: [],
         },
         {
           type: "error",
@@ -762,7 +832,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 15,
+      deployedOnBlock: 6,
     },
     RaffeNFT: {
       address: "0xb19b36b1456e65e3a6d514d3f715f204bd59f431",
@@ -2112,7 +2182,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 17,
+      deployedOnBlock: 8,
     },
     RaffeRaceSimulator: {
       address: "0x8ce361602b935680e8dec218b820ff5056beb7af",
@@ -2354,7 +2424,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 18,
+      deployedOnBlock: 9,
     },
     HouseTreasury: {
       address: "0xe1aa25618fa0c7a1cfdab5d6b456af611873b629",
@@ -2403,6 +2473,19 @@ const deployedContracts = {
               name: "",
               type: "bool",
               internalType: "bool",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "availableBalance",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
             },
           ],
           stateMutability: "view",
@@ -2466,6 +2549,32 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "getUnpaidLiability",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "liabilityTracker",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "address",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "owner",
           inputs: [],
           outputs: [
@@ -2510,6 +2619,19 @@ const deployedContracts = {
               name: "amount",
               type: "uint256",
               internalType: "uint256",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "setLiabilityTracker",
+          inputs: [
+            {
+              name: "tracker",
+              type: "address",
+              internalType: "address",
             },
           ],
           outputs: [],
@@ -2640,6 +2762,19 @@ const deployedContracts = {
         },
         {
           type: "event",
+          name: "LiabilityTrackerSet",
+          inputs: [
+            {
+              name: "tracker",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
           name: "OwnershipTransferred",
           inputs: [
             {
@@ -2729,6 +2864,11 @@ const deployedContracts = {
         },
         {
           type: "error",
+          name: "ExceedsAvailableBalance",
+          inputs: [],
+        },
+        {
+          type: "error",
           name: "IsPaused",
           inputs: [],
         },
@@ -2759,7 +2899,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 19,
+      deployedOnBlock: 10,
     },
     RaffeRace: {
       address: "0x196dbcbb54b8ec4958c959d8949ebfe87ac2aaaf",
@@ -3179,6 +3319,25 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "cleanupExpiredRace",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          outputs: [
+            {
+              name: "released",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
           name: "createRace",
           inputs: [],
           outputs: [
@@ -3287,6 +3446,11 @@ const deployedContracts = {
               name: "scores",
               type: "uint8[6]",
               internalType: "uint8[6]",
+            },
+            {
+              name: "expiredRaceIds",
+              type: "uint256[]",
+              internalType: "uint256[]",
             },
           ],
           stateMutability: "view",
@@ -4507,6 +4671,25 @@ const deployedContracts = {
         },
         {
           type: "event",
+          name: "ExpiredLiabilityReleased",
+          inputs: [
+            {
+              name: "raceId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "amount",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
           name: "HouseEdgeUpdated",
           inputs: [
             {
@@ -4915,6 +5098,11 @@ const deployedContracts = {
         },
         {
           type: "error",
+          name: "ClaimNotExpired",
+          inputs: [],
+        },
+        {
+          type: "error",
           name: "CooldownNotElapsed",
           inputs: [],
         },
@@ -5045,7 +5233,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 26,
+      deployedOnBlock: 17,
     },
   },
 } as const;

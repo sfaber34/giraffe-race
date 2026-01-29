@@ -103,9 +103,10 @@ contract DeployScript is ScaffoldETHDeploy {
         console.log("RaffeRace deployed at:", address(raffeRace));
         deployments.push(Deployment("RaffeRace", address(raffeRace)));
 
-        // 4. Authorize RaffeRace in treasury
+        // 4. Authorize RaffeRace in treasury and set as liability tracker
         treasury.authorize(address(raffeRace));
-        console.log("RaffeRace authorized in treasury");
+        treasury.setLiabilityTracker(address(raffeRace));
+        console.log("RaffeRace authorized in treasury and set as liability tracker");
 
         // 5. Transfer treasury ownership to the actual treasuryOwner (multisig)
         if (treasuryOwner != deployer) {

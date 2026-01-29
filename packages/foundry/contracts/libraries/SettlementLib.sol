@@ -78,12 +78,16 @@ library SettlementLib {
         // Record liability for payouts (Win + Place + Show)
         newSettledLiability = settledLiability;
         if (race.totalPot != 0) {
+            uint256 raceLiability = 0;
             // Win bet liability
-            newSettledLiability += ClaimLib.calculateRaceLiability(race);
+            raceLiability += ClaimLib.calculateRaceLiability(race);
             // Place bet liability
-            newSettledLiability += ClaimLib.calculatePlaceLiability(race);
+            raceLiability += ClaimLib.calculatePlaceLiability(race);
             // Show bet liability
-            newSettledLiability += ClaimLib.calculateShowLiability(race);
+            raceLiability += ClaimLib.calculateShowLiability(race);
+            
+            newSettledLiability += raceLiability;
+            race.unclaimedLiability = raceLiability; // Track for expiration cleanup
         }
 
         // Emit appropriate event

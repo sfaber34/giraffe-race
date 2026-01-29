@@ -484,7 +484,14 @@ contract RaffeNFT is ERC721, Ownable {
     function _update(address to, uint256 tokenId, address auth) internal override returns (address from) {
         from = super._update(to, tokenId, auth);
 
-        // Remove from previous owner (transfers + burns)
+        // SOULBOUND: Block transfers (from != 0 means it's a transfer, not a mint)
+        // Mints are allowed (from == address(0))
+        // Burns are allowed (to == address(0)) if you want to support burning
+        if (from != address(0) && to != address(0)) {
+            revert("RaffeNFT: soulbound, transfers disabled");
+        }
+
+        // Remove from previous owner (burns only now, since transfers are blocked)
         if (from != address(0)) {
             uint256 lastIndex = _ownedTokens[from].length - 1;
             uint256 tokenIndex = _ownedTokensIndex[tokenId];
@@ -496,7 +503,7 @@ contract RaffeNFT is ERC721, Ownable {
             _ownedTokens[from].pop();
         }
 
-        // Add to new owner (transfers + mints)
+        // Add to new owner (mints only now, since transfers are blocked)
         if (to != address(0)) {
             _ownedTokensIndex[tokenId] = _ownedTokens[to].length;
             _ownedTokens[to].push(tokenId);

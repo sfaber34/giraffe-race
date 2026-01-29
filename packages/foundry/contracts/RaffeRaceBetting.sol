@@ -154,7 +154,17 @@ abstract contract RaffeRaceBetting is RaffeRaceBase {
                 // Claim expired - forfeit unclaimed winnings and free up liability
                 uint256 forfeitedPayout = _forfeitExpiredClaims(r, userBets);
                 if (forfeitedPayout > 0) {
-                    settledLiability -= forfeitedPayout;
+                    // Safe decrement - cap at available amounts to prevent underflow
+                    if (forfeitedPayout <= settledLiability) {
+                        settledLiability -= forfeitedPayout;
+                    } else {
+                        settledLiability = 0;
+                    }
+                    if (forfeitedPayout <= r.unclaimedLiability) {
+                        r.unclaimedLiability -= forfeitedPayout;
+                    } else {
+                        r.unclaimedLiability = 0;
+                    }
                     emit ClaimExpired(raceId, bettor, forfeitedPayout);
                 }
                 idx++;
@@ -168,7 +178,17 @@ abstract contract RaffeRaceBetting is RaffeRaceBase {
             if (found) {
                 if (isWin || !skipLosses) {
                     if (p != 0) {
-                        settledLiability -= p;
+                        // Safe decrement - cap at available amounts to prevent underflow
+                        if (p <= settledLiability) {
+                            settledLiability -= p;
+                        } else {
+                            settledLiability = 0;
+                        }
+                        if (p <= r.unclaimedLiability) {
+                            r.unclaimedLiability -= p;
+                        } else {
+                            r.unclaimedLiability = 0;
+                        }
                         treasury.payWinner(bettor, p);
                     }
                     emit Claimed(raceId, bettor, p);
@@ -194,6 +214,36 @@ abstract contract RaffeRaceBetting is RaffeRaceBase {
 
         _nextClaimIndex[bettor] = ids.length;
         revert NoClaimableBets();
+    }
+    
+    /// @notice Release expired unclaimed liability for a race back to treasury
+    /// @dev Called by bot to clean up expired claims
+    /// @param raceId The race ID to clean up
+    /// @return released The amount released back to treasury
+    function cleanupExpiredRace(uint256 raceId) external onlyRaceBot returns (uint256 released) {
+        if (raceId >= nextRaceId) revert InvalidRace();
+        
+        Race storage r = _races[raceId];
+        
+        // Race must be settled and not cancelled
+        if (!r.settled || r.cancelled) revert NotSettled();
+        
+        // Already cleaned up
+        if (r.liabilityCleaned) revert AlreadyClaimed();
+        
+        // Claims must be expired
+        if (block.number <= uint256(r.settledAtBlock) + CLAIM_EXPIRATION_BLOCKS) {
+            revert ClaimNotExpired();
+        }
+        
+        released = r.unclaimedLiability;
+        if (released > 0) {
+            settledLiability -= released;
+            r.unclaimedLiability = 0;
+        }
+        r.liabilityCleaned = true;
+        
+        emit ExpiredLiabilityReleased(raceId, released);
     }
     
     /// @notice Forfeit expired claims and return total forfeited payout

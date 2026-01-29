@@ -267,6 +267,14 @@ export const RaceStatusCard = ({
                     {settledLiability === null ? "-" : `${formatUnits(settledLiability, USDC_DECIMALS)} USDC`}
                   </span>
                 </div>
+                <div className="flex justify-between font-semibold">
+                  <span className="opacity-70">Available balance</span>
+                  <span className="font-mono">
+                    {treasuryBalance !== undefined && settledLiability !== null
+                      ? `${formatUnits(treasuryBalance - settledLiability, USDC_DECIMALS)} USDC`
+                      : "-"}
+                  </span>
+                </div>
                 {connectedAddress && userUsdcBalance !== undefined && (
                   <div className="flex justify-between">
                     <span className="opacity-70">Your USDC</span>

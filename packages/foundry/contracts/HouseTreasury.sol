@@ -3,6 +3,11 @@ pragma solidity ^0.8.19;
 
 import { IERC20 } from "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
+/// @notice Interface for contracts that track liability
+interface ILiabilityTracker {
+    function settledLiability() external view returns (uint256);
+}
+
 /**
  * @title HouseTreasury
  * @notice Centralized treasury for the raffe race betting platform.
@@ -10,10 +15,14 @@ import { IERC20 } from "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC
  *      - Collect bets from users
  *      - Pay winners
  *      Only the multisig owner can authorize/deauthorize contracts and withdraw profits.
+ *      Withdrawals are limited to available balance (total - unpaid liability).
  */
 contract HouseTreasury {
     IERC20 public immutable usdc;
     address public owner; // Multisig
+
+    // Contract that tracks liability (RaffeRace)
+    address public liabilityTracker;
 
     // Contracts authorized to collect bets and pay winners
     mapping(address => bool) public authorizedContracts;
@@ -30,6 +39,7 @@ contract HouseTreasury {
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
     event Paused(address indexed by);
     event Unpaused(address indexed by);
+    event LiabilityTrackerSet(address indexed tracker);
 
     error NotOwner();
     error NotAuthorized();
@@ -37,6 +47,7 @@ contract HouseTreasury {
     error TransferFailed();
     error ZeroAddress();
     error ZeroAmount();
+    error ExceedsAvailableBalance();
 
     modifier onlyOwner() {
         if (msg.sender != owner) revert NotOwner();
@@ -95,21 +106,41 @@ contract HouseTreasury {
         emit Unpaused(msg.sender);
     }
 
-    /// @notice Withdraw USDC to owner (for profit extraction or emergency).
+    /// @notice Set the liability tracker contract (RaffeRace).
+    function setLiabilityTracker(address tracker) external onlyOwner {
+        liabilityTracker = tracker;
+        emit LiabilityTrackerSet(tracker);
+    }
+
+    /// @notice Get the current unpaid liability from the tracker.
+    function getUnpaidLiability() public view returns (uint256) {
+        if (liabilityTracker == address(0)) return 0;
+        return ILiabilityTracker(liabilityTracker).settledLiability();
+    }
+
+    /// @notice Get available balance (total - unpaid liability).
+    function availableBalance() public view returns (uint256) {
+        uint256 total = usdc.balanceOf(address(this));
+        uint256 liability = getUnpaidLiability();
+        return total > liability ? total - liability : 0;
+    }
+
+    /// @notice Withdraw USDC to owner (limited to available balance).
     function withdraw(uint256 amount) external onlyOwner {
         if (amount == 0) revert ZeroAmount();
+        if (amount > availableBalance()) revert ExceedsAvailableBalance();
         bool success = usdc.transfer(owner, amount);
         if (!success) revert TransferFailed();
         emit Withdrawn(owner, amount);
     }
 
-    /// @notice Withdraw all USDC to owner.
+    /// @notice Withdraw all available USDC to owner (respects unpaid liability).
     function withdrawAll() external onlyOwner {
-        uint256 bal = usdc.balanceOf(address(this));
-        if (bal == 0) revert ZeroAmount();
-        bool success = usdc.transfer(owner, bal);
+        uint256 available = availableBalance();
+        if (available == 0) revert ZeroAmount();
+        bool success = usdc.transfer(owner, available);
         if (!success) revert TransferFailed();
-        emit Withdrawn(owner, bal);
+        emit Withdrawn(owner, available);
     }
 
     // ============ Authorized Contract Functions ============
