@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { LANE_COUNT } from "../constants";
 import { LaneStats, QueueEntry } from "../types";
-import { parseStats } from "../utils";
 import { LaneName } from "./LaneName";
 import { Address } from "@scaffold-ui/components";
 import { usePublicClient } from "wagmi";
@@ -180,7 +179,7 @@ export const EnterNftCard = ({
   const publicClient = usePublicClient();
   const { data: raffeNftContract } = useDeployedContractInfo({ contractName: "RaffeNFT" });
 
-  // Fetch stats for owned tokens
+  // Fetch stats for owned tokens - using same pattern as RaffeNfts.tsx
   const [ownedTokenStats, setOwnedTokenStats] = useState<Record<string, LaneStats>>({});
 
   useEffect(() => {
@@ -190,39 +189,52 @@ export const EnterNftCard = ({
         return;
       }
 
+      const calls = ownedTokenIds.map(tokenId => ({
+        address: raffeNftContract.address as `0x${string}`,
+        abi: raffeNftContract.abi as any,
+        functionName: "statsOf",
+        args: [tokenId],
+      }));
+
+      let results: { result?: unknown }[];
+
       try {
-        const calls = ownedTokenIds.map(tokenId => ({
-          address: raffeNftContract.address as `0x${string}`,
-          abi: raffeNftContract.abi as any,
-          functionName: "statsOf",
-          args: [tokenId],
-        }));
-
-        const results = await publicClient.multicall({ contracts: calls as any, allowFailure: true });
-
-        const statsMap: Record<string, LaneStats> = {};
-        ownedTokenIds.forEach((tokenId, i) => {
-          const result = results[i];
-          if (result.status === "success") {
-            statsMap[tokenId.toString()] = parseStats(result.result);
-          } else {
-            statsMap[tokenId.toString()] = { zip: 10, moxie: 10, hustle: 10 };
-          }
-        });
-        setOwnedTokenStats(statsMap);
+        results = (await publicClient.multicall({ contracts: calls as any, allowFailure: true })) as any;
       } catch {
-        const statsMap: Record<string, LaneStats> = {};
-        ownedTokenIds.forEach(tokenId => {
-          statsMap[tokenId.toString()] = { zip: 10, moxie: 10, hustle: 10 };
-        });
-        setOwnedTokenStats(statsMap);
+        // Fallback to individual reads if multicall fails
+        const settled = await Promise.allSettled(
+          ownedTokenIds.map(tokenId =>
+            (publicClient as any).readContract({
+              address: raffeNftContract.address,
+              abi: raffeNftContract.abi,
+              functionName: "statsOf",
+              args: [tokenId],
+            }),
+          ),
+        );
+        results = settled.map(r => (r.status === "fulfilled" ? { result: r.value } : {}));
       }
+
+      const clampStat = (n: number) => Math.max(1, Math.min(10, Math.floor(n)));
+      const statsMap: Record<string, LaneStats> = {};
+
+      ownedTokenIds.forEach((tokenId, i) => {
+        const statsRaw = (results[i] as any)?.result;
+        const tuple = (Array.isArray(statsRaw) ? statsRaw : []) as any[];
+        statsMap[tokenId.toString()] = {
+          zip: clampStat(Number(tuple[0] ?? 10)),
+          moxie: clampStat(Number(tuple[1] ?? 10)),
+          hustle: clampStat(Number(tuple[2] ?? 10)),
+        };
+      });
+
+      setOwnedTokenStats(statsMap);
     };
 
     void fetchOwnedStats();
-  }, [publicClient, raffeNftContract, ownedTokenIds]);
+  }, [publicClient, raffeNftContract?.address, raffeNftContract?.abi, ownedTokenIds]);
 
-  // Fetch stats for all queue entries
+  // Fetch stats for all queue entries - using same pattern as RaffeNfts.tsx
   const [queueStats, setQueueStats] = useState<Record<string, LaneStats>>({});
 
   useEffect(() => {
@@ -232,38 +244,50 @@ export const EnterNftCard = ({
         return;
       }
 
+      const calls = queueEntries.map(entry => ({
+        address: raffeNftContract.address as `0x${string}`,
+        abi: raffeNftContract.abi as any,
+        functionName: "statsOf",
+        args: [entry.tokenId],
+      }));
+
+      let results: { result?: unknown }[];
+
       try {
-        const calls = queueEntries.map(entry => ({
-          address: raffeNftContract.address as `0x${string}`,
-          abi: raffeNftContract.abi as any,
-          functionName: "statsOf",
-          args: [entry.tokenId],
-        }));
-
-        const results = await publicClient.multicall({ contracts: calls as any, allowFailure: true });
-
-        const statsMap: Record<string, LaneStats> = {};
-        queueEntries.forEach((entry, i) => {
-          const result = results[i];
-          if (result.status === "success") {
-            statsMap[entry.tokenId.toString()] = parseStats(result.result);
-          } else {
-            statsMap[entry.tokenId.toString()] = { zip: 10, moxie: 10, hustle: 10 };
-          }
-        });
-        setQueueStats(statsMap);
+        results = (await publicClient.multicall({ contracts: calls as any, allowFailure: true })) as any;
       } catch {
-        // Fallback to default stats
-        const statsMap: Record<string, LaneStats> = {};
-        queueEntries.forEach(entry => {
-          statsMap[entry.tokenId.toString()] = { zip: 10, moxie: 10, hustle: 10 };
-        });
-        setQueueStats(statsMap);
+        // Fallback to individual reads if multicall fails
+        const settled = await Promise.allSettled(
+          queueEntries.map(entry =>
+            (publicClient as any).readContract({
+              address: raffeNftContract.address,
+              abi: raffeNftContract.abi,
+              functionName: "statsOf",
+              args: [entry.tokenId],
+            }),
+          ),
+        );
+        results = settled.map(r => (r.status === "fulfilled" ? { result: r.value } : {}));
       }
+
+      const clampStat = (n: number) => Math.max(1, Math.min(10, Math.floor(n)));
+      const statsMap: Record<string, LaneStats> = {};
+
+      queueEntries.forEach((entry, i) => {
+        const statsRaw = (results[i] as any)?.result;
+        const tuple = (Array.isArray(statsRaw) ? statsRaw : []) as any[];
+        statsMap[entry.tokenId.toString()] = {
+          zip: clampStat(Number(tuple[0] ?? 10)),
+          moxie: clampStat(Number(tuple[1] ?? 10)),
+          hustle: clampStat(Number(tuple[2] ?? 10)),
+        };
+      });
+
+      setQueueStats(statsMap);
     };
 
     void fetchStats();
-  }, [publicClient, raffeNftContract, queueEntries]);
+  }, [publicClient, raffeNftContract?.address, raffeNftContract?.abi, queueEntries]);
 
   // Determine which entries are "Up Next" (first LANE_COUNT entries)
   const upNextTokenIds = useMemo(() => {
