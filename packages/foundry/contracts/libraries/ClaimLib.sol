@@ -104,6 +104,7 @@ library ClaimLib {
     }
 
     /// @notice Calculate the maximum potential payout across all lanes for a race
+    /// @dev Uses calculatePayout for consistency
     /// @param totalOnLane Array of total bets on each lane
     /// @param decimalOddsBps Array of decimal odds for each lane
     /// @return maxPayout The maximum potential payout
@@ -112,7 +113,8 @@ library ClaimLib {
         uint32[6] memory decimalOddsBps
     ) internal pure returns (uint256 maxPayout) {
         for (uint8 i = 0; i < LANE_COUNT; ) {
-            uint256 payoutIfWin = (totalOnLane[i] * uint256(decimalOddsBps[i])) / ODDS_SCALE;
+            // Use calculatePayout with deadHeatDivisor=1 (worst case - no dead heat)
+            uint256 payoutIfWin = calculatePayout(totalOnLane[i], decimalOddsBps[i], 1);
             if (payoutIfWin > maxPayout) {
                 maxPayout = payoutIfWin;
             }
@@ -121,6 +123,7 @@ library ClaimLib {
     }
 
     /// @notice Calculate projected max payout with a new bet
+    /// @dev Uses calculatePayout for consistency
     /// @param totalOnLane Current totals on each lane
     /// @param decimalOddsBps Odds for each lane
     /// @param newBetLane Lane for the new bet
@@ -137,7 +140,8 @@ library ClaimLib {
             if (i == newBetLane) {
                 laneTotal += newBetAmount;
             }
-            uint256 payoutIfWin = (laneTotal * uint256(decimalOddsBps[i])) / ODDS_SCALE;
+            // Use calculatePayout with deadHeatDivisor=1 (worst case - no dead heat)
+            uint256 payoutIfWin = calculatePayout(laneTotal, decimalOddsBps[i], 1);
             if (payoutIfWin > maxPayout) {
                 maxPayout = payoutIfWin;
             }

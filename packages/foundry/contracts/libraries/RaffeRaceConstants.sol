@@ -74,4 +74,38 @@ library RaffeRaceConstants {
     uint8 internal constant CLAIM_STATUS_LOSS = 2;
     uint8 internal constant CLAIM_STATUS_WIN = 3;
     uint8 internal constant CLAIM_STATUS_REFUND = 4;
+
+    // ============ Helper Functions (Single Source of Truth) ============
+    
+    /// @notice Check if a claim has expired
+    /// @dev Use this EVERYWHERE instead of inline calculations
+    /// @param currentBlock Current block number
+    /// @param settledAtBlock Block when race was settled
+    /// @return True if claim has expired
+    function isClaimExpired(uint256 currentBlock, uint64 settledAtBlock) internal pure returns (bool) {
+        return currentBlock > uint256(settledAtBlock) + CLAIM_EXPIRATION_BLOCKS;
+    }
+    
+    /// @notice Calculate the block at which claims expire
+    /// @param settledAtBlock Block when race was settled
+    /// @return Block number when claims expire
+    function claimExpiresAtBlock(uint64 settledAtBlock) internal pure returns (uint256) {
+        return uint256(settledAtBlock) + CLAIM_EXPIRATION_BLOCKS;
+    }
+    
+    /// @notice Check if cooldown has elapsed
+    /// @dev Use this EVERYWHERE instead of inline calculations
+    /// @param currentBlock Current block number
+    /// @param settledAtBlock Block when previous race was settled
+    /// @return True if cooldown has elapsed
+    function isCooldownElapsed(uint256 currentBlock, uint64 settledAtBlock) internal pure returns (bool) {
+        return currentBlock >= uint256(settledAtBlock) + POST_RACE_COOLDOWN_BLOCKS;
+    }
+    
+    /// @notice Calculate the block at which cooldown ends
+    /// @param settledAtBlock Block when race was settled
+    /// @return Block number when cooldown ends
+    function cooldownEndsAtBlock(uint64 settledAtBlock) internal pure returns (uint64) {
+        return settledAtBlock + POST_RACE_COOLDOWN_BLOCKS;
+    }
 }

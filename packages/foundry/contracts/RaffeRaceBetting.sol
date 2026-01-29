@@ -4,6 +4,7 @@ pragma solidity ^0.8.19;
 import { RaffeRaceBase } from "./RaffeRaceBase.sol";
 import { ClaimLib } from "./libraries/ClaimLib.sol";
 import { SettlementLib } from "./libraries/SettlementLib.sol";
+import { RaffeRaceConstants as C } from "./libraries/RaffeRaceConstants.sol";
 
 /**
  * @title RaffeRaceBetting
@@ -50,7 +51,8 @@ abstract contract RaffeRaceBetting is RaffeRaceBase {
 
         // Risk control: ensure treasury can cover worst-case payout
         uint32 odds = _getOddsForBetType(r, lane, betType);
-        uint256 maxPayout = (amount * uint256(odds)) / ODDS_SCALE;
+        // Use ClaimLib.calculatePayout for consistency (deadHeatDivisor=1 for worst case)
+        uint256 maxPayout = ClaimLib.calculatePayout(amount, odds, 1);
         if (treasury.balance() < settledLiability + maxPayout) {
             revert InsufficientBankroll();
         }
@@ -150,7 +152,7 @@ abstract contract RaffeRaceBetting is RaffeRaceBase {
             UserRaceBets storage userBets = _userBets[raceId][bettor];
             
             // Check if claim has expired (only for settled races)
-            if (r.settled && block.number > uint256(r.settledAtBlock) + CLAIM_EXPIRATION_BLOCKS) {
+            if (r.settled && C.isClaimExpired(block.number, r.settledAtBlock)) {
                 // Claim expired - forfeit unclaimed winnings and free up liability
                 uint256 forfeitedPayout = _forfeitExpiredClaims(r, userBets);
                 if (forfeitedPayout > 0) {
@@ -232,7 +234,7 @@ abstract contract RaffeRaceBetting is RaffeRaceBase {
         if (r.liabilityCleaned) revert AlreadyClaimed();
         
         // Claims must be expired
-        if (block.number <= uint256(r.settledAtBlock) + CLAIM_EXPIRATION_BLOCKS) {
+        if (!C.isClaimExpired(block.number, r.settledAtBlock)) {
             revert ClaimNotExpired();
         }
         
@@ -493,7 +495,7 @@ abstract contract RaffeRaceBetting is RaffeRaceBase {
             }
             
             // Skip expired claims
-            if (block.number > uint256(r.settledAtBlock) + CLAIM_EXPIRATION_BLOCKS) {
+            if (C.isClaimExpired(block.number, r.settledAtBlock)) {
                 unchecked { ++i; }
                 continue;
             }
@@ -593,7 +595,7 @@ abstract contract RaffeRaceBetting is RaffeRaceBase {
             }
 
             // Skip expired settled claims
-            if (r.settled && block.number > uint256(r.settledAtBlock) + CLAIM_EXPIRATION_BLOCKS) {
+            if (r.settled && C.isClaimExpired(block.number, r.settledAtBlock)) {
                 idx++;
                 continue;
             }

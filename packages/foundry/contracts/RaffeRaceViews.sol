@@ -2,6 +2,7 @@
 pragma solidity ^0.8.19;
 
 import { RaffeRaceBase } from "./RaffeRaceBase.sol";
+import { RaffeRaceConstants as C } from "./libraries/RaffeRaceConstants.sol";
 
 /**
  * @title RaffeRaceViews
@@ -145,8 +146,8 @@ abstract contract RaffeRaceViews is RaffeRaceBase {
         
         // Race is settled - check cooldown for next race
         if (r.settled) {
-            uint64 cooldownEndsAt = r.settledAtBlock + POST_RACE_COOLDOWN_BLOCKS;
-            if (block.number >= cooldownEndsAt) {
+            uint64 cooldownEndsAt = C.cooldownEndsAtBlock(r.settledAtBlock);
+            if (C.isCooldownElapsed(block.number, r.settledAtBlock)) {
                 return (BOT_ACTION_CREATE_RACE, raceId + 1, 0, scores, expiredRaceIds);
             } else {
                 blocksRemaining = uint64(cooldownEndsAt - block.number);
@@ -200,7 +201,7 @@ abstract contract RaffeRaceViews is RaffeRaceBase {
             Race storage r = _races[i];
             if (r.settled && !r.cancelled && !r.liabilityCleaned &&
                 r.unclaimedLiability > 0 &&
-                block.number > uint256(r.settledAtBlock) + CLAIM_EXPIRATION_BLOCKS) {
+                C.isClaimExpired(block.number, r.settledAtBlock)) {
                 count++;
             }
         }
@@ -212,7 +213,7 @@ abstract contract RaffeRaceViews is RaffeRaceBase {
             Race storage r = _races[i];
             if (r.settled && !r.cancelled && !r.liabilityCleaned &&
                 r.unclaimedLiability > 0 &&
-                block.number > uint256(r.settledAtBlock) + CLAIM_EXPIRATION_BLOCKS) {
+                C.isClaimExpired(block.number, r.settledAtBlock)) {
                 raceIds[idx++] = i;
             }
         }

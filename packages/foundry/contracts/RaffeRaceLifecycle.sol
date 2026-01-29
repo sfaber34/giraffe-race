@@ -4,6 +4,7 @@ pragma solidity ^0.8.19;
 import { RaffeRaceBase } from "./RaffeRaceBase.sol";
 import { SettlementLib } from "./libraries/SettlementLib.sol";
 import { OddsLib } from "./libraries/OddsLib.sol";
+import { RaffeRaceConstants as C } from "./libraries/RaffeRaceConstants.sol";
 
 /**
  * @title RaffeRaceLifecycle
@@ -46,7 +47,7 @@ abstract contract RaffeRaceLifecycle is RaffeRaceBase {
             
             if (prev.settled) {
                 // Normal case: previous race finished, check cooldown
-                if (block.number < uint256(prev.settledAtBlock) + POST_RACE_COOLDOWN_BLOCKS) {
+                if (!C.isCooldownElapsed(block.number, prev.settledAtBlock)) {
                     revert CooldownNotElapsed();
                 }
             } else if (prev.cancelled) {
@@ -403,8 +404,8 @@ abstract contract RaffeRaceLifecycle is RaffeRaceBase {
         }
         
         // Settled - check cooldown
-        cooldownEndsAtBlock = prev.settledAtBlock + POST_RACE_COOLDOWN_BLOCKS;
-        if (block.number >= cooldownEndsAtBlock) {
+        cooldownEndsAtBlock = C.cooldownEndsAtBlock(prev.settledAtBlock);
+        if (C.isCooldownElapsed(block.number, prev.settledAtBlock)) {
             return (true, 0, cooldownEndsAtBlock);
         }
         
