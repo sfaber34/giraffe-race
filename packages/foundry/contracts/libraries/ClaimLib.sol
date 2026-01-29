@@ -21,20 +21,23 @@ library ClaimLib {
         assert(ODDS_SCALE == C.ODDS_SCALE);
     }
 
-    /// @notice Calculate payout for a winning bet
-    /// @param betAmount The amount bet
-    /// @param decimalOddsBps The decimal odds in basis points
-    /// @param deadHeatCount Number of winners (1 = normal, 2+ = dead heat)
+    /// @notice THE SINGLE SOURCE OF TRUTH for payout calculation
+    /// @dev This function is used for BOTH settlement liability AND claim payouts
+    ///      to ensure they NEVER diverge. Any change here affects both.
+    /// @param amount The amount (bet amount for claims, totalOnLane for settlement)
+    /// @param oddsBps The decimal odds in basis points
+    /// @param deadHeatDivisor Number to divide by for dead heat (1 = no dead heat)
     /// @return payout The calculated payout amount
     function calculatePayout(
-        uint256 betAmount,
-        uint32 decimalOddsBps,
-        uint8 deadHeatCount
+        uint256 amount,
+        uint32 oddsBps,
+        uint8 deadHeatDivisor
     ) internal pure returns (uint256 payout) {
-        // Winner payout: (betAmount * odds) / ODDS_SCALE / deadHeatCount
-        payout = (betAmount * uint256(decimalOddsBps)) / ODDS_SCALE;
-        if (deadHeatCount > 1) {
-            payout = payout / uint256(deadHeatCount);
+        // CRITICAL: This exact calculation must be used everywhere
+        // payout = (amount * odds) / ODDS_SCALE / deadHeatDivisor
+        payout = (amount * uint256(oddsBps)) / ODDS_SCALE;
+        if (deadHeatDivisor > 1) {
+            payout = payout / uint256(deadHeatDivisor);
         }
     }
 
@@ -142,75 +145,102 @@ library ClaimLib {
         }
     }
 
-    /// @notice Calculate total liability for a settled race (Win bets only - legacy)
+    /// @notice Calculate total liability for Win bets
+    /// @dev Uses calculatePayout to ensure consistency with claim calculations
     /// @param race The race struct
-    /// @return liability Total liability for the race
+    /// @return liability Total liability for Win bets
     function calculateRaceLiability(
         RaffeRaceBase.Race storage race
     ) internal view returns (uint256 liability) {
         uint8 winnerCount = race.deadHeatCount;
         for (uint8 i = 0; i < winnerCount; ) {
-            uint8 w = race.winners[i];
-            uint256 lanePayout = (race.totalOnLane[w] * uint256(race.decimalOddsBps[w])) / ODDS_SCALE;
-            liability += lanePayout / uint256(winnerCount);
+            uint8 lane = race.winners[i];
+            // Use the SAME calculatePayout function used at claim time
+            liability += calculatePayout(
+                race.totalOnLane[lane],
+                race.decimalOddsBps[lane],
+                winnerCount
+            );
             unchecked { ++i; }
         }
     }
 
     /// @notice Calculate total liability for Place bets (1st or 2nd place)
+    /// @dev Uses calculatePayout to ensure consistency with claim calculations
     /// @param race The race struct
     /// @return liability Total Place bet liability
     function calculatePlaceLiability(
         RaffeRaceBase.Race storage race
     ) internal view returns (uint256 liability) {
-        // 1st place lanes get full payout
+        // 1st place lanes get full payout (no dead heat divisor)
         for (uint8 i = 0; i < race.firstPlace.count; ) {
             uint8 lane = race.firstPlace.lanes[i];
-            uint256 lanePayout = (race.totalPlaceOnLane[lane] * uint256(race.placeOddsBps[lane])) / ODDS_SCALE;
-            liability += lanePayout;
+            // Use the SAME calculatePayout function used at claim time
+            liability += calculatePayout(
+                race.totalPlaceOnLane[lane],
+                race.placeOddsBps[lane],
+                1 // No dead heat division for 1st place in Place bets
+            );
             unchecked { ++i; }
         }
         
-        // 2nd place lanes: split if dead heat
+        // 2nd place lanes: split if dead heat for 2nd
         uint8 secondCount = race.secondPlace.count;
+        uint8 secondDivisor = secondCount > 1 ? secondCount : 1;
         for (uint8 i = 0; i < secondCount; ) {
             uint8 lane = race.secondPlace.lanes[i];
-            uint256 lanePayout = (race.totalPlaceOnLane[lane] * uint256(race.placeOddsBps[lane])) / ODDS_SCALE;
-            // Split payout if dead heat for 2nd
-            liability += lanePayout / uint256(secondCount > 1 ? secondCount : 1);
+            // Use the SAME calculatePayout function used at claim time
+            liability += calculatePayout(
+                race.totalPlaceOnLane[lane],
+                race.placeOddsBps[lane],
+                secondDivisor
+            );
             unchecked { ++i; }
         }
     }
 
     /// @notice Calculate total liability for Show bets (1st, 2nd, or 3rd place)
+    /// @dev Uses calculatePayout to ensure consistency with claim calculations
     /// @param race The race struct
     /// @return liability Total Show bet liability
     function calculateShowLiability(
         RaffeRaceBase.Race storage race
     ) internal view returns (uint256 liability) {
-        // 1st place lanes get full payout
+        // 1st place lanes get full payout (no dead heat divisor)
         for (uint8 i = 0; i < race.firstPlace.count; ) {
             uint8 lane = race.firstPlace.lanes[i];
-            uint256 lanePayout = (race.totalShowOnLane[lane] * uint256(race.showOddsBps[lane])) / ODDS_SCALE;
-            liability += lanePayout;
+            // Use the SAME calculatePayout function used at claim time
+            liability += calculatePayout(
+                race.totalShowOnLane[lane],
+                race.showOddsBps[lane],
+                1 // No dead heat division for 1st place in Show bets
+            );
             unchecked { ++i; }
         }
         
-        // 2nd place lanes get full payout
+        // 2nd place lanes get full payout (no dead heat divisor)
         for (uint8 i = 0; i < race.secondPlace.count; ) {
             uint8 lane = race.secondPlace.lanes[i];
-            uint256 lanePayout = (race.totalShowOnLane[lane] * uint256(race.showOddsBps[lane])) / ODDS_SCALE;
-            liability += lanePayout;
+            // Use the SAME calculatePayout function used at claim time
+            liability += calculatePayout(
+                race.totalShowOnLane[lane],
+                race.showOddsBps[lane],
+                1 // No dead heat division for 2nd place in Show bets
+            );
             unchecked { ++i; }
         }
         
-        // 3rd place lanes: split if dead heat
+        // 3rd place lanes: split if dead heat for 3rd
         uint8 thirdCount = race.thirdPlace.count;
+        uint8 thirdDivisor = thirdCount > 1 ? thirdCount : 1;
         for (uint8 i = 0; i < thirdCount; ) {
             uint8 lane = race.thirdPlace.lanes[i];
-            uint256 lanePayout = (race.totalShowOnLane[lane] * uint256(race.showOddsBps[lane])) / ODDS_SCALE;
-            // Split payout if dead heat for 3rd
-            liability += lanePayout / uint256(thirdCount > 1 ? thirdCount : 1);
+            // Use the SAME calculatePayout function used at claim time
+            liability += calculatePayout(
+                race.totalShowOnLane[lane],
+                race.showOddsBps[lane],
+                thirdDivisor
+            );
             unchecked { ++i; }
         }
     }
