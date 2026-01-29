@@ -214,66 +214,129 @@ export const PlaceBetCard = ({
                 key={lane}
                 className={`border rounded-lg p-2 ${hasBetOnLane ? "border-primary bg-base-200" : "border-base-300"}`}
               >
-                <div className="flex items-center gap-2">
-                  {/* Left: Avatar + Name */}
-                  <div className="flex items-center gap-2 min-w-0 flex-shrink-0">
-                    <RaffeAnimated
-                      idPrefix={`bet-${(viewingRaceId ?? 0n).toString()}-${lane}-${(laneTokenIds[lane] ?? 0n).toString()}`}
-                      tokenId={laneTokenIds[lane] ?? 0n}
-                      playbackRate={1}
-                      playing={false}
-                      sizePx={40}
-                    />
-                    <div className="flex flex-col items-start min-w-0">
-                      <span className="text-sm font-medium truncate max-w-[80px]">
-                        {lineupFinalized && parsedRaffes?.tokenIds?.[lane] && parsedRaffes.tokenIds[lane] !== 0n ? (
-                          <LaneName tokenId={parsedRaffes.tokenIds[lane]} fallback={`Lane ${lane}`} />
-                        ) : (
-                          `Lane ${lane}`
+                <div className="flex flex-col gap-2 md:gap-0">
+                  {/* Row 1 on mobile, left side on desktop: Avatar + Name */}
+                  <div className="relative flex items-center md:hidden">
+                    <div className="flex items-center gap-2">
+                      <RaffeAnimated
+                        idPrefix={`bet-${(viewingRaceId ?? 0n).toString()}-${lane}-${(laneTokenIds[lane] ?? 0n).toString()}`}
+                        tokenId={laneTokenIds[lane] ?? 0n}
+                        playbackRate={1}
+                        playing={false}
+                        sizePx={40}
+                      />
+                      <div className="flex flex-col items-start">
+                        <span className="text-sm font-medium">
+                          {lineupFinalized && parsedRaffes?.tokenIds?.[lane] && parsedRaffes.tokenIds[lane] !== 0n ? (
+                            <LaneName tokenId={parsedRaffes.tokenIds[lane]} fallback={`Lane ${lane}`} />
+                          ) : (
+                            `Lane ${lane}`
+                          )}
+                        </span>
+                        {betMarkers.length > 0 && (
+                          <div className="flex gap-0.5">
+                            {betMarkers.map(m => (
+                              <span key={m.label} className={`badge badge-xs ${m.color}`}>
+                                {m.label}
+                              </span>
+                            ))}
+                          </div>
                         )}
-                      </span>
-                      {betMarkers.length > 0 && (
-                        <div className="flex gap-0.5">
-                          {betMarkers.map(m => (
-                            <span key={m.label} className={`badge badge-xs ${m.color}`}>
-                              {m.label}
-                            </span>
-                          ))}
-                        </div>
-                      )}
+                      </div>
                     </div>
                   </div>
 
-                  {/* Middle: Bet buttons */}
-                  <div className="flex gap-1 flex-1 justify-center">
-                    {renderCompactBetButton(
-                      lane,
-                      BET_TYPE.WIN,
-                      "Win",
-                      winOddsLabelForLane(lane),
-                      !raffeRaceContract || !connectedAddress || !canBet || !isViewingLatest,
-                    )}
-                    {renderCompactBetButton(
-                      lane,
-                      BET_TYPE.PLACE,
-                      "Place",
-                      placeOddsLabelForLane(lane),
-                      !raffeRaceContract || !connectedAddress || !canBet || !isViewingLatest,
-                    )}
-                    {renderCompactBetButton(
-                      lane,
-                      BET_TYPE.SHOW,
-                      "Show",
-                      showOddsLabelForLane(lane),
-                      !raffeRaceContract || !connectedAddress || !canBet || !isViewingLatest,
-                    )}
+                  {/* Row 2 on mobile: Bet buttons + Stats */}
+                  <div className="flex items-center justify-between md:hidden">
+                    <div className="flex gap-1">
+                      {renderCompactBetButton(
+                        lane,
+                        BET_TYPE.WIN,
+                        "Win",
+                        winOddsLabelForLane(lane),
+                        !raffeRaceContract || !connectedAddress || !canBet || !isViewingLatest,
+                      )}
+                      {renderCompactBetButton(
+                        lane,
+                        BET_TYPE.PLACE,
+                        "Place",
+                        placeOddsLabelForLane(lane),
+                        !raffeRaceContract || !connectedAddress || !canBet || !isViewingLatest,
+                      )}
+                      {renderCompactBetButton(
+                        lane,
+                        BET_TYPE.SHOW,
+                        "Show",
+                        showOddsLabelForLane(lane),
+                        !raffeRaceContract || !connectedAddress || !canBet || !isViewingLatest,
+                      )}
+                    </div>
+                    <div className="flex flex-col items-end text-[10px] opacity-70 leading-tight">
+                      <span>Zip:{laneStats[lane]?.zip ?? 10}</span>
+                      <span>Moxie:{laneStats[lane]?.moxie ?? 10}</span>
+                      <span>Hustle:{laneStats[lane]?.hustle ?? 10}</span>
+                    </div>
                   </div>
 
-                  {/* Right: Stats */}
-                  <div className="flex flex-col items-end text-[10px] opacity-70 flex-shrink-0 leading-tight">
-                    <span>Zip:{laneStats[lane]?.zip ?? 10}</span>
-                    <span>Moxie:{laneStats[lane]?.moxie ?? 10}</span>
-                    <span>Hustle:{laneStats[lane]?.hustle ?? 10}</span>
+                  {/* Desktop layout: Single row */}
+                  <div className="relative hidden md:flex items-center">
+                    <div className="flex items-center gap-2">
+                      <RaffeAnimated
+                        idPrefix={`bet-desktop-${(viewingRaceId ?? 0n).toString()}-${lane}-${(laneTokenIds[lane] ?? 0n).toString()}`}
+                        tokenId={laneTokenIds[lane] ?? 0n}
+                        playbackRate={1}
+                        playing={false}
+                        sizePx={40}
+                      />
+                      <div className="flex flex-col items-start">
+                        <span className="text-sm font-medium">
+                          {lineupFinalized && parsedRaffes?.tokenIds?.[lane] && parsedRaffes.tokenIds[lane] !== 0n ? (
+                            <LaneName tokenId={parsedRaffes.tokenIds[lane]} fallback={`Lane ${lane}`} />
+                          ) : (
+                            `Lane ${lane}`
+                          )}
+                        </span>
+                        {betMarkers.length > 0 && (
+                          <div className="flex gap-0.5">
+                            {betMarkers.map(m => (
+                              <span key={m.label} className={`badge badge-xs ${m.color}`}>
+                                {m.label}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="absolute left-1/2 -translate-x-1/2 flex gap-1">
+                      {renderCompactBetButton(
+                        lane,
+                        BET_TYPE.WIN,
+                        "Win",
+                        winOddsLabelForLane(lane),
+                        !raffeRaceContract || !connectedAddress || !canBet || !isViewingLatest,
+                      )}
+                      {renderCompactBetButton(
+                        lane,
+                        BET_TYPE.PLACE,
+                        "Place",
+                        placeOddsLabelForLane(lane),
+                        !raffeRaceContract || !connectedAddress || !canBet || !isViewingLatest,
+                      )}
+                      {renderCompactBetButton(
+                        lane,
+                        BET_TYPE.SHOW,
+                        "Show",
+                        showOddsLabelForLane(lane),
+                        !raffeRaceContract || !connectedAddress || !canBet || !isViewingLatest,
+                      )}
+                    </div>
+
+                    <div className="ml-auto flex flex-col items-end text-[10px] opacity-70 leading-tight">
+                      <span>Zip:{laneStats[lane]?.zip ?? 10}</span>
+                      <span>Moxie:{laneStats[lane]?.moxie ?? 10}</span>
+                      <span>Hustle:{laneStats[lane]?.hustle ?? 10}</span>
+                    </div>
                   </div>
                 </div>
               </div>
